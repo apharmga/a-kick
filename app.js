@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, doc, getDocs, getDoc, setDoc, deleteDoc, writeBatch, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -67,7 +67,8 @@ onAuthStateChanged(auth, async (u) => {
     let ok = false; try { ok = sessionStorage.getItem('afutsal_pin_' + CID) === '1'; } catch (e) {}
     if (ok) { S.unlocked = true; return loadAll(); }
     const cfg = await getDoc(D('config', 'main'));
-    pinGate(cfg.exists() ? cfg.data().pinHash : '');
+    if (!cfg.exists()) { S.unlocked = true; return loadAll(); }        // 방금 만든 팀: 비밀번호는 설정 마법사에서 정함
+    pinGate(cfg.data().pinHash || '');
   } catch (e) { deny(u, e.message); }
 });
 function deny(u, msg) {
@@ -76,7 +77,8 @@ function deny(u, msg) {
 function pinGate(hash) {
   $('#app').innerHTML = '<div class="center"><div class="logo" style="font-size:26px">' + esc(S.club.name) + '</div><div class="muted">관리자 전용 페이지</div>' +
     '<label class="f" style="width:240px">관리자 비밀번호<input id="pin" class="pinbox" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off"></label>' +
-    '<div class="muted">숫자 4자리를 입력하면 바로 들어가요</div><a class="muted" href="./?c=' + CID + '">회원 화면으로 돌아가기</a></div>';
+    '<div class="muted">' + (hash ? '숫자 4자리를 입력하면 바로 들어가요' : '처음 비밀번호는 0000이에요 · 설정에서 바꿀 수 있어요') + '</div>' +
+    '<button class="btn ghost" id="pinlost">비밀번호를 잊었어요</button><a class="muted" href="./?c=' + CID + '">회원 화면으로 돌아가기</a></div>';
   const inp = $('#pin'); inp.focus();
   let wrongT = null;
   const ok = async () => (await pinHash(inp.value.trim())) === (hash || PIN_DEFAULT);
@@ -86,6 +88,15 @@ function pinGate(hash) {
   inp.oninput = async () => {
     inp.value = inp.value.replace(/\D/g, ''); clearTimeout(wrongT);
     if (inp.value.length === 4) { if (await ok()) return enter(); wrongT = setTimeout(() => { if (inp.value.length === 4) wrong(); }, 700); }
+  };
+  // 잊었을 때: 팀을 만든 구글 계정으로 한 번 더 로그인하면 새 비밀번호를 정할 수 있음
+  $('#pinlost').onclick = async () => {
+    try { const r = await signInWithPopup(auth, new GoogleAuthProvider()); if (r.user.uid !== S.club.owner) return toast('팀을 만든 구글 계정으로 로그인해 주세요'); }
+    catch (e) { return toast('확인을 취소했어요'); }
+    const np = prompt('새 관리자 비밀번호 (숫자 4자리)') || '';
+    if (!/^\d{4}$/.test(np)) return toast('숫자 4자리로 해주세요');
+    await setDoc(D('config', 'main'), { pinHash: await pinHash(np) }, { merge: true }).catch(fail);
+    toast('비밀번호를 바꿨어요'); enter();
   };
   inp.onkeydown = async (e) => { if (e.key === 'Enter' && inp.value) { clearTimeout(wrongT); if (await ok()) enter(); else wrong(); } };
 }
@@ -104,7 +115,7 @@ async function loadAll() {
     S.claims = {}; S.goals = []; S.polls = []; S.pvotes = []; S.avotes = []; S.sugs = [];
     const live = (col, key) => onSnapshot(CL(col), (q) => { S[key] = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); if (S.view === 'polls') render(); if (key === 'sugs' || key === 'reqs') render(); }, () => {});
     if (!S.pollSub) S.pollSub = [live('polls', 'polls'), live('pollvotes', 'pvotes'), live('anonvotes', 'avotes'), live('suggest', 'sugs'), live('requests', 'reqs')];
-    getDocs(CL('claims')).then((q) => q.docs.forEach((d) => (S.claims[d.id] = d.data()))).catch(() => {});
+    getDocs(CL('claims')).then((q) => { q.docs.forEach((d) => (S.claims[d.id] = d.data())); S.claimsLoaded = true; if (S.view === 'week') render(); }).catch(() => {});
     if (!S.goalSub) S.goalSub = onSnapshot(CL('goals'), (q) => { S.goals = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); if (S.view === 'stats') render(); }, () => {});
     render();
     if (!S.voteSub) S.voteSub = onSnapshot(CL('votes'), (snap) => {
@@ -130,7 +141,7 @@ function timeVal(root, id) { const el = root.querySelector('#' + id); return Str
 
 /* ---------------- 처음 시작: 폰에서 4단계로 끝내는 팀 설정 ---------------- */
 function renderSetup() {
-  const W = S.wiz = S.wiz || { step: 1, sport: '', dow: 0, time: '16:00', place: '', fee: 30000, guestFee: 10000, account: '', me: '', names: '' };
+  const W = S.wiz = S.wiz || { step: 1, sport: '', dow: 0, time: '16:00', place: '', fee: 30000, guestFee: 10000, account: '', me: '', names: '', pin: '' };
   const DOW = '일월화수목금토';
   const chip = (attr, val, on, label) => '<button class="wchip' + (on ? ' on' : '') + '" ' + attr + '="' + val + '">' + label + '</button>';
   const steps = ['종목', '경기', '회비', '회원'];
@@ -146,15 +157,17 @@ function renderSetup() {
     '<div class="wl">모임통장 계좌 (선택 · 회원 화면에 복사 버튼으로 떠요)</div><input class="win" id="wa" placeholder="예: 카카오뱅크 3333-00-0000000" value="' + esc(W.account) + '">';
   if (W.step === 4) body = '<h2>회원을 넣어주세요</h2><div class="wl">내 이름 (관리자도 회원으로 참여)</div><input class="win" id="wme" placeholder="예: 홍길동" value="' + esc(W.me) + '">' +
     '<div class="wl">다른 회원 이름 (한 줄에 한 명 · 나중에 추가해도 돼요)</div><textarea class="win" id="wn" rows="6" placeholder="김철수&#10;이영희&#10;박민수">' + esc(W.names) + '</textarea>' +
-    '<div class="muted">회원은 나중에 링크로 가입 신청 → 승인으로 들어와요. 여기 이름을 넣어두면 승인할 때 자동으로 연결돼요.</div>';
+    '<div class="muted">회원은 나중에 링크로 가입 신청 → 승인으로 들어와요. 여기 이름을 넣어두면 승인할 때 자동으로 연결돼요.</div>' +
+    '<div class="wl">관리자 비밀번호 (숫자 4자리)</div><input class="win" id="wpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="회원은 모르는 숫자로" value="' + esc(W.pin) + '">' +
+    '<div class="muted">관리자 화면에 들어갈 때 써요. 잊어도 구글 계정으로 다시 정할 수 있어요.</div>';
   $('#app').innerHTML = '<div class="wiz"><div class="wtop"><b>' + esc(S.club.name) + '</b><span>팀 설정 ' + W.step + ' / 4</span></div>' +
     '<div class="wbar">' + steps.map((t, i) => '<i class="' + (i < W.step ? 'on' : '') + '"></i>').join('') + '</div>' + body +
     '<div class="wnav">' + (W.step > 1 ? '<button class="wback" id="wprev">이전</button>' : '') + '<button class="wnext" id="wnext">' + (W.step < 4 ? '다음' : '시작하기 🎉') + '</button></div>' +
     (W.step === 1 ? '<details class="wold"><summary>PC에서 엑셀로 가져오기 · 기타</summary><div class="setup3"><button class="scard" id="s1"><b>빈 상태로 시작</b><span>설정 없이 바로 시작</span></button>' +
       '<label class="scard"><b>구글시트 엑셀 가져오기</b><span>A-KICK 전용 구글시트 양식만 가능</span><input type="file" accept=".xlsx" id="f" hidden></label>' +
-      '<button class="scard" id="s3" hidden><b>예전 A-FUTSAL 데이터 옮기기</b><span>도남풋살에서 쓰던 데이터 그대로</span></button></div></details>' : '') + '</div>';
+      '</div></details>' : '') + '</div>';
   const save = () => { const g = (id) => { const e = $(id); return e ? e.value.trim() : null; };
-    if (W.step === 2) { W.time = timeVal(document, 'wt'); W.place = g('#wp'); } if (W.step === 3) W.account = g('#wa'); if (W.step === 4) { W.me = g('#wme'); W.names = $('#wn').value; } };
+    if (W.step === 2) { W.time = timeVal(document, 'wt'); W.place = g('#wp'); } if (W.step === 3) W.account = g('#wa'); if (W.step === 4) { W.me = g('#wme'); W.names = $('#wn').value; W.pin = g('#wpin'); } };
   document.querySelectorAll('[data-sport]').forEach((b) => (b.onclick = () => { W.sport = b.dataset.sport; renderSetup(); }));
   document.querySelectorAll('[data-dow]').forEach((b) => (b.onclick = () => { save(); W.dow = +b.dataset.dow; renderSetup(); }));
   document.querySelectorAll('[data-fee]').forEach((b) => (b.onclick = () => { save(); W.fee = +b.dataset.fee; renderSetup(); }));
@@ -164,22 +177,23 @@ function renderSetup() {
     save();
     if (W.step === 1 && !W.sport) return toast('풋살인지 축구인지 골라주세요');
     if (W.step === 4 && !W.me) return toast('내 이름을 넣어주세요');
+    if (W.step === 4 && !/^\d{4}$/.test(W.pin || '')) return toast('관리자 비밀번호를 숫자 4자리로 정해주세요');
     if (W.step < 4) { W.step++; return renderSetup(); }
     $('#wnext').disabled = true; $('#wnext').textContent = '만드는 중...';
     await finishSetup(W);
   };
   const f = $('#f'); if (f) f.onchange = (e) => e.target.files[0] && readOld(e.target.files[0]);
-  const s1 = $('#s1'); if (s1) s1.onclick = async () => { S.cfg = baseCfg(); await setDoc(D('config', 'main'), S.cfg); toast('시작했어요 · 톱니바퀴에서 회비·계좌를 먼저 넣어주세요', 6000); loadAll(); };
-  if (W.step === 1) getDoc(doc(db, 'config', 'main')).then((d) => { if (d.exists() && $('#s3')) { $('#s3').hidden = false; $('#s3').onclick = moveLegacy; } }).catch(() => {});
+  const s1 = $('#s1'); if (s1) s1.onclick = async () => { S.cfg = baseCfg(); await setDoc(D('config', 'main'), S.cfg); toast('시작했어요 · 관리자 비밀번호는 0000이에요. 톱니바퀴에서 바꿔주세요', 7000); loadAll(); };
 }
 function baseCfg() { return { fee: 30000, guestFee: 10000, oneOff: 120000, rentPerGame: 0, cap: 12, time: '16:00', before: 7, after: 1, nextMonthDay: 25, dueDay: 30, reserve: 0, openChat: '', place: '', account: '', perSide: 5, maxSide: 6, dow: 0 }; }
 async function finishSetup(W) {
   const soccer = W.sport === 'soccer';
   S.cfg = Object.assign(baseCfg(), { fee: W.fee, guestFee: W.guestFee, account: W.account, place: W.place, time: W.time, dow: W.dow,
-    perSide: soccer ? 11 : 5, maxSide: soccer ? 11 : 6, cap: soccer ? 22 : 12, sport: W.sport });
+    perSide: soccer ? 11 : 5, maxSide: soccer ? 11 : 6, cap: soccer ? 22 : 12, sport: W.sport, pinHash: await pinHash(W.pin) });
+  try { sessionStorage.setItem('afutsal_pin_' + CID, '1'); } catch (e) {}
   const names = [W.me].concat(W.names.split(/[\n,]/).map((x) => x.trim()).filter(Boolean)).filter((x, i, a) => a.indexOf(x) === i).slice(0, 80);
   const list = [['config', 'main', S.cfg]];
-  names.forEach((n, i) => list.push(['members', 'M' + String(i + 1).padStart(3, '0'), { id: 'M' + String(i + 1).padStart(3, '0'), name: n, join: today(), quit: '', state: '활동', fee: 0, payers: [n] }]));
+  names.forEach((n, i) => list.push(['members', 'M' + String(i + 1).padStart(3, '0'), { id: 'M' + String(i + 1).padStart(3, '0'), name: n, join: today().substr(0, 7) + '-01', quit: '', state: '활동', fee: 0, payers: [n] }]));
   // 첫 경기: 오늘 이후 가장 가까운 정기 요일
   const d = new Date(today() + 'T00:00:00'); d.setDate(d.getDate() + ((W.dow - d.getDay() + 7) % 7));
   const gd = C.ymd(d);
@@ -189,17 +203,6 @@ async function finishSetup(W) {
   list.push(['users', S.uid, { mid: 'M001', name: W.me, at: Date.now() }]);
   try { await batchPut(list); } catch (e) { toast('저장 실패: ' + e.message, 6000); return renderSetup(); }
   S.wiz = null; toast('팀 준비 완료! 이번 주 경기도 만들어 뒀어요 ⚽', 6000); loadAll();
-}
-async function moveLegacy() {
-  $('#s3').disabled = true; $('#s3').querySelector('b').textContent = '옮기는 중... (10초쯤)';
-  const [cfg, ms, gs, ts, sk] = await Promise.all([getDoc(doc(db, 'config', 'main')), getDocs(collection(db, 'members')), getDocs(collection(db, 'games')), getDocs(collection(db, 'tx')), getDoc(doc(db, 'private', 'skills'))]);
-  const list = [];
-  ms.docs.forEach((d) => list.push(['members', d.id, d.data()]));
-  gs.docs.forEach((d) => list.push(['games', d.id, d.data()]));
-  ts.docs.forEach((d) => list.push(['tx', d.id, d.data()]));
-  if (sk.exists()) list.push(['private', 'skills', sk.data()]);
-  list.push(['config', 'main', cfg.data()]);
-  await batchPut(list); toast('옮겼어요! 회원 ' + ms.size + '명 · 거래 ' + ts.size + '건', 6000); loadAll();
 }
 async function readOld(file) {
   try {
@@ -239,7 +242,8 @@ function attOf(g) {
   return [...out];
 }
 const cfgC = () => Object.assign({ before: 7, after: 1, nextMonthDay: 25 }, S.cfg);
-function payYM() { return C.addYM(today().substr(0, 7), 1); }
+// 지금 걷는 회비의 달: '다음 달분 시작일'(기본 25일)부터는 다음 달, 그 전엔 이번 달
+function payYM() { const t = today(); return +t.substr(8, 2) >= ((S.cfg && S.cfg.nextMonthDay) || 25) ? C.addYM(t.substr(0, 7), 1) : t.substr(0, 7); }
 function activeAt(date) { return S.members.filter((m) => m.state !== '탈퇴' && (!m.join || m.join <= date) && (!m.quit || m.quit >= date)); }
 function partLabel(t) {
   if (t.state === '무시') return t.reason || '제외';
@@ -280,6 +284,14 @@ function render() {
 }
 
 /* ---- 이번 주 ---- */
+/** 새 팀 첫 화면: 무엇부터 할지 안내 (회원이 2명 이상 들어오면 사라짐) */
+function startGuide() {
+  if (!S.claimsLoaded || Object.keys(S.claims || {}).length > 1) return '';
+  return '<section class="panel pad sguide"><b>처음이면 이 순서로 시작하세요</b><ol>' +
+    '<li><button class="btn sm pri" id="mlink2">' + IC.copy + ' 회원 초대 문구 복사</button> → 팀 카톡방에 붙여넣기</li>' +
+    '<li>가입 신청이 오면 위 <b>회원 · 회비</b> 탭에 빨간 숫자가 떠요 → 이름 확인하고 <b>승인</b></li>' +
+    '<li>카카오뱅크 모임통장 거래내역 엑셀을 <b>거래내역 엑셀 넣기</b>로 올리면 회비·게스트비가 자동으로 체크돼요</li></ol></section>';
+}
 function weekHTML() {
   const days = [...Array(7)].map((_, i) => C.addDays(S.week, i));
   const need = S.txs.filter((t) => t.state === '확인필요');
@@ -315,7 +327,7 @@ function weekHTML() {
     (curMiss.length ? '<div class="sum bad"><span>' + mon(cur) + ' 회비 아직 안 냄</span><b>' + curMiss.length + '<em>명</em></b><small>' + esc(curMiss.join(', ')) + '</small></div>' : '') +
     (rent ? '<div class="sum"><span>' + md(ym + '-01') + ' 구장비 (' + C.gamesInMonth(S.games, ym).length + '경기)</span><b>' + won(rent) + '<em>원</em></b><small>' + (rentPaid ? '납부 완료' : '아직 안 냄') + '</small></div>' : '') +
     '</div>';
-  return head + '<div class="wk"><div class="wk-main"><section class="panel txpanel"><div class="g-lbl2">이번 주 입출금 ' + txN + '건 <small>눌러서 자세히 보기·고치기</small></div>' + (rows || '<div class="empty">이번 주 입출금이 없어요</div>') + '</section>' + teamBox + '</div>' +
+  return head + startGuide() + '<div class="wk"><div class="wk-main"><section class="panel txpanel"><div class="g-lbl2">이번 주 입출금 ' + txN + '건 <small>눌러서 자세히 보기·고치기</small></div>' + (rows || '<div class="empty">이번 주 입출금이 없어요</div>') + '</section>' + teamBox + '</div>' +
     '<div class="wk-side">' + side + foot + '</div></div>';
 }
 function txHTML(t) {
@@ -408,7 +420,7 @@ function bindWeek() {
   document.querySelectorAll('[data-team]').forEach((b) => (b.onclick = () => { S.gid = b.dataset.team; S.view = 'team'; S.pick = null; render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-newgame]').forEach((b) => (b.onclick = () => newGameAsk(b.dataset.newgame)));
   document.querySelectorAll('[data-dl]').forEach((b) => (b.onclick = () => editDeadline(b.dataset.dl)));
-  const ml = $('#mlink'); if (ml) ml.onclick = () => copy('⚽ ' + S.club.name + ' 온라인 라커룸에 초대합니다\n' + MEMBER_URL + '\n\n① 링크 열고 구글 로그인\n② 내 실명 쓰고 가입 신청\n③ 관리자 승인 후 바로 입장 🙌\n\n카톡에서 로그인이 안 되면 \'사파리/크롬으로 열기\' 버튼을 눌러주세요.');
+  const ml = $('#mlink'), ml2 = $('#mlink2'); if (ml2) ml2.onclick = () => ml.click(); if (ml) ml.onclick = () => copy('⚽ ' + S.club.name + ' 온라인 라커룸에 초대합니다\n' + MEMBER_URL + '\n\n① 링크 열고 구글 로그인\n② 내 실명 쓰고 가입 신청\n③ 관리자 승인 후 바로 입장 🙌\n\n카톡에서 로그인이 안 되면 \'사파리/크롬으로 열기\' 버튼을 눌러주세요.');
   $('#dues').onclick = duesText;
   const tw = $('#tw'); if (tw) tw.onclick = () => { S.week = monday(today()); render(); };
 }
@@ -973,7 +985,7 @@ function openSettingsReal() {
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
     themeHTML() +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
-    '<div class="muted" style="margin-top:8px">A-KICK v0.24</div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK v0.25</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
     bindTheme(m);

@@ -3,17 +3,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
 
-    // 예전(v0.5까지) 도남풋살 데이터: 옮기기용으로 형님 계정만 읽기
-    function legacy() {
-      return signedIn() && request.auth.token.email == 'apharmga@gmail.com'
-        && request.auth.token.email_verified == true;
-    }
-    match /config/{d}  { allow read: if legacy(); }
-    match /members/{d} { allow read: if legacy(); }
-    match /games/{d}   { allow read: if legacy(); }
-    match /tx/{d}      { allow read: if legacy(); }
-    match /private/{d} { allow read: if legacy(); }
-
     // 내 팀 목록 (본인만)
     match /me/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;

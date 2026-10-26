@@ -74,7 +74,6 @@
       else if (cls === '회비') {
         var ns = names(tName); if (!ns.length) ns = [t.desc];
         var due = ns.reduce(function (a, n) { var m = members.filter(function (x) { return x.name === n; })[0]; return a + ((m && m.fee) || cfg.fee); }, 0);
-        if (ym && ym < '2026-11') due = ns.length * 40000;            // 10월분까지는 월 4만원
         if (/중간가입/.test(note)) due = t.amt;
         if (t.amt > due && (t.amt - due) % cfg.guestFee === 0) {
           var ng = C.nextGameAfter(games, t.dt);
