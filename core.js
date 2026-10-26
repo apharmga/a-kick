@@ -55,18 +55,20 @@
   function txId(dt, amt, desc, bal) { return md5(dt + '|' + amt + '|' + desc + '|' + bal).substr(0, 12); }
 
   /* ---------- 카카오뱅크 엑셀 읽기 (rows = 2차원 배열) ---------- */
-  function parseBankRows(rows) {
+  function parseBankRows(rows, map) {
     var hr = -1, idx = {};
     for (var r = 0; r < rows.length && hr < 0; r++) {
       for (var c = 0; c < rows[r].length; c++) {
         if (String(rows[r][c] == null ? '' : rows[r][c]).replace(/\s/g, '') === '거래일시') { hr = r; break; }
       }
     }
-    if (hr < 0) throw new Error('엑셀에서 "거래일시" 칸을 찾지 못했어요. 카카오뱅크 거래내역 엑셀이 맞는지 확인해 주세요.');
-    rows[hr].forEach(function (h, c) { var k = String(h == null ? '' : h).replace(/\s/g, ''); if (k) idx[k] = c; });
-    ['거래일시', '구분', '거래금액', '거래후잔액'].forEach(function (k) {
-      if (idx[k] === undefined) throw new Error('엑셀에 "' + k + '" 칸이 없어요.');
-    });
+    if (hr >= 0) rows[hr].forEach(function (h, c) { var k = String(h == null ? '' : h).replace(/\s/g, ''); if (k) idx[k] = c; });
+    // 카카오뱅크 양식이 아니면 → 다른 은행 자동 인식 (카카오는 예전과 똑같이 읽어서 거래 번호가 바뀌지 않게)
+    if (hr < 0 || ['구분', '거래금액', '거래후잔액'].some(function (k) { return idx[k] === undefined; })) {
+      var g0 = map || guessBank(rows);
+      if (!g0) { var e = new Error('통장 엑셀의 칸을 자동으로 못 찾았어요'); e.code = 'NEED_MAP'; throw e; }
+      return parseWith(rows, g0);
+    }
     var out = [];
     for (var i = hr + 1; i < rows.length; i++) {
       var row = rows[i], raw = row[idx['거래일시']];
@@ -78,6 +80,75 @@
       out.push({ id: txId(dt, amt, desc, bal), dt: dt, kind: g('구분'), amt: amt, bal: bal,
                  type: g('거래구분'), desc: desc, memo: g('메모') });
     }
+    return out;
+  }
+
+  /* ---------- 다른 은행 통장 엑셀: 칸 이름으로 자동 인식 ---------- */
+  var BANKCOL = {
+    dt: ['거래일시', '거래일자', '거래일', '일자', '날짜', '거래날짜', '일시', '처리일시', '거래일자및시간', '거래일시분'],
+    tm: ['거래시간', '시간', '시각', '거래시각'],
+    in: ['입금액', '입금', '입금금액', '맡기신금액', '받은금액', '들어온금액', '입금된금액'],
+    out: ['출금액', '출금', '출금금액', '지급', '찾으신금액', '보낸금액', '지급금액', '나간금액', '출금된금액'],
+    amt: ['거래금액', '금액', '이체금액'],
+    kind: ['구분', '입출금구분', '입출구분', '입/출금', '입출금', '거래유형'],
+    desc: ['보낸분/받는분', '상대계좌예금주명', '거래기록사항', '받는분/보낸분', '입금자명', '입금자', '상대방', '상대방명', '거래처', '의뢰인/수취인', '기재내용', '통장표시내용', '받는분', '보낸분', '내용', '거래내용', '적요'],
+    bal: ['거래후잔액', '잔액', '거래후잔고', '잔고', '남은금액'],
+    memo: ['메모', '비고'],
+    type: ['거래구분', '거래종류', '적요', '거래방법']
+  };
+  var hnorm = function (v) { return String(v == null ? '' : v).replace(/\s|\(원\)|\(₩\)|\*/g, ''); };
+  function colsOf(head) {
+    var c = {}, used = {};
+    ['dt', 'tm', 'in', 'out', 'amt', 'bal', 'desc', 'kind', 'memo', 'type'].forEach(function (k) {
+      for (var j = 0; j < BANKCOL[k].length && c[k] === undefined; j++) {
+        for (var i = 0; i < head.length; i++) if (!used[i] && hnorm(head[i]) === BANKCOL[k][j]) { c[k] = i; used[i] = 1; break; }
+      }
+    });
+    return c;
+  }
+  function guessBank(rows) {
+    for (var r = 0; r < Math.min(rows.length, 40); r++) {
+      var c = colsOf(rows[r] || []);
+      if (c.dt !== undefined && (c.amt !== undefined || c.in !== undefined || c.out !== undefined) && c.desc !== undefined) return { hr: r, c: c };
+    }
+    return null;
+  }
+  function bankDt(v, t) {
+    if (v == null || v === '') return '';
+    var d = '', tm = '';
+    if (v instanceof Date) { d = dtStr(v); if (t == null || t === '') return d; d = d.substr(0, 10); }
+    else if (typeof v === 'number' && v > 20000 && v < 80000) { var x = new Date(Math.round((v - 25569) * 864e5)); var s0 = new Date(x.getTime() + x.getTimezoneOffset() * 6e4); d = dtStr(s0); if (t == null || t === '') return d; d = d.substr(0, 10); }
+    else {
+      var s = String(v).trim(), m = s.match(/(\d{4})\D?(\d{1,2})\D?(\d{1,2})(?:\D+(\d{1,2}):?(\d{2})(?::?(\d{2}))?)?/);
+      if (!m) return '';
+      d = m[1] + '.' + pad(+m[2]) + '.' + pad(+m[3]);
+      if (m[4] !== undefined) tm = pad(+m[4]) + ':' + m[5] + ':' + (m[6] || '00');
+    }
+    if (!tm && t != null && t !== '') {
+      if (t instanceof Date) tm = pad(t.getHours()) + ':' + pad(t.getMinutes()) + ':' + pad(t.getSeconds());
+      else if (typeof t === 'number' && t < 1) { var sec = Math.round(t * 86400); tm = pad(Math.floor(sec / 3600)) + ':' + pad(Math.floor(sec % 3600 / 60)) + ':' + pad(sec % 60); }
+      else { var q = String(t).replace(/\D/g, ''); if (q.length >= 4) tm = q.substr(0, 2) + ':' + q.substr(2, 2) + ':' + (q.substr(4, 2) || '00'); }
+    }
+    return d.length === 10 ? d + ' ' + (tm || '00:00:00') : d;
+  }
+  function parseWith(rows, g) {
+    var c = g.c, out = [];
+    var cell = function (row, k) { return c[k] !== undefined && row[c[k]] != null ? String(row[c[k]]).trim() : ''; };
+    for (var i = g.hr + 1; i < rows.length; i++) {
+      var row = rows[i] || [], dt = bankDt(row[c.dt], c.tm !== undefined ? row[c.tm] : null);
+      if (!/^\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}$/.test(dt)) continue;
+      var vi = c.in !== undefined ? Math.abs(num(row[c.in])) : 0, vo = c.out !== undefined ? Math.abs(num(row[c.out])) : 0, kind = '', amt = 0;
+      if (vi || vo) { kind = vi ? '입금' : '출금'; amt = vi || vo; }
+      else if (c.amt !== undefined) {
+        var a = num(row[c.amt]), k = cell(row, 'kind');
+        if (!a) continue;
+        kind = a < 0 || /출|지급|^-$/.test(k) ? '출금' : '입금'; amt = Math.abs(a);
+      }
+      if (!amt) continue;
+      var desc = cell(row, 'desc'), bal = c.bal !== undefined ? num(row[c.bal]) : 0;
+      out.push({ id: txId(dt, amt, desc, bal), dt: dt, kind: kind, amt: amt, bal: bal, type: cell(row, 'type'), desc: desc, memo: cell(row, 'memo') });
+    }
+    if (!out.length) { var e = new Error('통장 엑셀에서 거래를 하나도 못 읽었어요'); e.code = 'NEED_MAP'; throw e; }
     return out;
   }
   function num(v) { if (typeof v === 'number') return v; var s = String(v == null ? '' : v).replace(/[^\d.-]/g, ''); return s ? +s : 0; }
@@ -445,8 +516,8 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.39';
-  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
+  var VERSION = 'v0.40';
+  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
     balance: balance, book: book, nearestGame: nearestGame, nextGameAfter: nextGameAfter, gamesInMonth: gamesInMonth,

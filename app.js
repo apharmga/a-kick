@@ -283,7 +283,7 @@ function render() {
   const tab = (k, l) => '<button class="tab' + (v === k ? ' on' : '') + '" data-v="' + k + '">' + l + '</button>';
   const nav = '<header class="bar"><div class="bar-in"><a class="logo" href="./?c=' + CID + '" title="홈으로">' + esc(S.club.name) + '<small>관리자</small></a><nav class="tabs" aria-label="메뉴">' + tab('week', '이번 주') + tab('members', '회원 · 회비' + ((S.reqs || []).length ? ' <em class="badge">' + S.reqs.length + '</em>' : '')) + tab('ledger', '장부') + tab('stats', '경기기록') + tab('polls', '투표 · 건의' + (newSugs() ? ' <em class="badge">' + newSugs() + '</em>' : '')) + '</nav>' +
     '<div class="stats"><div class="stat"><span>통장 잔액</span><b>' + won(C.balance(S.txs)) + '<em>원</em></b></div><div class="stat"><span>' + mon(ym) + ' 회비</span><b>' + list.filter((m) => paid[m.name]).length + '<em> / ' + list.length + '명</em></b></div></div>' +
-    '<label class="btn pri up">' + IC.up + '<span>거래내역 엑셀 넣기</span><input type="file" accept=".xlsx,.xls" id="up" hidden></label>' +
+    '<label class="btn pri up">' + IC.up + '<span>거래내역 엑셀 넣기</span><input type="file" accept=".xlsx,.xls,.csv" id="up" hidden></label>' +
     '<a class="btn" href="./?c=' + CID + '">' + IC.home + ' 홈</a><button class="iconbtn" id="gear" aria-label="설정">' + IC.gear + '</button></div></header>';
   const body = v === 'week' ? weekHTML() : v === 'members' ? membersHTML() : v === 'team' ? teamHTML() : v === 'stats' ? statsHTML() : v === 'polls' ? pollsHTML() : ledgerHTML();
   $('#app').innerHTML = nav + '<main class="wrap">' + body + '</main>';
@@ -820,11 +820,60 @@ function bindManualTools(m, t) {
 }
 
 /* ---- 카카오뱅크 엑셀 넣기 ---- */
-async function importBank(file) {
+/* 통장 엑셀 읽기: xlsx·xls·csv(한글 깨짐 자동 처리) · 비밀번호 걸린 파일 안내 */
+async function bankRows(file) {
+  const buf = await file.arrayBuffer();
+  let wb;
   try {
-    const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
-    const parsed = C.parseBankRows(rows);
+    if (/\.csv$/i.test(file.name)) {
+      let txt = new TextDecoder('utf-8').decode(buf);
+      if (txt.indexOf('\uFFFD') >= 0) txt = new TextDecoder('euc-kr').decode(buf);
+      wb = XLSX.read(txt, { type: 'string', cellDates: true });
+    } else wb = XLSX.read(buf, { cellDates: true });
+  } catch (e) {
+    if (/password|encrypt|ECMA-376|CFB/i.test(e.message)) throw new Error('비밀번호가 걸린 엑셀이에요. 엑셀에서 열고 [다른 이름으로 저장] → 비밀번호 없이 저장한 파일을 넣어주세요.');
+    throw new Error('엑셀 파일을 열지 못했어요: ' + e.message);
+  }
+  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
+}
+const hN = (v) => String(v == null ? '' : v).replace(/\s/g, '');
+/** 전에 '칸 고르기'로 알려준 은행 양식이면 그 설정으로 */
+function savedMap(rows) {
+  for (const m of (S.cfg.bankMaps || [])) {
+    const r = rows.findIndex((row) => (row || []).map(hN).join('|') === m.sig);
+    if (r >= 0) return { hr: r, c: m.c };
+  }
+  return null;
+}
+/** 자동 인식 실패 → 엑셀 첫 줄들을 보여주고 칸을 한 번만 골라주면 다음부터 자동 */
+function mapBank(rows, file) {
+  const top = rows.slice(0, 15), W = Math.min(12, Math.max(...top.map((r) => (r || []).length), 1));
+  const ROLE = [['', '안 씀'], ['dt', '날짜(일시)'], ['tm', '시간'], ['in', '입금액'], ['out', '출금액'], ['amt', '금액(±)'], ['kind', '입금/출금 구분'], ['desc', '입금자·내용'], ['bal', '잔액'], ['memo', '메모']];
+  const cellT = (v) => esc(v instanceof Date ? C.dtStr(v) : v == null ? '' : String(v)).slice(0, 22);
+  let hr = 0;
+  modal('<h2>통장 엑셀 칸 알려주기</h2><div class="muted">처음 보는 은행 양식이에요. ① 칸 제목이 있는 줄을 누르고 ② 각 칸이 무엇인지 골라주세요. 한 번만 하면 다음부터 자동으로 읽어요.</div>' +
+    '<div class="bmap"><table><tbody>' + top.map((r, i) => '<tr data-hr="' + i + '"><th>' + (i + 1) + '</th>' + [...Array(W)].map((_, j) => '<td>' + cellT((r || [])[j]) + '</td>').join('') + '</tr>').join('') + '</tbody>' +
+    '<tfoot><tr><th></th>' + [...Array(W)].map((_, j) => '<td><select data-col="' + j + '">' + ROLE.map(([k, l]) => '<option value="' + k + '">' + l + '</option>').join('') + '</select></td>').join('') + '</tr></tfoot></table></div>' +
+    '<div class="mfoot"><span class="muted" id="bmmsg">필수: 날짜 · (입금액·출금액 또는 금액) · 입금자</span><span style="flex:1"></span><button class="btn" id="bmx">취소</button><button class="btn pri" id="bmok">이걸로 읽기</button></div>', (m) => {
+    const pick = (i) => { hr = i; m.querySelectorAll('[data-hr]').forEach((tr) => tr.classList.toggle('on', +tr.dataset.hr === i)); };
+    m.querySelectorAll('[data-hr]').forEach((tr) => (tr.onclick = () => pick(+tr.dataset.hr)));
+    const g0 = C.guessBank(rows); pick(g0 ? g0.hr : 0);
+    m.querySelector('#bmx').onclick = closeModal;
+    m.querySelector('#bmok').onclick = async () => {
+      const c = {}; m.querySelectorAll('[data-col]').forEach((x) => { if (x.value) c[x.value] = +x.dataset.col; });
+      if (c.dt === undefined || c.desc === undefined || (c.in === undefined && c.out === undefined && c.amt === undefined)) return toast('날짜 · 금액 · 입금자 칸은 꼭 골라주세요');
+      try { C.parseWith(rows, { hr, c }); } catch (e) { return toast('이 설정으로는 거래를 못 읽었어요. 칸을 다시 확인해 주세요'); }
+      S.cfg.bankMaps = [{ sig: (rows[hr] || []).map(hN).join('|'), c }].concat(S.cfg.bankMaps || []).slice(0, 3);
+      await putCfg(); closeModal(); toast('이 은행 양식을 기억했어요'); importBank(file, rows);
+    };
+  });
+}
+async function importBank(file, rows0) {
+  try {
+    const rows = rows0 || await bankRows(file);
+    let parsed;
+    try { parsed = C.parseBankRows(rows, savedMap(rows)); }
+    catch (e) { if (e.code === 'NEED_MAP') return mapBank(rows, file); throw e; }
     const have = new Set(S.txs.map((t) => t.id));
     const fresh = parsed.filter((t) => !have.has(t.id)).sort((a, b) => (a.dt < b.dt ? -1 : 1));
     if (!fresh.length) return toast('새 거래가 없어요 (' + parsed.length + '건 모두 이미 있음)', 4000);
