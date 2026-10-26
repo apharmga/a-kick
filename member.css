@@ -296,3 +296,10 @@ body.noscroll{overflow:hidden}
 .vin textarea{flex:1;resize:none;border:1px solid #D5DBE7;border-radius:12px;padding:9px 11px;font:inherit;font-size:15px;max-height:110px}
 .vnow,.vsend{flex:none;border:0;border-radius:12px;min-height:40px;padding:0 10px;font:inherit;font-weight:800;cursor:pointer}
 .vnow{background:#F1F5F9;color:var(--ink);font-size:13px}.vsend{background:var(--btn,var(--navy));color:var(--on-btn,#fff)}
+.vth2{display:flex;flex-direction:column;gap:6px}
+.vkids{display:flex;flex-direction:column;gap:6px;margin-left:18px;padding-left:10px;border-left:2px solid #E2E8F0}
+.vcm.sub{background:#F8FAFC}
+.vcm.gone{color:var(--sub);font-size:13px;font-style:italic}
+.vrb{border:0;background:transparent;color:var(--sub);font:inherit;font-size:12px;font-weight:700;padding:4px 0 0;cursor:pointer}
+.vrep{display:flex;align-items:center;gap:6px;padding:6px 12px;background:#EEF2FF;color:var(--navy);font-size:13px}
+.vrep button{margin-left:auto;border:0;background:transparent;color:var(--sub);cursor:pointer}

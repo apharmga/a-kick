@@ -112,7 +112,7 @@ service cloud.firestore {
       match /vcomments/{id} {
         allow read: if isMember();
         allow create: if isMember()
-          && request.resource.data.keys().hasOnly(['vid', 'text', 'name', 'mid', 'uid', 'at'])
+          && request.resource.data.keys().hasOnly(['vid', 'text', 'name', 'mid', 'uid', 'at', 'pid'])
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.mid == myMid()
           && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;

@@ -280,7 +280,7 @@ const IC = {
 function render() {
   const v = S.view, ym = payYM(), list = C.membersFor(S.members, ym), paid = C.duesPaid(S.txs, ym);
   const tab = (k, l) => '<button class="tab' + (v === k ? ' on' : '') + '" data-v="' + k + '">' + l + '</button>';
-  const nav = '<header class="bar"><div class="bar-in"><a class="logo" href="./?c=' + CID + '" title="홈으로">' + esc(S.club.name) + '<small>관리자</small></a><nav class="tabs" aria-label="메뉴">' + tab('week', '이번 주') + tab('members', '회원 · 회비' + ((S.reqs || []).length ? ' <em class="badge">' + S.reqs.length + '</em>' : '')) + tab('ledger', '장부') + tab('stats', '스탯 · 하이라이트') + tab('polls', '투표 · 건의' + (newSugs() ? ' <em class="badge">' + newSugs() + '</em>' : '')) + '</nav>' +
+  const nav = '<header class="bar"><div class="bar-in"><a class="logo" href="./?c=' + CID + '" title="홈으로">' + esc(S.club.name) + '<small>관리자</small></a><nav class="tabs" aria-label="메뉴">' + tab('week', '이번 주') + tab('members', '회원 · 회비' + ((S.reqs || []).length ? ' <em class="badge">' + S.reqs.length + '</em>' : '')) + tab('ledger', '장부') + tab('stats', '경기기록') + tab('polls', '투표 · 건의' + (newSugs() ? ' <em class="badge">' + newSugs() + '</em>' : '')) + '</nav>' +
     '<div class="stats"><div class="stat"><span>통장 잔액</span><b>' + won(C.balance(S.txs)) + '<em>원</em></b></div><div class="stat"><span>' + mon(ym) + ' 회비</span><b>' + list.filter((m) => paid[m.name]).length + '<em> / ' + list.length + '명</em></b></div></div>' +
     '<label class="btn pri up">' + IC.up + '<span>거래내역 엑셀 넣기</span><input type="file" accept=".xlsx,.xls" id="up" hidden></label>' +
     '<a class="btn" href="./?c=' + CID + '">' + IC.home + ' 홈</a><button class="iconbtn" id="gear" aria-label="설정">' + IC.gear + '</button></div></header>';
@@ -386,7 +386,7 @@ function gameHTML(g) {
   const guests = C.guestNames(S.txs, g.id, att);
   const total = att.length + guests.length;
   const status = sideTxt(total);
-  if (g.postponed) return '<div class="game off"><div class="g-head"><b>' + md(g.date) + ' (' + C.dayName(g.date) + ') ' + esc(g.time || '') + '</b><span class="pp">' + esc(g.postponed) + '</span></div><div class="muted">이 경기는 열리지 않았어요. 출석·스탯 계산에서 빠져요.</div></div>';
+  if (g.postponed) return '<div class="game off"><div class="g-head"><b>' + md(g.date) + ' (' + C.dayName(g.date) + ') ' + esc(g.time || '') + '</b><span class="pp">' + esc(g.postponed) + '</span></div><div class="muted">이 경기는 열리지 않았어요. 출석·경기기록 계산에서 빠져요.</div></div>';
   return '<div class="game"><div class="g-head"><b>' + md(g.date) + ' (' + C.dayName(g.date) + ') ' + esc(g.time || '') + '</b><span>정원 ' + (g.cap || S.cfg.cap) + '</span></div>' +
     '<div class="g-total"><b>' + total + '</b><span>명</span><em class="' + (total >= minN() ? 'ok' : 'low') + '">' + status + '</em></div>' +
     cdHTML(g) +
@@ -408,7 +408,7 @@ function pullSrc(g) {
 async function pullGuests(gid) {
   const g = S.games.find((x) => x.id === gid), src = pullSrc(g); if (!src) return;
   const list = guestParts(src.id), n = list.filter((x) => !x.p.self).reduce((a, x) => a + (x.p.cnt || 1), 0);
-  if (!confirm(md(src.date) + ' 경기 게스트 ' + n + '명을 ' + md(g.date) + ' 경기로 옮길까요?\n\n' + md(src.date) + ' 경기는 "' + md(g.date) + '로 연기"로 표시되고, 출석·스탯 계산에서 빠져요.')) return;
+  if (!confirm(md(src.date) + ' 경기 게스트 ' + n + '명을 ' + md(g.date) + ' 경기로 옮길까요?\n\n' + md(src.date) + ' 경기는 "' + md(g.date) + '로 연기"로 표시되고, 출석·경기기록 계산에서 빠져요.')) return;
   const touched = new Set();
   list.forEach(({ t, p }) => { p.gid = g.id; t.note = ((t.note || '') + ' ' + md(src.date) + ' 우천 → ' + md(g.date) + ' 연기').trim(); touched.add(t); });
   src.postponed = md(g.date) + '로 연기';
@@ -1036,10 +1036,10 @@ function statsHTML() {
   const gl = games.filter((g) => !S.sym || g.date.substr(0, 7) === S.sym).reverse().map((g) => {
     const gs = S.goals.filter((x) => x.gid === g.id), sc = C.score(g, S.goals);
     return '<div class="glog"><div class="glh"><b>' + md(g.date) + ' (' + C.dayName(g.date) + ')</b>' + (g.teams.length >= 2 ? '<span>A ' + sc[0] + ' : ' + sc[1] + ' B</span>' : '') + '</div>' +
-      (gs.length ? gs.map((x) => '<div class="gli">⚽ <b>' + esc(x.scorer) + '</b>' + (x.assist ? ' <span class="muted">도움 ' + esc(x.assist) + '</span>' : '') + '<small>' + esc(x.byName || '') + ' 입력</small><button class="btn xs ghost" data-gdel="' + x.id + '">삭제</button></div>').join('') : '<div class="muted">기록 없음 · 회원 화면 \'스탯\' 탭에서 누구나 넣을 수 있어요</div>') + '</div>';
+      (gs.length ? gs.map((x) => '<div class="gli">⚽ <b>' + esc(x.scorer) + '</b>' + (x.assist ? ' <span class="muted">도움 ' + esc(x.assist) + '</span>' : '') + '<small>' + esc(x.byName || '') + ' 입력</small><button class="btn xs ghost" data-gdel="' + x.id + '">삭제</button></div>').join('') : '<div class="muted">기록 없음 · 회원 화면 \'경기기록\' 탭에서 누구나 넣을 수 있어요</div>') + '</div>';
   }).join('');
-  return '<div class="pagehead"><h1>스탯 · 하이라이트</h1><div class="ph-act"><select id="sym"><option value="">전체 기간</option>' + months.map((m) => '<option value="' + m + '"' + (m === S.sym ? ' selected' : '') + '>' + m.replace('-', '년 ') + '월</option>').join('') + '</select></div></div>' +
-    '<div class="evnote">🔒 아래 1위 정리는 관리자만 보여요. · 스탯은 ' + md(statFrom()) + ' 경기부터 집계 (설정에서 변경)</div>' +
+  return '<div class="pagehead"><h1>경기기록</h1><div class="ph-act"><select id="sym"><option value="">전체 기간</option>' + months.map((m) => '<option value="' + m + '"' + (m === S.sym ? ' selected' : '') + '>' + m.replace('-', '년 ') + '월</option>').join('') + '</select></div></div>' +
+    '<div class="evnote">🔒 아래 1위 정리는 관리자만 보여요. · 골·도움은 ' + md(statFrom()) + ' 경기부터 집계 (설정에서 변경)</div>' +
     '<div class="sumrow">' + top('g', (S.sym ? mon(S.sym) : '전체') + ' 득점 1위', '골') + top('a', '도움 1위', '개') + top('ap', '공격포인트 1위', 'P') + top('gp', '출석 1위', '경기') + '</div>' +
     '<div class="statgrid"><div class="panel tablewrap"><table><thead><tr>' + th('name', '이름') + th('gp', '경기') + th('g', '골') + th('a', '도움') + th('ap', '공격P') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<div class="scol">' + vidPanel() + '<div class="panel pad"><div class="g-lbl2" style="margin-bottom:8px">경기별 기록</div>' + (gl || '<div class="muted">이 기간 경기가 없어요</div>') + '</div></div></div>';
@@ -1171,7 +1171,7 @@ function bindLedger() {
 /* ---- 설정 ---- */
 const CFG = [['fee', '월회비', 'number'], ['guestFee', '게스트비', 'number'], ['rentPerGame', '정기대관 회당 구장비', 'number'], ['oneOff', '일회성 구장비', 'number'],
   ['cap', '기본 정원', 'number'], ['perSide', '한 팀 최소 인원 (풋살 5 · 축구 11)', 'number'], ['maxSide', '한 팀 최대 인원 (풋살 6 · 축구 11)', 'number'], ['time', '경기 시간', 'text'], ['nextMonthDay', '이 날짜부터 들어온 회비는 다음 달분', 'number'], ['dueDay', '회비 마감일', 'number'],
-  ['reserve', '곶간(비상금)', 'number'], ['statFrom', '골·도움 스탯 집계 시작일', 'date'], ['place', '구장 이름', 'text'], ['account', '모임통장 (예: 카카오뱅크 3333-00-0000000)', 'text'], ['openChat', '오픈채팅 링크', 'text']];
+  ['reserve', '곶간(비상금)', 'number'], ['statFrom', '골·도움 집계 시작일', 'date'], ['place', '구장 이름', 'text'], ['account', '모임통장 (예: 카카오뱅크 3333-00-0000000)', 'text'], ['openChat', '오픈채팅 링크', 'text']];
 function openSettings() { openSettingsReal(); }
 /* ---- 팀 테마 고르기 (추천 5개 + 직접 고르기) ---- */
 function themeHTML() {

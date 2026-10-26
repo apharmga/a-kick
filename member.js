@@ -163,7 +163,7 @@ function tsText(t) {
     return pre + '<button class="ts" data-ts="' + sec + '">' + txt + '</button>';
   });
 }
-const VV = { player: null, unsub: null, id: '' };
+const VV = { player: null, unsub: null, id: '', reply: null };
 function closeVideo(fromPop) {
   const ov = $('#vov'); if (!ov) return;
   if (VV.unsub) VV.unsub(); VV.unsub = null;
@@ -181,10 +181,17 @@ async function openVideo(id) {
   ov.innerHTML = '<div class="vtop"><button class="vx" id="vx" aria-label="닫기">‹</button><div><b>' + esc(v.title || '하이라이트') + '</b><small>' + (v.date ? md(v.date) + ' (' + day(v.date) + ') 경기' : '') + '</small></div></div>' +
     '<div class="vplay"><div id="ytp"></div></div>' +
     '<div class="vbody"><div class="vhint">댓글에 <b>1:23</b>처럼 시간을 쓰면, 누를 때 그 장면으로 이동해요</div><div id="vcl" class="vcl"><div class="muted">댓글 불러오는 중...</div></div></div>' +
-    '<div class="vin"><button id="vnow" class="vnow">⏱ 지금 시간</button><textarea id="vtxt" rows="1" maxlength="500" placeholder="댓글 쓰기 (예: 2:15 이 골 미쳤다)"></textarea><button id="vsend" class="vsend">등록</button></div>';
+    '<div class="vrep" id="vrep" hidden></div><div class="vin"><button id="vnow" class="vnow">⏱ 지금 시간</button><textarea id="vtxt" rows="1" maxlength="500" placeholder="댓글 쓰기 (예: 2:15 이 골 미쳤다)"></textarea><button id="vsend" class="vsend">등록</button></div>';
   document.body.appendChild(ov); document.body.classList.add('noscroll');
   $('#vx').onclick = () => closeVideo();
   const ta = $('#vtxt');
+  VV.reply = null;
+  const setReply = (c) => {                            // 답글 대상 (대댓글은 한 단계: 답글에 답글을 달아도 같은 댓글 아래로)
+    VV.reply = c; const bar = $('#vrep');
+    if (!c) { bar.hidden = true; ta.placeholder = '댓글 쓰기 (예: 2:15 이 골 미쳤다)'; return; }
+    bar.hidden = false; bar.innerHTML = '↪ <b>' + esc(c.name) + '</b>님에게 답글 <button id="vrx" aria-label="답글 취소">✕</button>';
+    $('#vrx').onclick = () => setReply(null); ta.placeholder = '답글 쓰기'; ta.focus();
+  };
   ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 110) + 'px'; };
   $('#vnow').onclick = () => {
     const t = VV.player && VV.player.getCurrentTime ? fmtT(VV.player.getCurrentTime()) : '0:00';
@@ -193,20 +200,33 @@ async function openVideo(id) {
   $('#vsend').onclick = async () => {
     const text = ta.value.trim(); if (!text) return;
     $('#vsend').disabled = true;
-    try { await addDoc(collection(db, 'clubs', S.cid, 'vcomments'), { vid: id, text, name: S.me.name, mid: S.me.mid, uid: S.uid, at: Date.now() }); ta.value = ''; ta.oninput(); }
+    const doc0 = { vid: id, text, name: S.me.name, mid: S.me.mid, uid: S.uid, at: Date.now() };
+    if (VV.reply) { doc0.pid = VV.reply.root; if (VV.reply.root !== VV.reply.id && text.indexOf('@' + VV.reply.name) < 0) doc0.text = '@' + VV.reply.name + ' ' + text; }
+    try { await addDoc(collection(db, 'clubs', S.cid, 'vcomments'), doc0); ta.value = ''; ta.oninput(); setReply(null); }
     catch (e) { toast('댓글 저장 실패: ' + e.message); logErr('댓글 저장 실패: ' + e.message, e.stack); }
     $('#vsend').disabled = false;
   };
   $('#vcl').onclick = async (e) => {
     const ts = e.target.closest('[data-ts]');
     if (ts && VV.player && VV.player.seekTo) { VV.player.seekTo(+ts.dataset.ts, true); VV.player.playVideo(); ov.querySelector('.vplay').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    const rp = e.target.closest('[data-rep]');
+    if (rp) return setReply({ id: rp.dataset.rep, root: rp.dataset.root, name: rp.dataset.name });
     const del = e.target.closest('[data-cdel]');
-    if (del && confirm('이 댓글을 지울까요?')) await deleteDoc(doc(db, 'clubs', S.cid, 'vcomments', del.dataset.cdel)).catch((er) => toast('삭제 실패: ' + er.message));
+    if (del && confirm('이 댓글을 지울까요?' + (cs0().some((c) => c.pid === del.dataset.cdel) ? '\n(달린 답글은 남아요)' : ''))) await deleteDoc(doc(db, 'clubs', S.cid, 'vcomments', del.dataset.cdel)).catch((er) => toast('삭제 실패: ' + er.message));
   };
+  const cs0 = () => VV.cs || [];
   VV.unsub = onSnapshot(query(collection(db, 'clubs', S.cid, 'vcomments'), where('vid', '==', id)), (q) => {
     const cs = q.docs.map((d) => Object.assign({ id: d.id }, d.data())).sort((a, b) => a.at - b.at), box = $('#vcl'); if (!box) return;
-    box.innerHTML = cs.length ? cs.map((c) => '<div class="vcm"><div class="vch"><b>' + esc(c.name) + '</b><small>' + new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small>' +
-      (c.uid === S.uid || S.owner ? '<button class="vdel" data-cdel="' + esc(c.id) + '" aria-label="삭제">✕</button>' : '') + '</div><div class="vct">' + tsText(c.text) + '</div></div>').join('') : '<div class="muted">첫 댓글을 남겨보세요 ⚽</div>';
+    VV.cs = cs;
+    const ids = new Set(cs.map((c) => c.id)), roots = cs.filter((c) => !c.pid), kids = {};
+    cs.filter((c) => c.pid).forEach((c) => (kids[c.pid] = kids[c.pid] || []).push(c));
+    Object.keys(kids).forEach((p) => { if (!ids.has(p)) roots.push({ id: p, gone: 1, at: kids[p][0].at }); });   // 원댓글이 지워져도 답글은 남김
+    roots.sort((a, b) => a.at - b.at);
+    const one = (c, root) => c.gone ? '<div class="vcm gone">삭제된 댓글이에요</div>' :
+      '<div class="vcm' + (root !== c.id ? ' sub' : '') + '"><div class="vch"><b>' + esc(c.name) + '</b><small>' + new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small>' +
+      (c.uid === S.uid || S.owner ? '<button class="vdel" data-cdel="' + esc(c.id) + '" aria-label="삭제">✕</button>' : '') + '</div><div class="vct">' + tsText(c.text) + '</div>' +
+      '<button class="vrb" data-rep="' + esc(c.id) + '" data-root="' + esc(root) + '" data-name="' + esc(c.name) + '">답글</button></div>';
+    box.innerHTML = roots.length ? roots.map((r) => '<div class="vth2">' + one(r, r.id) + ((kids[r.id] || []).length ? '<div class="vkids">' + kids[r.id].map((k) => one(k, r.id)).join('') + '</div>' : '') + '</div>').join('') : '<div class="muted">첫 댓글을 남겨보세요 ⚽</div>';
   }, () => {});
   await loadYT();
   if (VV.id !== id) return;
@@ -263,7 +283,7 @@ async function leaveList(cid, name) {
   delete S.myClubs[cid]; await saveMyClubs(); renderHome();
 }
 async function deleteClub(cid, name) {
-  const t = prompt('⚠️ "' + name + '" 팀을 완전히 삭제해요.\n회원·거래·투표·스탯 기록이 모두 사라지고 되돌릴 수 없어요.\n\n정말 삭제하려면 팀 이름을 그대로 입력하세요.');
+  const t = prompt('⚠️ "' + name + '" 팀을 완전히 삭제해요.\n회원·거래·투표·경기기록이 모두 사라지고 되돌릴 수 없어요.\n\n정말 삭제하려면 팀 이름을 그대로 입력하세요.');
   if (t === null) return;
   if (t.trim() !== name) return toast('팀 이름이 달라서 삭제하지 않았어요');
   view('<div class="center">삭제하는 중... (몇 초 걸려요)</div>');
@@ -375,7 +395,7 @@ function render() {
     tab('week', '이번 주', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7l3 2-1 4h-4l-1-4z"/></svg>') +
     tab('dues', '회비', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>') +
     tab('bank', '통장', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/></svg>') +
-    tab('rec', '스탯', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>') + '</nav>');
+    tab('rec', '경기기록', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>') + '</nav>');
   document.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.t; render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.go; render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-vote]').forEach((b) => (b.onclick = () => vote(b.dataset.vote)));
@@ -403,7 +423,7 @@ function bindCommon() {
 }
 function accNo() { const a = (S.pub.dues && S.pub.dues.account) || ''; const n = (a.match(/[\d-]{6,}/) || [''])[0]; return n || a; }
 function renderPick(members) {
-  view('<header class="hero">' + heroTop() + '<h1>관리자님 이름을 골라주세요</h1><p>관리자도 회원으로 투표·스탯에 참여하려면 한 번 골라요.</p></header>' +
+  view('<header class="hero">' + heroTop() + '<h1>관리자님 이름을 골라주세요</h1><p>관리자도 회원으로 투표·경기기록에 참여하려면 한 번 골라요.</p></header>' +
     '<main class="pad lift"><section class="card"><div class="pick">' + members.map((m) => '<button data-pick="' + esc(m.id) + '">' + esc(m.name) + '</button>').join('') + '</div></section>' +
     '<p class="muted center-t">다른 회원은 링크로 가입 신청 → 관리자 승인으로 들어와요.</p><button class="link" id="home">다른 팀 보기</button> <button class="link" id="out">로그아웃</button></main>');
   document.querySelectorAll('[data-pick]').forEach((b) => (b.onclick = async () => {
@@ -517,7 +537,7 @@ function homeHTML() {
     '<div class="tiles">' +
     tile('dues', mon(d.ym) + ' 회비', !due ? '대상 아님' : paid ? '납부 완료' : '미납', won(d.fee) + '원 · 납부 ' + d.paid.length + '/' + (d.paid.length + d.unpaid.length) + '명', !due ? '' : paid ? 'ok' : 'bad') +
     tile('bank', '통장 잔액', won(bal) + '원', '입출금 전부 공개') +
-    tile('rec', '내 스탯', (myStat().g) + '골 ' + (myStat().a) + '도움', '참석 ' + r.came + '회 · ' + rate + '%') +
+    tile('rec', '내 기록', (myStat().g) + '골 ' + (myStat().a) + '도움', '참석 ' + r.came + '회 · ' + rate + '%') +
     tile('week', '팀 편성', g && (g.teams || []).length >= 2 ? '공개됨' : '준비 중', g ? md(g.date) + ' 경기' : '-') + '</div>' +
     (recent.length ? '<section class="card"><div class="h2row"><h2>최근 입출금</h2><button class="more inl" data-go="bank">전체 ›</button></div><div class="blist">' + recent.map((t) =>
       '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what + (t.pend ? ' · 통장 확인 전' : '')) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b></span></div>').join('') + '</div></section>' : '') +
@@ -631,7 +651,7 @@ function openSuggest() {
 function lastRecHTML() {
   const t = ymd(new Date()), g = played().filter((x) => x.date <= t).slice(-1)[0];
   if (!g || (Date.now() - Date.parse(g.date)) / 864e5 > 7) return '';
-  return '<section class="card"><div class="h2row"><h2>경기 기록</h2><button class="more inl" data-go="rec">전체 스탯 ›</button></div>' + gameRec(g) + '</section>';
+  return '<section class="card"><div class="h2row"><h2>경기 기록</h2><button class="more inl" data-go="rec">전체 경기기록 ›</button></div>' + gameRec(g) + '</section>';
 }
 function gameRec(g) {
   const gs = (S.goals || []).filter((x) => x.gid === g.id), T = (g.teams || []).map((x) => x.split('|')).filter((x) => x[0]);
@@ -647,10 +667,10 @@ function recHTML() {
   const all = window.Core.statTable(played(), S.goals || [], '', [S.me.name]), me = all.find((r) => r.name === S.me.name) || { gp: 0, g: 0, a: 0, ap: 0 };
   const r = (S.pub.records || {})[S.me.name] || { total: 0, came: 0, last: [] }, rate = r.total ? Math.round((r.came / r.total) * 100) : 0;
   const th = (k, l) => sortTh('st', k, l);
-  return '<header class="hero">' + heroTop() + '<h1>스탯</h1><p>골·도움은 회원 누구나 넣고 고칠 수 있어요</p></header>' +
+  return '<header class="hero">' + heroTop() + '<h1>경기기록</h1><p>골·도움 기록과 하이라이트 영상. 골·도움은 회원 누구나 넣고 고칠 수 있어요</p></header>' +
     '<main class="pad lift"><section class="card"><h2>내 기록 <small class="muted">전체 기간</small></h2><div class="stats four"><div><b>' + me.gp + '</b><span>경기</span></div><div><b>' + me.g + '</b><span>골</span></div><div><b>' + me.a + '</b><span>도움</span></div><div><b>' + rate + '%</b><span>참석률</span></div></div>' +
     '<div class="dots">' + r.last.map((x) => '<span class="' + (x ? 'on' : '') + '"></span>').join('') + '</div></section>' +
-    '<section class="card"><div class="h2row"><h2>팀 스탯</h2><select id="sym"><option value="">전체 기간</option>' + yms.map((y) => '<option value="' + y + '"' + (y === S.sym ? ' selected' : '') + '>' + y.substr(0, 4) + '년 ' + mon(y) + '</option>').join('') + '</select></div>' +
+    '<section class="card"><div class="h2row"><h2>골·도움 순위</h2><select id="sym"><option value="">전체 기간</option>' + yms.map((y) => '<option value="' + y + '"' + (y === S.sym ? ' selected' : '') + '>' + y.substr(0, 4) + '년 ' + mon(y) + '</option>').join('') + '</select></div>' +
     '<div class="muted" style="margin-top:4px">제목을 누르면 기본 → 내림차순 → 오름차순</div>' +
     '<table class="stab"><thead><tr>' + th('name', '이름') + th('gp', '경기') + th('g', '골') + th('a', '도움') + th('ap', '공격P') + '</tr></thead><tbody>' +
     sortRows(rows, 'st').map((x) => '<tr class="' + (x.name === S.me.name ? 'me' : '') + '"><td>' + esc(x.name) + '</td><td>' + x.gp + '</td><td>' + x.g + '</td><td>' + x.a + '</td><td><b>' + x.ap + '</b></td></tr>').join('') + '</tbody></table></section>' +
