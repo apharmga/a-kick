@@ -1009,6 +1009,7 @@ function editMember(id) {
     '<div class="card" style="background:#F6F7FA" id="fm"></div>' +
     (id ? '<div class="xpadj"><span>EXP 지급·차감 <small>지금까지 ' + ((S.cfg.xpAdj || {})[m.id] || 0) + '</small></span><input id="xpa" type="number" inputmode="numeric" placeholder="예: 100 또는 -50"></div>' : '') +
     (id ? '<div class="linkacc">' + (S.claims[m.id] ? '연결된 구글 계정: <b>' + esc(S.claims[m.id].email || '') + '</b> <button class="btn xs" id="unl">연결 해제</button>' : '<span class="muted">아직 이 이름을 고른 계정이 없어요</span>') + '</div>' : '') +
+    (id && m.state !== '탈퇴' ? '<div class="kick"><button class="btn" id="kick">🚪 강퇴 (팀에서 내보내기)</button>' + (memberUnused(m) ? '<button class="btn ghost" id="mdel">🗑 기록 없는 회원 완전 삭제</button>' : '') + '</div>' : '') +
     '<div class="row"><button class="btn" id="c">취소</button><button class="btn" id="cp">안내 문구 복사</button><button class="btn pri" id="ok">저장</button></div>', (el) => {
     const calc = () => {
       const j = el.querySelector('#j').value, mm = { name: el.querySelector('#n').value.trim(), join: j, fee: m.fee };
@@ -1029,6 +1030,8 @@ function editMember(id) {
     };
     calc(); el.querySelector('#j').onchange = calc;
     el.querySelector('#c').onclick = closeModal;
+    const kk = el.querySelector('#kick'); if (kk) kk.onclick = () => kickMember(m);
+    const md = el.querySelector('#mdel'); if (md) md.onclick = () => deleteMember(m);
     const ul = el.querySelector('#unl'); if (ul) ul.onclick = async () => {
       const c = S.claims[m.id]; if (!confirm(m.name + ' 이름과 ' + (c.email || '') + ' 계정 연결을 해제할까요?\n해제하면 그 사람은 이름을 다시 골라야 해요.')) return;
       await deleteDoc(D('claims', m.id)); await deleteDoc(D('users', c.uid)).catch(() => {}); delete S.claims[m.id]; closeModal(); toast('연결을 해제했어요');
@@ -1051,6 +1054,34 @@ function editMember(id) {
       closeModal(); render(); await putMember(m); toast(xv ? '저장했어요 · EXP ' + (xv > 0 ? '+' : '') + xv : '저장했어요');
     };
   });
+}
+
+/** 회비·게스트비 기록이나 출석 기록이 하나도 없는 회원 (테스트·잘못 만든 회원) */
+function memberUnused(m) {
+  const inTx = S.txs.some((t) => C.partsOf(t).some((p) => (p.names || []).indexOf(m.name) >= 0 || p.name === m.name));
+  const inGame = S.games.some((g) => (g.attend || []).indexOf(m.name) >= 0 || (g.log || {})[m.name]);
+  return !inTx && !inGame;
+}
+/** 강퇴: 탈퇴 처리 + 구글 계정 연결 끊기 → 그 사람 앱에서 바로 팀 화면이 닫힘. 장부·출석 기록은 남김 */
+async function kickMember(m) {
+  if (!confirm('⚠ ' + m.name + ' 님을 강퇴할까요?\n\n· 앱에서 바로 팀 화면이 닫혀요\n· 다시 들어오려면 가입 신청 → 관리자 승인이 필요해요\n· 회비·출석 기록은 장부에 그대로 남아요')) return;
+  const c = S.claims[m.id];
+  try {
+    if (c) { await deleteDoc(D('claims', m.id)); await deleteDoc(D('users', c.uid)).catch(() => {}); await deleteDoc(D('requests', c.uid)).catch(() => {}); delete S.claims[m.id]; }
+    m.state = '탈퇴'; if (!m.quit) m.quit = today();
+    closeModal(); render(); await putMember(m); toast(m.name + ' 님을 강퇴했어요');
+  } catch (e) { fail(e); }
+}
+/** 기록 없는 회원은 명단에서 완전히 지움 (테스트 계정 정리용) */
+async function deleteMember(m) {
+  if (!memberUnused(m)) return toast('회비·출석 기록이 있어서 지울 수 없어요. 강퇴를 써주세요');
+  if (!confirm(m.name + ' 님을 명단에서 완전히 지울까요? 되돌릴 수 없어요.')) return;
+  const c = S.claims[m.id];
+  try {
+    if (c) { await deleteDoc(D('claims', m.id)); await deleteDoc(D('users', c.uid)).catch(() => {}); await deleteDoc(D('requests', c.uid)).catch(() => {}); delete S.claims[m.id]; }
+    await deleteDoc(D('members', m.id)); await deleteDoc(D('profiles', m.id)).catch(() => {});
+    S.members = S.members.filter((x) => x.id !== m.id); closeModal(); render(); schedulePublish(); toast(m.name + ' 님을 지웠어요');
+  } catch (e) { fail(e); }
 }
 
 /* ---- 장부 ---- */

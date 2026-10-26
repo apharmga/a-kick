@@ -101,6 +101,8 @@ async function start() {
     const u = await getDoc(CD('users', S.uid)); S.me = u.exists() ? u.data() : null;
     // 가입 승인제: 관리자가 승인해야(users 문서가 생겨야) 팀 화면이 열림
     if (!S.me && !S.owner) return renderRequest();
+    // 관리자가 강퇴하거나 연결을 끊으면 내 users 문서가 사라짐 → 바로 안내 화면으로
+    if (S.me && !S.owner) S.subs.push(onSnapshot(CD('users', S.uid), (d) => { if (!d.exists()) kickedView(); }, () => {}));
     S.subs.push(onSnapshot(CD('pub', 'state'), (d) => { S.pub = d.exists() ? d.data() : null; watchVotes(); render(); },
       (e) => view('<div class="center">불러오지 못했어요<br><small>' + esc(e.message) + '</small></div>')));
   } catch (e) { view('<div class="center">불러오지 못했어요<br><small>' + esc(e.message) + '</small></div>'); }
@@ -1261,4 +1263,13 @@ async function showFeedback() {
   sheet('<h2>개발자 건의 ' + rows.length + '건</h2><pre class="errs">' + esc(txt || '아직 없어요') + '</pre><div class="srow"><button id="fx">닫기</button><button class="pri" id="fc">전체 복사</button></div>', (el) => {
     el.querySelector('#fx').onclick = () => (el.hidden = true); el.querySelector('#fc').onclick = () => copy(txt, '복사했어요. Claude에게 붙여넣어 주세요');
   });
+}
+
+function kickedView() {
+  S.subs.forEach((f) => f()); S.subs = []; S.me = null;
+  view('<header class="hero"><div class="hrow"><b>' + esc(clubName()) + '</b></div><h1>팀에서 나가졌어요</h1><p>관리자가 이 계정의 팀 연결을 해제했어요.</p></header><main class="pad lift">' +
+    '<section class="card"><p class="muted">잘못된 일이라면 관리자에게 말씀해 주세요. 다시 가입 신청을 할 수도 있어요.</p><button class="bigbtn" id="rejoin">다시 가입 신청하기</button></section>' +
+    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button></div></main>');
+  $('#rejoin').onclick = () => renderRequest();
+  bindCommon();
 }
