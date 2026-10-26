@@ -123,8 +123,8 @@ async function loadAll() {
     S.txs = ts.docs.map((d) => d.data()).sort((a, b) => (a.dt < b.dt ? -1 : 1));
     S.skills = sk.exists() ? sk.data() : {};
     S.claims = {}; S.goals = []; S.polls = []; S.pvotes = []; S.avotes = []; S.sugs = [];
-    const live = (col, key) => onSnapshot(CL(col), (q) => { S[key] = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); if (S.view === 'polls') render(); if (key === 'sugs' || key === 'reqs') render(); }, () => {});
-    if (!S.pollSub) S.pollSub = [live('polls', 'polls'), live('pollvotes', 'pvotes'), live('anonvotes', 'avotes'), live('suggest', 'sugs'), live('requests', 'reqs')];
+    const live = (col, key) => onSnapshot(CL(col), (q) => { S[key] = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); if (S.view === 'polls' || (key === 'videos' && S.view === 'stats')) render(); if (key === 'sugs' || key === 'reqs') render(); }, () => {});
+    if (!S.pollSub) S.pollSub = [live('polls', 'polls'), live('pollvotes', 'pvotes'), live('anonvotes', 'avotes'), live('videos', 'videos'), live('suggest', 'sugs'), live('requests', 'reqs')];
     getDocs(CL('claims')).then((q) => { q.docs.forEach((d) => (S.claims[d.id] = d.data())); S.claimsLoaded = true; if (S.view === 'week') render(); }).catch(() => {});
     if (!S.goalSub) S.goalSub = onSnapshot(CL('goals'), (q) => { S.goals = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); if (S.view === 'stats') render(); }, () => {});
     render();
@@ -280,7 +280,7 @@ const IC = {
 function render() {
   const v = S.view, ym = payYM(), list = C.membersFor(S.members, ym), paid = C.duesPaid(S.txs, ym);
   const tab = (k, l) => '<button class="tab' + (v === k ? ' on' : '') + '" data-v="' + k + '">' + l + '</button>';
-  const nav = '<header class="bar"><div class="bar-in"><a class="logo" href="./?c=' + CID + '" title="홈으로">' + esc(S.club.name) + '<small>관리자</small></a><nav class="tabs" aria-label="메뉴">' + tab('week', '이번 주') + tab('members', '회원 · 회비' + ((S.reqs || []).length ? ' <em class="badge">' + S.reqs.length + '</em>' : '')) + tab('ledger', '장부') + tab('stats', '스탯 · 이벤트') + tab('polls', '투표 · 건의' + (newSugs() ? ' <em class="badge">' + newSugs() + '</em>' : '')) + '</nav>' +
+  const nav = '<header class="bar"><div class="bar-in"><a class="logo" href="./?c=' + CID + '" title="홈으로">' + esc(S.club.name) + '<small>관리자</small></a><nav class="tabs" aria-label="메뉴">' + tab('week', '이번 주') + tab('members', '회원 · 회비' + ((S.reqs || []).length ? ' <em class="badge">' + S.reqs.length + '</em>' : '')) + tab('ledger', '장부') + tab('stats', '스탯 · 하이라이트') + tab('polls', '투표 · 건의' + (newSugs() ? ' <em class="badge">' + newSugs() + '</em>' : '')) + '</nav>' +
     '<div class="stats"><div class="stat"><span>통장 잔액</span><b>' + won(C.balance(S.txs)) + '<em>원</em></b></div><div class="stat"><span>' + mon(ym) + ' 회비</span><b>' + list.filter((m) => paid[m.name]).length + '<em> / ' + list.length + '명</em></b></div></div>' +
     '<label class="btn pri up">' + IC.up + '<span>거래내역 엑셀 넣기</span><input type="file" accept=".xlsx,.xls" id="up" hidden></label>' +
     '<a class="btn" href="./?c=' + CID + '">' + IC.home + ' 홈</a><button class="iconbtn" id="gear" aria-label="설정">' + IC.gear + '</button></div></header>';
@@ -1019,7 +1019,7 @@ function bindSort() {
   }));
 }
 
-/* ---- 스탯 · 이벤트 (관리자만 보는 페이지) ---- */
+/* ---- 스탯 · 하이라이트 (관리자 페이지) ---- */
 function statFrom() { return S.cfg.statFrom || (S.club.created || '').substr(0, 10) || '2000-01-01'; }
 function playedGames() { return S.games.filter((g) => g.date <= today() && g.date >= statFrom() && !g.postponed).map((g) => ({ id: g.id, date: g.date, players: playersOf(g), teams: g.teams || [] })); }
 function statsHTML() {
@@ -1038,11 +1038,11 @@ function statsHTML() {
     return '<div class="glog"><div class="glh"><b>' + md(g.date) + ' (' + C.dayName(g.date) + ')</b>' + (g.teams.length >= 2 ? '<span>A ' + sc[0] + ' : ' + sc[1] + ' B</span>' : '') + '</div>' +
       (gs.length ? gs.map((x) => '<div class="gli">⚽ <b>' + esc(x.scorer) + '</b>' + (x.assist ? ' <span class="muted">도움 ' + esc(x.assist) + '</span>' : '') + '<small>' + esc(x.byName || '') + ' 입력</small><button class="btn xs ghost" data-gdel="' + x.id + '">삭제</button></div>').join('') : '<div class="muted">기록 없음 · 회원 화면 \'스탯\' 탭에서 누구나 넣을 수 있어요</div>') + '</div>';
   }).join('');
-  return '<div class="pagehead"><h1>스탯 · 이벤트</h1><div class="ph-act"><select id="sym"><option value="">전체 기간</option>' + months.map((m) => '<option value="' + m + '"' + (m === S.sym ? ' selected' : '') + '>' + m.replace('-', '년 ') + '월</option>').join('') + '</select></div></div>' +
-    '<div class="evnote">🔒 이 페이지는 관리자만 볼 수 있어요. 아래 1위 후보는 회원 화면에 나오지 않아요. · 스탯은 ' + md(statFrom()) + ' 경기부터 집계 (설정에서 변경)</div>' +
+  return '<div class="pagehead"><h1>스탯 · 하이라이트</h1><div class="ph-act"><select id="sym"><option value="">전체 기간</option>' + months.map((m) => '<option value="' + m + '"' + (m === S.sym ? ' selected' : '') + '>' + m.replace('-', '년 ') + '월</option>').join('') + '</select></div></div>' +
+    '<div class="evnote">🔒 아래 1위 정리는 관리자만 보여요. · 스탯은 ' + md(statFrom()) + ' 경기부터 집계 (설정에서 변경)</div>' +
     '<div class="sumrow">' + top('g', (S.sym ? mon(S.sym) : '전체') + ' 득점 1위', '골') + top('a', '도움 1위', '개') + top('ap', '공격포인트 1위', 'P') + top('gp', '출석 1위', '경기') + '</div>' +
     '<div class="statgrid"><div class="panel tablewrap"><table><thead><tr>' + th('name', '이름') + th('gp', '경기') + th('g', '골') + th('a', '도움') + th('ap', '공격P') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
-    '<div class="panel pad"><div class="g-lbl2" style="margin-bottom:8px">경기별 기록</div>' + (gl || '<div class="muted">이 기간 경기가 없어요</div>') + '</div></div>';
+    '<div class="scol">' + vidPanel() + '<div class="panel pad"><div class="g-lbl2" style="margin-bottom:8px">경기별 기록</div>' + (gl || '<div class="muted">이 기간 경기가 없어요</div>') + '</div></div></div>';
 }
 /* ---- 투표 · 공지 · 건의함 ---- */
 const newSugs = () => (S.sugs || []).filter((x) => !x.done).length;
@@ -1111,8 +1111,50 @@ function newPoll(old) {
     };
   });
 }
+/* 하이라이트: 유튜브 '일부공개' 링크를 붙이면 회원 화면 안에서 재생·댓글·시간 태그 */
+function ytId(u) {
+  u = String(u || '').trim();
+  const m = u.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/|embed\/))([A-Za-z0-9_-]{11})/) || u.match(/^([A-Za-z0-9_-]{11})$/);
+  return m ? m[1] : '';
+}
+function vidPanel() {
+  const vs = (S.videos || []).slice().sort((a, b) => (a.date === b.date ? b.at - a.at : a.date < b.date ? 1 : -1));
+  return '<div class="panel pad"><div class="ph"><div class="g-lbl2">🎬 하이라이트 ' + vs.length + '개</div><button class="btn sm pri" id="vadd">+ 하이라이트 추가</button></div>' +
+    (vs.length ? vs.map((v) => '<div class="vrow"><img src="https://i.ytimg.com/vi/' + v.yt + '/default.jpg" alt=""><div><b>' + esc(v.title || '하이라이트') + '</b><small>' + (v.date ? md(v.date) + ' 경기' : '') + '</small></div>' +
+      '<button class="btn xs" data-vcopy="' + v.id + '">' + IC.copy + ' 카톡 문구</button><button class="btn xs ghost" data-vdel="' + v.id + '">삭제</button></div>').join('')
+      : '<div class="muted">구장에서 받은 영상을 유튜브에 <b>일부공개</b>로 올리고, 링크를 붙여넣으세요. 회원은 앱 안에서 보고 댓글·시간 태그를 남길 수 있어요.</div>') + '</div>';
+}
+function addVideo() {
+  const gs = S.games.filter((g) => !g.postponed && g.date <= C.addDays(today(), 1)).slice(-10).reverse();
+  modal('<h2>하이라이트 추가</h2><div class="muted">유튜브 앱 → 업로드할 때 공개 범위 <b>일부공개</b> → 공유 → 링크 복사 후 붙여넣기</div>' +
+    '<label class="f">유튜브 링크<input id="vu" placeholder="https://youtu.be/..." inputmode="url"></label><div id="vprev" class="muted"></div>' +
+    '<label class="f">어느 경기 영상인가요? <b class="req">필수</b><select id="vg"><option value="">— 경기 선택 —</option>' + gs.map((g) => '<option value="' + g.id + '">' + md(g.date) + ' (' + C.dayName(g.date) + ')</option>').join('') + '</select></label>' +
+    '<label class="f">제목 (선택)<input id="vt" maxlength="40" placeholder="예: 1쿼터 · A팀 득점 모음"></label>' +
+    '<div class="mfoot"><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">추가</button></div>', (m) => {
+    const u = m.querySelector('#vu'), pv = m.querySelector('#vprev');
+    u.oninput = () => { const id = ytId(u.value); pv.innerHTML = id ? '<img src="https://i.ytimg.com/vi/' + id + '/mqdefault.jpg" alt="" style="width:200px;border-radius:8px;margin-top:6px">' : u.value ? '⚠ 유튜브 링크가 아닌 것 같아요' : ''; };
+    m.querySelector('#cx').onclick = closeModal;
+    m.querySelector('#ok').onclick = async () => {
+      const id = ytId(u.value), gid = m.querySelector('#vg').value, g = S.games.find((x) => x.id === gid);
+      if (!id) return toast('유튜브 링크를 확인해 주세요');
+      if (!g) { m.querySelector('#vg').classList.add('need'); return toast('어느 경기 영상인지 골라주세요'); }
+      const n = (S.videos || []).filter((x) => x.gid === gid).length;
+      const v = { yt: id, gid, date: g.date, title: m.querySelector('#vt').value.trim() || md(g.date) + ' 하이라이트 ' + (n + 1), at: Date.now() };
+      const vid = 'V' + Date.now().toString(36);
+      await setDoc(D('videos', vid), v).catch(fail); closeModal(); toast('추가했어요 · 회원 화면에 바로 떠요'); vcopy(Object.assign({ id: vid }, v));
+    };
+  });
+}
+function vcopy(v) { copy('🎬 ' + v.title + ' 올라왔어요!\n앱에서 보고 명장면에 댓글 남겨주세요 (시간 쓰면 그 장면으로 이동해요)\n👉 ' + MEMBER_URL + '&v=' + v.id, '카톡 공지 문구를 복사했어요'); }
 function bindStats() {
   $('#sym').onchange = (e) => { S.sym = e.target.value; render(); };
+  const va = $('#vadd'); if (va) va.onclick = addVideo;
+  document.querySelectorAll('[data-vcopy]').forEach((b) => (b.onclick = () => vcopy(S.videos.find((x) => x.id === b.dataset.vcopy))));
+  document.querySelectorAll('[data-vdel]').forEach((b) => (b.onclick = async () => {
+    if (!confirm('이 하이라이트를 앱에서 지울까요? 댓글도 같이 지워져요.\n(유튜브 영상 자체는 그대로 있어요)')) return;
+    const id = b.dataset.vdel; await deleteDoc(D('videos', id)).catch(fail);
+    const cs = await getDocs(CL('vcomments')).catch(() => null); if (cs) cs.docs.filter((d) => d.data().vid === id).forEach((d) => deleteDoc(d.ref).catch(() => {}));
+  }));
   document.querySelectorAll('[data-gdel]').forEach((b) => (b.onclick = async () => { if (!confirm('이 기록을 지울까요?')) return; await deleteDoc(D('goals', b.dataset.gdel)).catch(fail); }));
 }
 

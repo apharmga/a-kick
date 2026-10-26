@@ -104,6 +104,20 @@ service cloud.firestore {
           && id == request.resource.data.pid + '__' + getAfter(/databases/$(database)/documents/clubs/$(cid)/anonmark/$(request.resource.data.pid + '__' + request.auth.uid)).data.key;
         allow delete: if signedIn() && id == resource.data.pid + '__' + get(/databases/$(database)/documents/clubs/$(cid)/anonmark/$(resource.data.pid + '__' + request.auth.uid)).data.key;
       }
+      // 하이라이트: 관리자가 올리고(위 isOwner 규칙) 회원은 보기만
+      match /videos/{id} {
+        allow read: if isMember();
+      }
+      // 하이라이트 댓글: 회원이 본인 이름으로 쓰고, 본인 것만 지움 (관리자는 전부)
+      match /vcomments/{id} {
+        allow read: if isMember();
+        allow create: if isMember()
+          && request.resource.data.keys().hasOnly(['vid', 'text', 'name', 'mid', 'uid', 'at'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.mid == myMid()
+          && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
+        allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      }
       match /suggest/{id} {
         allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
         allow create: if isMember()

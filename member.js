@@ -130,13 +130,96 @@ function askJoin(name) {
 
 /* 팀 삭제 (만든 사람만) · 목록에서 빼기 (회원) */
 async function saveMyClubs() { await setDoc(doc(db, 'me', S.uid), { clubs: S.myClubs, last: '' }).catch(() => {}); }
+/* ---------------- 하이라이트 영상 (유튜브 일부공개 + 앱 안에서 재생·댓글·시간 태그) ----------------
+   전체 화면을 다시 그리는 render()와 분리된 별도 창(#vov)에서 재생 → 투표·기록이 갱신돼도 영상이 끊기지 않음 */
+const ytThumb = (id) => 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg';
+const fmtT = (s) => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+function vidsSorted() { return (S.videos || []).slice().sort((a, b) => (a.date === b.date ? b.at - a.at : a.date < b.date ? 1 : -1)); }
+function vidCard(v) {
+  return '<button class="vcard" data-vid="' + esc(v.id) + '"><span class="vth"><img src="' + ytThumb(v.yt) + '" alt="" loading="lazy"><i>▶</i></span><span class="vtx"><b>' + esc(v.title || '하이라이트') + '</b><small>' + (v.date ? md(v.date) + ' 경기' : '') + '</small></span></button>';
+}
+function vidsHome() {
+  const vs = vidsSorted(); if (!vs.length) return '';
+  return '<section class="card"><div class="h2row"><h2>🎬 하이라이트</h2>' + (vs.length > 3 ? '<button class="more inl" data-go="rec">전체 ›</button>' : '') + '</div><div class="vlist">' + vs.slice(0, 3).map(vidCard).join('') + '</div></section>';
+}
+function vidsRec() {
+  const vs = vidsSorted(); if (!vs.length) return '';
+  return '<section class="card"><h2>🎬 하이라이트</h2><div class="vlist">' + vs.map(vidCard).join('') + '</div></section>';
+}
+let ytReady = null;
+function loadYT() {
+  if (ytReady) return ytReady;
+  ytReady = new Promise((res) => {
+    if (window.YT && window.YT.Player) return res();
+    const prev = window.onYouTubeIframeAPIReady; window.onYouTubeIframeAPIReady = () => { if (prev) prev(); res(); };
+    const sc = document.createElement('script'); sc.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(sc);
+  });
+  return ytReady;
+}
+/** 댓글 글자 안의 1:23, 12:05, 1:02:33 → 누르면 그 시간으로 이동하는 버튼 */
+function tsText(t) {
+  return esc(t).replace(/(^|[^\d:])((\d{1,2}):([0-5]\d)(?::([0-5]\d))?)(?![\d:])/g, (all, pre, txt, a, b, c) => {
+    const sec = c !== undefined ? (+a) * 3600 + (+b) * 60 + (+c) : (+a) * 60 + (+b);
+    return pre + '<button class="ts" data-ts="' + sec + '">' + txt + '</button>';
+  });
+}
+const VV = { player: null, unsub: null, id: '' };
+function closeVideo(fromPop) {
+  const ov = $('#vov'); if (!ov) return;
+  if (VV.unsub) VV.unsub(); VV.unsub = null;
+  try { VV.player && VV.player.destroy(); } catch (e) {}
+  VV.player = null; VV.id = ''; ov.remove(); document.body.classList.remove('noscroll');
+  if (!fromPop && history.state && history.state.vov) history.back();
+}
+window.addEventListener('popstate', () => { if ($('#vov')) closeVideo(true); });
+async function openVideo(id) {
+  const v = (S.videos || []).find((x) => x.id === id); if (!v) return toast('영상을 찾지 못했어요');
+  closeVideo(true);
+  history.pushState({ vov: 1 }, '');
+  VV.id = id;
+  const ov = document.createElement('div'); ov.id = 'vov'; ov.className = 'vov';
+  ov.innerHTML = '<div class="vtop"><button class="vx" id="vx" aria-label="닫기">‹</button><div><b>' + esc(v.title || '하이라이트') + '</b><small>' + (v.date ? md(v.date) + ' (' + day(v.date) + ') 경기' : '') + '</small></div></div>' +
+    '<div class="vplay"><div id="ytp"></div></div>' +
+    '<div class="vbody"><div class="vhint">댓글에 <b>1:23</b>처럼 시간을 쓰면, 누를 때 그 장면으로 이동해요</div><div id="vcl" class="vcl"><div class="muted">댓글 불러오는 중...</div></div></div>' +
+    '<div class="vin"><button id="vnow" class="vnow">⏱ 지금 시간</button><textarea id="vtxt" rows="1" maxlength="500" placeholder="댓글 쓰기 (예: 2:15 이 골 미쳤다)"></textarea><button id="vsend" class="vsend">등록</button></div>';
+  document.body.appendChild(ov); document.body.classList.add('noscroll');
+  $('#vx').onclick = () => closeVideo();
+  const ta = $('#vtxt');
+  ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 110) + 'px'; };
+  $('#vnow').onclick = () => {
+    const t = VV.player && VV.player.getCurrentTime ? fmtT(VV.player.getCurrentTime()) : '0:00';
+    const p = ta.selectionStart || ta.value.length; ta.value = ta.value.slice(0, p) + t + ' ' + ta.value.slice(p); ta.focus(); ta.oninput();
+  };
+  $('#vsend').onclick = async () => {
+    const text = ta.value.trim(); if (!text) return;
+    $('#vsend').disabled = true;
+    try { await addDoc(collection(db, 'clubs', S.cid, 'vcomments'), { vid: id, text, name: S.me.name, mid: S.me.mid, uid: S.uid, at: Date.now() }); ta.value = ''; ta.oninput(); }
+    catch (e) { toast('댓글 저장 실패: ' + e.message); logErr('댓글 저장 실패: ' + e.message, e.stack); }
+    $('#vsend').disabled = false;
+  };
+  $('#vcl').onclick = async (e) => {
+    const ts = e.target.closest('[data-ts]');
+    if (ts && VV.player && VV.player.seekTo) { VV.player.seekTo(+ts.dataset.ts, true); VV.player.playVideo(); ov.querySelector('.vplay').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    const del = e.target.closest('[data-cdel]');
+    if (del && confirm('이 댓글을 지울까요?')) await deleteDoc(doc(db, 'clubs', S.cid, 'vcomments', del.dataset.cdel)).catch((er) => toast('삭제 실패: ' + er.message));
+  };
+  VV.unsub = onSnapshot(query(collection(db, 'clubs', S.cid, 'vcomments'), where('vid', '==', id)), (q) => {
+    const cs = q.docs.map((d) => Object.assign({ id: d.id }, d.data())).sort((a, b) => a.at - b.at), box = $('#vcl'); if (!box) return;
+    box.innerHTML = cs.length ? cs.map((c) => '<div class="vcm"><div class="vch"><b>' + esc(c.name) + '</b><small>' + new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small>' +
+      (c.uid === S.uid || S.owner ? '<button class="vdel" data-cdel="' + esc(c.id) + '" aria-label="삭제">✕</button>' : '') + '</div><div class="vct">' + tsText(c.text) + '</div></div>').join('') : '<div class="muted">첫 댓글을 남겨보세요 ⚽</div>';
+  }, () => {});
+  await loadYT();
+  if (VV.id !== id) return;
+  VV.player = new YT.Player('ytp', { videoId: v.yt, width: '100%', height: '100%', playerVars: { playsinline: 1, rel: 0, modestbranding: 1 } });
+}
+
 /* ---------------- 탈퇴 · 계정 삭제 ---------------- */
 async function wipeMine(cid) {                       // 한 팀 안의 내 흔적 지우기 (이름이 들어간 장부 기록은 관리자 소유라 남음)
   const C = (c) => collection(db, 'clubs', cid, c), del = (q) => getDocs(q).then((r) => Promise.all(r.docs.map((d) => deleteDoc(d.ref).catch(() => {})))).catch(() => {});
   const marks = await getDocs(query(C('anonmark'), where('uid', '==', S.uid))).catch(() => null);
   if (marks) for (const m of marks.docs) { await deleteDoc(doc(db, 'clubs', cid, 'anonvotes', m.data().pid + '__' + m.data().key)).catch(() => {}); }
   await Promise.all([del(query(C('votes'), where('uid', '==', S.uid))), del(query(C('pollvotes'), where('uid', '==', S.uid))),
-    del(query(C('goals'), where('by', '==', S.uid))), del(query(C('suggest'), where('uid', '==', S.uid)))]);
+    del(query(C('goals'), where('by', '==', S.uid))), del(query(C('suggest'), where('uid', '==', S.uid))), del(query(C('vcomments'), where('uid', '==', S.uid)))]);
   if (marks) await Promise.all(marks.docs.map((m) => deleteDoc(m.ref).catch(() => {})));
   const u = await getDoc(doc(db, 'clubs', cid, 'users', S.uid)).catch(() => null);
   if (u && u.exists()) await deleteDoc(doc(db, 'clubs', cid, 'claims', u.data().mid)).catch(() => {});
@@ -185,7 +268,7 @@ async function deleteClub(cid, name) {
   if (t.trim() !== name) return toast('팀 이름이 달라서 삭제하지 않았어요');
   view('<div class="center">삭제하는 중... (몇 초 걸려요)</div>');
   try {
-    for (const c of ['members', 'games', 'tx', 'config', 'private', 'pub', 'votes', 'goals', 'polls', 'pollvotes', 'anonvotes', 'anonmark', 'suggest', 'requests', 'claims', 'users']) {
+    for (const c of ['members', 'games', 'tx', 'config', 'private', 'pub', 'votes', 'goals', 'polls', 'pollvotes', 'anonvotes', 'anonmark', 'videos', 'vcomments', 'suggest', 'requests', 'claims', 'users']) {
       const q = await getDocs(collection(db, 'clubs', cid, c));
       for (let i = 0; i < q.docs.length; i += 400) { const b = writeBatch(db); q.docs.slice(i, i + 400).forEach((d) => b.delete(d.ref)); await b.commit(); }
     }
@@ -236,6 +319,11 @@ function watchVotes() {
       onSnapshot(collection(db, 'clubs', S.cid, 'anonvotes'), (q) => { S.avotes = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render(); }, () => {})];
   }
   if (S.me && !S.goalSub) S.goalSub = onSnapshot(collection(db, 'clubs', S.cid, 'goals'), (q) => { S.goals = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render(); }, () => {});
+  if (S.me && !S.vidSub) S.vidSub = onSnapshot(collection(db, 'clubs', S.cid, 'videos'), (q) => {
+    S.videos = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render();
+    const want = new URLSearchParams(location.search).get('v');                 // 카톡으로 받은 영상 링크(?v=)면 바로 열기
+    if (want && !S.vOpened && S.videos.some((x) => x.id === want)) { S.vOpened = true; openVideo(want); }
+  }, () => {});
   const g = game(); if (!g || !S.me || S.voteGid === g.id) return;
   if (S.voteSub) S.voteSub();
   S.voteGid = g.id;
@@ -297,6 +385,7 @@ function render() {
   document.querySelectorAll('[data-gdel]').forEach((b) => (b.onclick = async () => { if (confirm('이 골 기록을 지울까요?')) await deleteDoc(CD('goals', b.dataset.gdel)).catch((e) => toast('삭제 실패: ' + e.message)); }));
   document.querySelectorAll('[data-sort]').forEach((h) => (h.onclick = () => { const [tb, k] = h.dataset.sort.split(':'), st = S.sort[tb] || {}; S.sort[tb] = st.k === k ? { k, d: ((st.d || 0) + 1) % 3 } : { k, d: 1 }; render(); }));
   document.querySelectorAll('[data-poll]').forEach((b) => (b.onclick = () => openPoll(b.dataset.poll)));
+  document.querySelectorAll('[data-vid]').forEach((b) => (b.onclick = () => openVideo(b.dataset.vid)));
   const sg = $('#sug'); if (sg) sg.onclick = openSuggest;
   autoPopup();
   const sy = $('#sym'); if (sy) sy.onchange = (e) => { S.sym = e.target.value; render(); };
@@ -424,7 +513,7 @@ function homeHTML() {
   const tile = (go, lbl, val, sub, cls) => '<button class="tile ' + (cls || '') + '" data-go="' + go + '"><span>' + lbl + '</span><b>' + val + '</b><small>' + sub + '</small></button>';
   const recent = txs.slice(-3).reverse();
   return '<header class="hero home">' + heroTop() + '<h1>안녕하세요, ' + esc(S.me.name) + ' 님 👋</h1><p>' + esc(clubName()) + '에 오신 걸 환영해요</p></header>' +
-    '<main class="pad lift">' + gcard + pollsCard() + installCard() +
+    '<main class="pad lift">' + gcard + pollsCard() + vidsHome() + installCard() +
     '<div class="tiles">' +
     tile('dues', mon(d.ym) + ' 회비', !due ? '대상 아님' : paid ? '납부 완료' : '미납', won(d.fee) + '원 · 납부 ' + d.paid.length + '/' + (d.paid.length + d.unpaid.length) + '명', !due ? '' : paid ? 'ok' : 'bad') +
     tile('bank', '통장 잔액', won(bal) + '원', '입출금 전부 공개') +
@@ -565,7 +654,7 @@ function recHTML() {
     '<div class="muted" style="margin-top:4px">제목을 누르면 기본 → 내림차순 → 오름차순</div>' +
     '<table class="stab"><thead><tr>' + th('name', '이름') + th('gp', '경기') + th('g', '골') + th('a', '도움') + th('ap', '공격P') + '</tr></thead><tbody>' +
     sortRows(rows, 'st').map((x) => '<tr class="' + (x.name === S.me.name ? 'me' : '') + '"><td>' + esc(x.name) + '</td><td>' + x.gp + '</td><td>' + x.g + '</td><td>' + x.a + '</td><td><b>' + x.ap + '</b></td></tr>').join('') + '</tbody></table></section>' +
-    '<section class="card"><h2>경기별 기록</h2>' + (played().length ? played().slice(-12).reverse().map(gameRec).join('') : '<p class="muted">' + (S.pub.statFrom ? md(S.pub.statFrom) + ' 경기 당일부터 여기에 [+ 골 기록 넣기] 버튼이 생겨요.' : '아직 치른 경기가 없어요') + '</p>') + '</section></main>';
+    vidsRec() + '<section class="card"><h2>경기별 기록</h2>' + (played().length ? played().slice(-12).reverse().map(gameRec).join('') : '<p class="muted">' + (S.pub.statFrom ? md(S.pub.statFrom) + ' 경기 당일부터 여기에 [+ 골 기록 넣기] 버튼이 생겨요.' : '아직 치른 경기가 없어요') + '</p>') + '</section></main>';
 }
 /* 정렬: 제목 누를 때마다 기본 → 내림차순 → 오름차순 */
 S.sort = {};
