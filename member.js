@@ -624,7 +624,7 @@ function weekHTML() {
     '<h1>' + md(g.date) + ' (' + day(g.date) + ') ' + esc(g.time) + '</h1><p>' + esc(S.pub.place || '') + ' · 투표 마감 ' + dlTxt + (lk ? ' (마감됨)' : '') + '</p></header>' +
     '<main class="pad lift">' +
     '<section class="card"><h2>이번 주 참석할까요?</h2>' + wxLine(g) + cdHTML(g) + '<div class="vote">' +
-    '<button data-vote="참석" class="' + (amIn ? 'on' : '') + '"' + (lk ? ' disabled' : '') + '>참석</button>' +
+    '<button data-vote="참석" class="' + (amIn && mine && mine.v === '참석' ? 'on' : '') + '"' + (lk ? ' disabled' : '') + '>참석</button>' +
     '<button data-vote="불참" class="' + (!amIn && mine && mine.v === '불참' ? 'on no' : '') + '"' + (lk ? ' disabled' : '') + '>불참</button></div>' +
     '<div class="cnt"><span>지금 <b>' + total + '명</b> · 회원 ' + att.length + ' + 게스트 ' + (g.guests || []).length + '</span><em class="' + (total >= minN() ? 'ok' : 'low') + '">' + status + '</em></div>' +
     '<div class="names">' + att.map((n) => '<span class="' + (n === S.me.name ? 'me' : '') + '">' + lvPill(lvOfName(n)) + esc(n) + '</span>').join('') + ((g.guests || []).length ? '<span class="g">게스트 ' + g.guests.length + '명</span>' : '') + '</div></section>' +
@@ -643,12 +643,12 @@ function homeHTML() {
   let gcard = '<section class="card soft"><span class="lbl">다음 경기</span><h2 style="margin-top:6px">아직 정해지지 않았어요</h2></section>';
   if (g) {
     const att = attendOf(g), total = att.length + (g.guests || []).length, mine = S.votes[S.me.name], amIn = att.indexOf(S.me.name) >= 0, lk = locked(g);
-    const st = amIn ? ['in', '참석'] : mine && mine.v === '불참' ? ['out', '불참'] : ['none', '아직 응답 안 함'];
+    const st = amIn ? ['in', mine && mine.v === '참석' ? '참석' : '참석 (관리자 체크)'] : mine && mine.v === '불참' ? ['out', '불참'] : ['none', '아직 응답 안 함'];
     gcard = '<section class="card nextg"><div class="h2row"><span class="lbl">다음 경기</span><span class="mystat ' + st[0] + '">나: ' + st[1] + '</span></div>' +
       '<div class="ng-date">' + md(g.date) + ' <small>(' + day(g.date) + ')</small> ' + esc(g.time) + '</div>' +
       '<div class="ng-sub">' + esc(S.pub.place || '') + (S.pub.place ? ' · ' : '') + '지금 <b>' + total + '명</b> · ' + sideTxt(total) + '</div>' + wxLine(g) +
       cdHTML(g) +
-      (lk ? '' : '<div class="vote sm"><button data-vote="참석" class="' + (amIn ? 'on' : '') + '">참석</button><button data-vote="불참" class="' + (st[0] === 'out' ? 'on no' : '') + '">불참</button></div>') +
+      (lk ? '' : '<div class="vote sm"><button data-vote="참석" class="' + (amIn && mine && mine.v === '참석' ? 'on' : '') + '">참석</button><button data-vote="불참" class="' + (st[0] === 'out' ? 'on no' : '') + '">불참</button></div>') +
       '<button class="more" data-go="week">참석 명단 · 팀 편성 보기 ›</button></section>';
   }
   const tile = (go, lbl, val, sub, cls) => '<button class="tile ' + (cls || '') + '" data-go="' + go + '"><span>' + lbl + '</span><b>' + val + '</b><small>' + sub + '</small></button>';
