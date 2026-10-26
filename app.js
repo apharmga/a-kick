@@ -738,22 +738,33 @@ function reqHTML() {
   if (!rs.length) return '';
   const act = S.members.filter((m) => m.state !== '탈퇴');
   return '<div class="panel pad reqbox"><div class="g-lbl2">가입 신청 ' + rs.length + '건 · 승인해야 회원 화면이 열려요</div>' + rs.map((r) => {
-    const same = act.find((m) => m.name === r.name.trim());
-    return '<div class="req"><div class="rq"><b>' + esc(r.name) + '</b><small>' + esc(r.email || '') + '</small></div>' +
-      '<select data-rsel="' + r.id + '"><option value="">+ 새 회원으로 등록 (' + esc(r.name) + ')</option>' + act.map((m) => '<option value="' + m.id + '"' + (same && same.id === m.id ? ' selected' : '') + '>' + esc(m.name) + (S.claims[m.id] ? ' (연결됨: ' + esc(S.claims[m.id].email || '') + ')' : '') + '</option>').join('') + '</select>' +
+    const nm = r.name.trim(), same = S.members.filter((m) => m.name === nm || (m.payers || []).some((p) => p.replace(/\s/g, '') === nm.replace(/\s/g, '')));
+    // 같은 이름이 있으면 자동으로 고르지 않음: 기존 회원 본인인지, 동명이인 새 사람인지 관리자가 직접 고름
+    return '<div class="req"><div class="rq"><b>' + esc(r.name) + '</b><small>' + esc(r.email || '') + '</small>' +
+      (same.length ? '<em class="dup">⚠ 같은 이름 회원이 있어요: ' + same.map((m) => esc(m.name) + ' (가입 ' + esc(m.join || '-') + (S.claims[m.id] ? ' · ' + esc(S.claims[m.id].email || '연결됨') : ' · 아직 미가입') + ')').join(', ') + ' — 본인인지 꼭 확인하세요</em>' : '') + '</div>' +
+      '<select data-rsel="' + r.id + '">' + (same.length ? '<option value="?" selected>— 누구인지 골라주세요 —</option>' : '') + '<option value="">+ 새 회원으로 등록' + (same.length ? ' (동명이인)' : ' (' + esc(r.name) + ')') + '</option>' + act.map((m) => '<option value="' + m.id + '">' + esc(m.name) + (S.claims[m.id] ? ' (연결됨: ' + esc(S.claims[m.id].email || '') + ')' : '') + '</option>').join('') + '</select>' +
       '<button class="btn pri sm" data-rok="' + r.id + '">승인</button><button class="btn ghost sm" data-rno="' + r.id + '">거절</button></div>';
   }).join('') + '</div>';
 }
 async function approve(uid) {
   const r = S.reqs.find((x) => x.id === uid), mid = document.querySelector('[data-rsel="' + uid + '"]').value;
+  if (mid === '?') return toast('기존 회원 본인인지, 새 회원(동명이인)인지 먼저 골라주세요');
   let m = S.members.find((x) => x.id === mid);
   if (!m) {
-    m = { id: 'M' + String(S.members.length + 1).padStart(3, '0'), name: r.name.trim(), join: today(), quit: '', state: '활동', fee: 0, payers: [r.name.trim()] };
+    let name = r.name.trim();
+    if (S.members.some((x) => x.name === name)) {          // 동명이인: 팀 안에서 겹치지 않는 표시 이름 필수
+      let k = 2; while (S.members.some((x) => x.name === r.name.trim() + k)) k++;
+      name = (prompt('같은 이름 회원이 이미 있어요.\n이 사람을 구분할 이름을 정해주세요 (예: ' + r.name.trim() + 'B, ' + r.name.trim() + '(91))', r.name.trim() + k) || '').trim();
+      if (!name) return;
+      if (S.members.some((x) => x.name === name)) return toast('그 이름도 이미 있어요. 다른 이름으로 해주세요');
+    }
+    m = { id: 'M' + String(S.members.length + 1).padStart(3, '0'), name, join: today(), quit: '', state: '활동', fee: 0, payers: [r.name.trim()] };
+    if (name !== r.name.trim()) m.realName = r.name.trim();   // 동명이인: 통장에 찍히는 실제 이름
     while (S.members.some((x) => x.id === m.id)) m.id = 'M' + String(+m.id.slice(1) + 1).padStart(3, '0');
     if (!confirm(m.name + ' 님을 새 회원(가입일 오늘)으로 등록하고 승인할까요?')) return;
     S.members.push(m); await putMember(m);
   } else if (S.claims[m.id] && S.claims[m.id].uid !== uid) {
-    if (!confirm(m.name + ' 이름은 이미 ' + (S.claims[m.id].email || '다른 계정') + '에 연결돼 있어요. 새 계정으로 바꿀까요?')) return;
+    if (!confirm('⚠ ' + m.name + ' 님은 이미 ' + (S.claims[m.id].email || '다른 계정') + '으로 쓰고 있어요.\n\n동명이인이면 [취소] 후 \'새 회원으로 등록\'을 고르세요.\n같은 사람이 계정을 바꾼 거라면 [확인] (기존 계정은 로그아웃돼요).')) return;
     await deleteDoc(D('users', S.claims[m.id].uid)).catch(() => {});
   }
   const b = writeBatch(db);
@@ -811,7 +822,9 @@ function editMember(id) {
         mon(st) + '부터는 매달 ' + won(S.cfg.fee) + '원이에요.' + (S.cfg.account ? '\n🏦 ' + S.cfg.account : ''));
     };
     el.querySelector('#ok').onclick = async () => {
-      m.name = el.querySelector('#n').value.trim(); if (!m.name) return toast('이름을 넣어주세요');
+      const nn = el.querySelector('#n').value.trim(); if (!nn) return toast('이름을 넣어주세요');
+      if (S.members.some((x) => x.id !== m.id && x.name === nn)) return toast('같은 이름 회원이 이미 있어요. 동명이인이면 ' + nn + 'B처럼 구분해 주세요');
+      m.name = nn;
       m.join = el.querySelector('#j').value; m.state = el.querySelector('#s').value; m.quit = el.querySelector('#q').value;
       if (m.state === '탈퇴' && !m.quit) m.quit = today();
       m.payers = el.querySelector('#p').value.split(',').map((x) => x.trim()).filter(Boolean); if (m.payers.indexOf(m.name) < 0) m.payers.unshift(m.name);
@@ -985,7 +998,7 @@ function openSettingsReal() {
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
     themeHTML() +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
-    '<div class="muted" style="margin-top:8px">A-KICK v0.26</div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK v0.27</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
     bindTheme(m);

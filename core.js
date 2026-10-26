@@ -225,6 +225,12 @@
       if (/이자/.test(t.desc) || /예금이자/.test(t.type)) return { parts: [{ cls: '이자', amt: t.amt }], state: '자동', reason: '통장 이자' };
       if (/취소/.test(t.desc)) return need('취소 입금이에요. 같은 금액 출금과 짝이면 "무시"를 눌러주세요.', { label: '무시', state: '무시' });
 
+      // 동명이인: 같은 입금자명을 가진 회원이 둘 이상이고 금액이 '전원 합계'가 아니면 자동으로 정하지 않음
+      // (부부·가족이 대신 내는 경우와 구분: 실제 이름(realName, 없으면 표시 이름)이 입금자명과 같은 회원이 둘 이상일 때만)
+      if (hit && !partial) {
+        var twins = hit.filter(function (m) { return String(m.realName || m.name).replace(/\s/g, '') === key; });
+        if (twins.length > 1) return need('동명이인 ' + twins.map(function (m) { return m.name; }).join('·') + ' — 누구 돈인지 골라주세요');
+      }
       if (hit && !partial) {
         var dtYM = ymOf(t.dt), day = +t.dt.substr(8, 2);
         // 1) 첫 달 회비 (회비 시작 전 달에 예정 금액이 들어오면)

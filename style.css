@@ -347,3 +347,4 @@ body{background:var(--bg);background-image:var(--bg-grad);background-attachment:
 .btn.pri:hover,.g-btn:hover{filter:brightness(.96);background:var(--btn)}
 .sguide{margin-bottom:12px;border-left:4px solid var(--navy)}
 .sguide ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5}
+.req .dup{display:block;font-style:normal;color:#B45309;background:#FFF7E6;border-radius:8px;padding:4px 8px;margin-top:4px;font-size:12px}
