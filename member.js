@@ -1221,12 +1221,13 @@ async function wxRefresh(g) {
   catch (e) { /* 날씨 서버가 잠깐 안 되면 다음에 다시 */ }
   wxBusy = false;
 }
-function wxLine(g) {
+function wxLine(g) { try { return wxLine0(g); } catch (e) { logErr('날씨 표시 실패: ' + e.message, e.stack); return ''; } }
+function wxLine0(g) {
   const w = S.wx; if (!g) return '';
-  if (!w || w.date !== g.date) return (Date.parse(g.date) - Date.now()) / 864e5 > 15 ? '<div class="wx soft">🌤️ 날씨는 경기 15일 전부터 나와요</div>' : '';
+  if (!w || w.date !== g.date) return (Date.parse(g.date) - Date.now()) / 864e5 > 15 ? '<div class="wx wx-soft">🌤️ 날씨는 경기 15일 전부터 나와요</div>' : '';
   const [ic, lb] = window.Core.wxLabel(w.code), mx = w.mx != null ? w.mx : w.pr, pv = window.Core.playable(mx, w.st || w.code >= 95);
-  return '<div class="wx ' + pv.lv + '"><span class="wi">' + ic + '</span><div class="wmain"><div class="w1"><b>' + w.t + '°</b><span>' + lb + '</span></div><div class="w2"><span>강수확률 <b>' + w.pop + '%</b></span><span>강수량 <b>' + (mx > 0 ? mx + 'mm/시간' : '비 없음') + '</b></span></div></div>' +
-    '<em>' + pv.text + '</em><small>경기 ' + (g.time || '').substr(0, 5) + '부터 2시간 · ' + new Date(w.at).getHours() + '시 업데이트</small></div>';
+  return '<div class="wx wx-' + pv.lv + '"><span class="wi">' + ic + '</span><div class="wmain"><div class="w1"><b>' + w.t + '°</b><span>' + lb + '</span></div><div class="w2"><span>강수확률 <b>' + w.pop + '%</b></span><span>강수량 <b>' + (mx > 0 ? mx + 'mm/시간' : '비 없음') + '</b></span></div></div>' +
+    '<em><b>' + pv.text.split(/ · | \(/)[0] + '</b><i>' + (pv.text.split(/ · | \(/)[1] || '').replace(')', '') + '</i>' + '</em><small>경기 ' + (g.time || '').substr(0, 5) + '부터 2시간 · ' + new Date(w.at).getHours() + '시 업데이트</small></div>';
 }
 
 /* ---------------- 앱 개발자에게 건의 · 후원 ---------------- */

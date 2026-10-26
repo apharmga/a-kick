@@ -387,7 +387,7 @@ body.noscroll{overflow:hidden}
 /* ---- 날씨 ---- */
 .wx{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;background:var(--bg);border-radius:12px;padding:8px 12px;margin:8px 0;font-size:13px}
 .wx .wi{font-size:20px}.wx b{font-size:17px}.wx em{font-style:normal;font-weight:800;color:var(--navy);width:100%;font-size:12.5px}.wx small{margin-left:auto;color:var(--sub);font-size:11px}
-.wx.ok em{color:#15803D}.wx.warn{background:#FFFBEB}.wx.warn em{color:#B45309}.wx.bad{background:#FEF2F2}.wx.bad em{color:#B91C1C}.wx.soft{color:var(--sub)}
+.wx.wx-ok em{color:#15803D}.wx.wx-warn{background:#FFFBEB}.wx.wx-warn em{color:#B45309}.wx.wx-bad{background:#FEF2F2}.wx.wx-bad em{color:#B91C1C}.wx.wx-soft{color:var(--sub)}
 .wx b.mm{font-size:13px}
 .lvb{border:0;cursor:pointer}
 .lvg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 6px;margin:10px 0}.lvg div{display:flex;flex-direction:column;align-items:center;gap:1px}.lvg b{font-size:13px}.lvg small{font-size:11px;color:var(--sub);margin-bottom:3px}
@@ -399,7 +399,7 @@ body.noscroll{overflow:hidden}
 .wx .w2{font-size:12.5px;color:var(--sub);display:flex;flex-wrap:wrap;gap:0 10px}.wx .w2 span{white-space:nowrap}.wx{text-align:left}.wx .w2 b{color:var(--ink)}
 .wx em{grid-column:1/-1;margin-top:6px;padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.75);font-size:13px}
 .wx small{grid-column:1/-1;margin:2px 0 0;text-align:right}
-.wx.soft{display:block!important}
+.wx.wx-soft{display:block!important}
 /* ---- 투표 카운트다운 · 후원 · 가위바위보 마지막 판 ---- */
 .pcd{white-space:nowrap}.pcd b{font-variant-numeric:tabular-nums;color:var(--navy)}
 .dona p{margin:8px 0;font-size:14px;line-height:1.6}.dona .acrow{display:flex;gap:8px;align-items:center;background:var(--bg);border-radius:12px;padding:10px 12px;margin-top:10px}.dona .acrow b{flex:1;font-size:13.5px}
@@ -417,3 +417,6 @@ body.noscroll{overflow:hidden}
 .wx .wmain{flex:1 1 150px;min-width:0}
 .wx em{flex:1 1 170px;margin:0;align-self:stretch;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px 12px;font-size:14px;font-weight:800;border-radius:12px}
 .wx small{flex:1 1 100%;margin:0}
+.wx{width:100%;max-width:none}
+.wx em{flex-direction:column;gap:1px;line-height:1.3}.wx em b{font-size:14px;color:inherit}.wx em i{font-style:normal;font-size:12px;font-weight:600;opacity:.85}
+.wx .wmain{flex:1 1 170px}.wx em{flex:1 1 140px}
