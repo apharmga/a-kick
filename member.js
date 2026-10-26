@@ -359,7 +359,7 @@ function weekDays() {
   return [...Array(7)].map((_, i) => { const d = new Date(x); d.setDate(x.getDate() + i); return ymd(d); });
 }
 function txChip(t) {
-  return '<div class="txc' + (t.off ? ' off' : '') + '"><div class="txt"><b>' + esc(t.who) + '</b><span class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</span></div><small>' + esc(t.off ? '장부 제외' : t.what) + '</small></div>';
+  return '<div class="txc' + (t.off ? ' off' : '') + '"><div class="txt"><b>' + esc(t.who) + '</b><span class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</span></div><small>' + esc(t.off ? '장부 제외' : t.what + (t.pend ? ' · 통장 확인 전' : '')) + '</small></div>';
 }
 function weekTxHTML() {
   const days = weekDays(), all = S.pub.txs || [], tday = ymd(new Date());
@@ -379,7 +379,7 @@ function bankHTML() {
   const bal = all.length ? all[0].bal : 0;
   return '<header class="hero">' + heroTop() + '<h1>통장 잔액 ' + won(bal) + '원</h1><p>모임통장 입출금 전체 · 관리자가 올린 거래내역 기준</p></header><main class="pad lift">' +
     Object.keys(byM).map((ym) => '<section class="card"><h2>' + ym.substr(0, 4) + '년 ' + mon(ym) + '</h2><div class="blist">' + byM[ym].map((t) =>
-      '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b><small>' + won(t.bal) + '</small></span></div>').join('') + '</div></section>').join('') +
+      '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what + (t.pend ? ' · 통장 확인 전' : '')) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b><small>' + won(t.bal) + '</small></span></div>').join('') + '</div></section>').join('') +
     (all.length ? '' : '<section class="card soft"><p class="muted">아직 올라온 거래가 없어요</p></section>') + '</main>';
 }
 function weekHTML() {
@@ -431,7 +431,7 @@ function homeHTML() {
     tile('rec', '내 스탯', (myStat().g) + '골 ' + (myStat().a) + '도움', '참석 ' + r.came + '회 · ' + rate + '%') +
     tile('week', '팀 편성', g && (g.teams || []).length >= 2 ? '공개됨' : '준비 중', g ? md(g.date) + ' 경기' : '-') + '</div>' +
     (recent.length ? '<section class="card"><div class="h2row"><h2>최근 입출금</h2><button class="more inl" data-go="bank">전체 ›</button></div><div class="blist">' + recent.map((t) =>
-      '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b></span></div>').join('') + '</div></section>' : '') +
+      '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what + (t.pend ? ' · 통장 확인 전' : '')) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b></span></div>').join('') + '</div></section>' : '') +
     '<button class="sugbtn" id="sug">💬 관리자에게 건의하기</button>' +
     (S.owner ? '<a class="bigbtn" href="admin.html?c=' + esc(S.cid) + '">관리자 페이지</a>' : '') +
     '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button></div><div class="links"><a class="link" href="privacy.html">개인정보처리방침</a><a class="link" href="terms.html">이용약관</a></div></main>';

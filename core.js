@@ -141,9 +141,29 @@
     });
     return out;
   }
+  /** 잔액 = 통장 엑셀의 마지막 잔액 + 아직 통장에서 확인 안 된 직접 입력 건 */
   function balance(txs) {
-    var s = txs.slice().sort(function (a, b) { return a.dt < b.dt ? -1 : 1; });
-    return s.length ? s[s.length - 1].bal : 0;
+    var s = txs.filter(function (t) { return !t.manual; }).sort(function (a, b) { return a.dt < b.dt ? -1 : 1; });
+    return (s.length ? s[s.length - 1].bal || 0 : 0) + pendingManual(txs).sum;
+  }
+  function pendingManual(txs) {
+    var m = txs.filter(function (t) { return t.manual && t.state !== '무시'; });
+    return { n: m.length, sum: m.reduce(function (a, t) { return a + (t.kind === '입금' ? t.amt : -t.amt); }, 0), list: m };
+  }
+  /* ---------- 직접 입력 ↔ 통장 거래 짝 찾기 (구글시트 시절 기준: 같은 금액·구분, 하루 차이까지, 이름 비슷) ---------- */
+  function nmCore(x) { return String(x || '').replace(/외\s*\d+/g, '').replace(/[^가-힣A-Za-z]/g, ''); }
+  function nmMatch(a, b) { var x = nmCore(a), y = nmCore(b); return !!x && !!y && (x === y || x.indexOf(y) >= 0 || y.indexOf(x) >= 0); }
+  function dayGap(a, b) { return Math.abs((new Date(dtDate(a) + 'T00:00:00') - new Date(dtDate(b) + 'T00:00:00')) / 86400000); }
+  function sameTx(m, b, days) { return m.amt === b.amt && m.kind === b.kind && dayGap(m.dt, b.dt) <= (days == null ? 1 : days) && nmMatch(m.desc, b.desc); }
+  /** 새로 들어온 통장 거래(fresh)마다 짝이 되는 직접 입력 건 1:1로 찾기 → [[통장건, 직접입력건], ...] */
+  function matchManual(fresh, txs) {
+    var man = txs.filter(function (t) { return t.manual; }), used = {}, out = [];
+    fresh.forEach(function (b) {
+      var best = null, bd = 9;
+      man.forEach(function (m) { if (used[m.id] || !sameTx(m, b)) return; var g = dayGap(m.dt, b.dt); if (g < bd) { best = m; bd = g; } });
+      if (best) { used[best.id] = 1; out.push([b, best]); }
+    });
+    return out;
   }
   /** 월 장부 (회비는 귀속월, 게스트비·구장비는 경기 달) */
   function book(txs, games, ym) {
@@ -392,8 +412,8 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.29';
-  var Core = { VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
+  var VERSION = 'v0.30';
+  var Core = { pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
     balance: balance, book: book, nearestGame: nearestGame, nextGameAfter: nextGameAfter, gamesInMonth: gamesInMonth,

@@ -348,3 +348,12 @@ body{background:var(--bg);background-image:var(--bg-grad);background-attachment:
 .sguide{margin-bottom:12px;border-left:4px solid var(--navy)}
 .sguide ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5}
 .req .dup{display:block;font-style:normal;color:#B45309;background:#FFF7E6;border-radius:8px;padding:4px 8px;margin-top:4px;font-size:12px}
+.seg{display:flex;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:10px 0}
+.seg button{flex:1;min-height:42px;border:0;background:#fff;font:inherit;font-weight:700;color:var(--sub);cursor:pointer}
+.seg button.on{background:var(--navy);color:#fff}
+.mprev{background:#F6F7FA;border-radius:10px;padding:10px 12px;font-size:13px;margin-top:8px;color:var(--ink2)}
+.mprev.warn{background:#FFF7E6;color:#92400E}
+.mtag{font-style:normal;font-size:11px;font-weight:700;background:#EEF2FF;color:var(--navy);border-radius:6px;padding:1px 6px}
+.mtag.bad{background:#FEE2E2;color:#B91C1C}
+.mtool{background:#F8FAFC;border:1px dashed var(--line);border-radius:12px;padding:10px;margin:8px 0;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.pill.gry{background:#F1F5F9;color:#475569}
