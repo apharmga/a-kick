@@ -122,6 +122,15 @@ service cloud.firestore {
       match /push/{uid} {
         allow read, write: if isMember() && request.auth.uid == uid;
       }
+      // 선수 정보(등번호·포지션): 회원이 본인 것만
+      match /profiles/{mid} {
+        allow read: if isMember();
+        allow write: if isMember() && mid == myMid()
+          && (request.resource == null || (request.resource.data.keys().hasOnly(['num', 'pos', 'uid', 'at'])
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.num is int && request.resource.data.num >= 0 && request.resource.data.num <= 99
+            && request.resource.data.pos is list && request.resource.data.pos.size() <= 2));
+      }
       match /suggest/{id} {
         allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
         allow create: if isMember()

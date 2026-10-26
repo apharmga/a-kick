@@ -122,6 +122,7 @@ async function loadAll() {
     S.games = gs.docs.map((d) => gameIn(d.data())).sort((a, b) => (a.date < b.date ? -1 : 1));
     S.txs = ts.docs.map((d) => d.data()).sort((a, b) => (a.dt < b.dt ? -1 : 1));
     S.skills = sk.exists() ? sk.data() : {};
+    getDocs(CL('profiles')).then((q) => { S.profs = {}; q.docs.forEach((d) => (S.profs[d.id] = d.data())); if (S.view === 'team' || S.view === 'week') render(); }).catch(() => {});
     S.claims = {}; S.goals = []; S.polls = []; S.pvotes = []; S.avotes = []; S.sugs = [];
     const live = (col, key) => onSnapshot(CL(col), (q) => { S[key] = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); if (S.view === 'polls' || (key === 'videos' && S.view === 'stats')) render(); if (key === 'sugs' || key === 'reqs') render(); }, () => {});
     if (!S.pollSub) S.pollSub = [live('polls', 'polls'), live('pollvotes', 'pvotes'), live('anonvotes', 'avotes'), live('videos', 'videos'), live('suggest', 'sugs'), live('requests', 'reqs')];
@@ -534,14 +535,15 @@ function teamOf(g) {
   const missing = players.filter((n) => !inT.has(n)), gone = [...inT].filter((n) => players.indexOf(n) < 0);
   return { teams: g.teams, missing, gone };
 }
+const numOf = (name) => { const m = S.members.find((x) => x.name === name); const p = m && (S.profs || {})[m.id]; return p && p.num ? p.num : ''; };
 function pitchSide(team, side, ti, gid, plain) {
   const ord = C.order(team, gid + ':' + ti), f = FORM[Math.min(11, Math.max(3, ord.length))] || FORM[5];
   return ord.map((name, i) => {
     const pos = f[i] || [46, 10 + ((i - f.length) * 16) % 80];
     const x = side === 'L' ? pos[0] : 100 - pos[0];
-    if (plain) return '<div class="tok t' + ti + ' plain" style="left:' + x + '%;top:' + pos[1] + '%"><span class="tok-c"></span><span class="tok-n">' + esc(name) + (i === 0 ? ' <i>GK</i>' : '') + '</span></div>';
+    if (plain) return '<div class="tok t' + ti + ' plain" style="left:' + x + '%;top:' + pos[1] + '%"><span class="tok-c">' + numOf(name) + '</span><span class="tok-n">' + esc(name) + (i === 0 ? ' <i>GK</i>' : '') + '</span></div>';
     const sel = S.pick === name ? ' sel' : '';
-    return '<button class="tok t' + ti + sel + '" style="left:' + x + '%;top:' + pos[1] + '%" data-pick="' + esc(name) + '" aria-label="' + esc(name) + ' ' + scoreOf(name) + '점"><span class="tok-c">' + scoreOf(name) + '</span><span class="tok-n">' + esc(name) + (i === 0 ? ' <i>GK</i>' : '') + '</span></button>';
+    return '<button class="tok t' + ti + sel + '" style="left:' + x + '%;top:' + pos[1] + '%" data-pick="' + esc(name) + '" aria-label="' + esc(name) + ' ' + scoreOf(name) + '점"><span class="tok-c">' + scoreOf(name) + '</span><span class="tok-n">' + (numOf(name) ? '<small>' + numOf(name) + '</small> ' : '') + esc(name) + (i === 0 ? ' <i>GK</i>' : '') + '</span></button>';
   }).join('');
 }
 function teamHTML() {

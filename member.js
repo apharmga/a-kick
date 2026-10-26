@@ -292,6 +292,37 @@ function openNotify() {
   });
 }
 
+/* ---------------- 선수 정보 (등번호·포지션, 선택) ---------------- */
+const POS = ['GK', 'DF', 'MF', 'FW'];
+function profOf(name) { const m = (S.pub.members || []).find((x) => x.name === name); return (m && (S.profs || {})[m.id]) || null; }
+function profCard() {
+  const p = (S.profs || {})[S.me.mid] || {};
+  return '<section class="card"><div class="h2row"><h2>내 선수 정보 <small class="muted">선택</small></h2><button class="more inl" id="pedit">' + (p.num || (p.pos || []).length ? '수정 ›' : '입력 ›') + '</button></div>' +
+    '<div class="pinfo">' + (p.num ? '<b class="pnum">' + p.num + '</b>' : '<span class="muted">등번호 없음</span>') + ((p.pos || []).length ? p.pos.map((x) => '<em class="ppos">' + x + '</em>').join('') : '') + '</div>' +
+    '<div class="muted" style="font-size:12px">등번호는 팀 편성 그림에 표시돼요</div></section>';
+}
+function openProfile() {
+  const p = (S.profs || {})[S.me.mid] || {}; let pos = (p.pos || []).slice();
+  sheet('<h2>내 선수 정보</h2><div class="muted">모두 선택이에요. 등번호는 팀 편성 그림의 동그라미 안에 떠요.</div>' +
+    '<label class="f">등번호 (1~99)<input id="pn" type="number" inputmode="numeric" min="1" max="99" value="' + (p.num || '') + '"></label>' +
+    '<div class="wl">주 포지션 (최대 2개)</div><div class="ppick">' + POS.map((x) => '<button data-pp="' + x + '" class="' + (pos.indexOf(x) >= 0 ? 'on' : '') + '">' + x + '<small>' + { GK: '골키퍼', DF: '수비', MF: '미드필더', FW: '공격' }[x] + '</small></button>').join('') + '</div>' +
+    '<div class="srow"><button id="px2">닫기</button><button class="pri" id="psv">저장</button></div>', (el) => {
+    el.querySelectorAll('[data-pp]').forEach((b) => (b.onclick = () => {
+      const x = b.dataset.pp; if (pos.indexOf(x) >= 0) pos = pos.filter((y) => y !== x); else { pos.push(x); if (pos.length > 2) pos.shift(); }
+      el.querySelectorAll('[data-pp]').forEach((y) => y.classList.toggle('on', pos.indexOf(y.dataset.pp) >= 0));
+    }));
+    el.querySelector('#px2').onclick = () => (el.hidden = true);
+    el.querySelector('#psv').onclick = async () => {
+      const n = +el.querySelector('#pn').value || 0;
+      if (n && (n < 1 || n > 99)) return toast('등번호는 1~99로 넣어주세요');
+      const dup = n && Object.entries(S.profs || {}).find(([mid, x]) => mid !== S.me.mid && x.num === n);
+      if (dup) { const who = (S.pub.members || []).find((m) => m.id === dup[0]); if (!confirm((who ? who.name + ' 님이' : '다른 회원이') + ' 이미 ' + n + '번이에요. 그래도 쓸까요?')) return; }
+      try { await setDoc(doc(db, 'clubs', S.cid, 'profiles', S.me.mid), { num: n, pos, uid: S.uid, at: Date.now() }); el.hidden = true; toast('저장했어요'); }
+      catch (e) { toast('저장 실패: ' + e.message); logErr('프로필 저장 실패: ' + e.message, e.stack); }
+    };
+  });
+}
+
 /* ---------------- 탈퇴 · 계정 삭제 ---------------- */
 async function wipeMine(cid) {                       // 한 팀 안의 내 흔적 지우기 (이름이 들어간 장부 기록은 관리자 소유라 남음)
   const C = (c) => collection(db, 'clubs', cid, c), del = (q) => getDocs(q).then((r) => Promise.all(r.docs.map((d) => deleteDoc(d.ref).catch(() => {})))).catch(() => {});
@@ -303,6 +334,7 @@ async function wipeMine(cid) {                       // 한 팀 안의 내 흔�
   const u = await getDoc(doc(db, 'clubs', cid, 'users', S.uid)).catch(() => null);
   if (u && u.exists()) await deleteDoc(doc(db, 'clubs', cid, 'claims', u.data().mid)).catch(() => {});
   await deleteDoc(doc(db, 'clubs', cid, 'push', S.uid)).catch(() => {});
+  if (u && u.exists()) await deleteDoc(doc(db, 'clubs', cid, 'profiles', u.data().mid)).catch(() => {});
   await deleteDoc(doc(db, 'clubs', cid, 'users', S.uid)).catch(() => {});
   await deleteDoc(doc(db, 'clubs', cid, 'requests', S.uid)).catch(() => {});
 }
@@ -348,7 +380,7 @@ async function deleteClub(cid, name) {
   if (t.trim() !== name) return toast('팀 이름이 달라서 삭제하지 않았어요');
   view('<div class="center">삭제하는 중... (몇 초 걸려요)</div>');
   try {
-    for (const c of ['members', 'games', 'tx', 'config', 'private', 'pub', 'votes', 'goals', 'polls', 'pollvotes', 'anonvotes', 'anonmark', 'videos', 'vcomments', 'push', 'suggest', 'requests', 'claims', 'users']) {
+    for (const c of ['members', 'games', 'tx', 'config', 'private', 'pub', 'votes', 'goals', 'polls', 'pollvotes', 'anonvotes', 'anonmark', 'videos', 'vcomments', 'push', 'profiles', 'suggest', 'requests', 'claims', 'users']) {
       const q = await getDocs(collection(db, 'clubs', cid, c));
       for (let i = 0; i < q.docs.length; i += 400) { const b = writeBatch(db); q.docs.slice(i, i + 400).forEach((d) => b.delete(d.ref)); await b.commit(); }
     }
@@ -399,6 +431,7 @@ function watchVotes() {
       onSnapshot(collection(db, 'clubs', S.cid, 'anonvotes'), (q) => { S.avotes = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render(); }, () => {})];
   }
   if (S.me && !S.goalSub) S.goalSub = onSnapshot(collection(db, 'clubs', S.cid, 'goals'), (q) => { S.goals = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render(); }, () => {});
+  if (S.me && !S.profSub) S.profSub = onSnapshot(collection(db, 'clubs', S.cid, 'profiles'), (q) => { S.profs = {}; q.docs.forEach((d) => (S.profs[d.id] = d.data())); render(); }, () => {});
   if (S.me && !S.vcSub) S.vcSub = onSnapshot(collection(db, 'clubs', S.cid, 'vcomments'), (q) => { S.vcAll = q.docs.map((d) => d.data()); if (!$('#vov')) render(); }, () => {});
   if (S.me && !S.vidSub) S.vidSub = onSnapshot(collection(db, 'clubs', S.cid, 'videos'), (q) => {
     S.videos = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render();
@@ -467,6 +500,7 @@ function render() {
   document.querySelectorAll('[data-gdel]').forEach((b) => (b.onclick = async () => { if (confirm('이 골 기록을 지울까요?')) await deleteDoc(CD('goals', b.dataset.gdel)).catch((e) => toast('삭제 실패: ' + e.message)); }));
   document.querySelectorAll('[data-sort]').forEach((h) => (h.onclick = () => { const [tb, k] = h.dataset.sort.split(':'), st = S.sort[tb] || {}; S.sort[tb] = st.k === k ? { k, d: ((st.d || 0) + 1) % 3 } : { k, d: 1 }; render(); }));
   document.querySelectorAll('[data-poll]').forEach((b) => (b.onclick = () => openPoll(b.dataset.poll)));
+  const pe = $('#pedit'); if (pe) pe.onclick = openProfile;
   document.querySelectorAll('[data-vid]').forEach((b) => (b.onclick = () => openVideo(b.dataset.vid)));
   const sg = $('#sug'); if (sg) sg.onclick = openSuggest;
   autoPopup();
@@ -523,7 +557,7 @@ function side(team, bottom, cls, seed) {
   const ord = window.Core.order(team, seed), f = FORM[Math.min(11, Math.max(3, ord.length))];
   return ord.map((n, i) => {
     const p = f[i] || [46, 15 + i * 10], top = bottom ? 100 - p[0] : p[0];
-    return '<div class="ptok" style="left:' + p[1] + '%;top:' + top + '%"><span class="dot ' + cls + (n === S.me.name ? ' me' : '') + '"></span><span class="pn">' + esc(n) + (i === 0 ? ' <i>GK</i>' : '') + '</span></div>';
+    return '<div class="ptok" style="left:' + p[1] + '%;top:' + top + '%"><span class="dot ' + cls + (n === S.me.name ? ' me' : '') + '">' + ((profOf(n) || {}).num || '') + '</span><span class="pn">' + esc(n) + (i === 0 ? ' <i>GK</i>' : '') + '</span></div>';
   }).join('');
 }
 function weekDays() {
@@ -733,7 +767,7 @@ function recHTML() {
   const th = (k, l) => sortTh('st', k, l);
   return '<header class="hero">' + heroTop() + '<h1>경기기록</h1><p>골·도움 기록과 하이라이트 영상. 골·도움은 회원 누구나 넣고 고칠 수 있어요</p></header>' +
     '<main class="pad lift"><section class="card"><h2>내 기록 <small class="muted">전체 기간</small></h2><div class="stats four"><div><b>' + me.gp + '</b><span>경기</span></div><div><b>' + me.g + '</b><span>골</span></div><div><b>' + me.a + '</b><span>도움</span></div><div><b>' + rate + '%</b><span>참석률</span></div></div>' +
-    '<div class="dots">' + r.last.map((x) => '<span class="' + (x ? 'on' : '') + '"></span>').join('') + '</div></section>' +
+    '<div class="dots">' + r.last.map((x) => '<span class="' + (x ? 'on' : '') + '"></span>').join('') + '</div></section>' + profCard() +
     '<section class="card"><div class="h2row"><h2>골·도움 순위</h2><select id="sym"><option value="">전체 기간</option>' + yms.map((y) => '<option value="' + y + '"' + (y === S.sym ? ' selected' : '') + '>' + y.substr(0, 4) + '년 ' + mon(y) + '</option>').join('') + '</select></div>' +
     '<div class="muted" style="margin-top:4px">제목을 누르면 기본 → 내림차순 → 오름차순</div>' +
     '<table class="stab"><thead><tr>' + th('name', '이름') + th('gp', '경기') + th('g', '골') + th('a', '도움') + th('ap', '공격P') + '</tr></thead><tbody>' +

@@ -309,3 +309,14 @@ body.noscroll{overflow:hidden}
 .tab{position:relative}
 .tb{position:absolute;top:4px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:#EF4444;color:#fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;border:2px solid #fff;font-style:normal}
 .ntfbox{background:#F1F5F9;border-radius:12px;padding:12px;font-size:14px;line-height:1.6}
+.pinfo{display:flex;align-items:center;gap:8px;margin:4px 0}
+.pnum{font-size:26px;font-weight:900;color:var(--navy);font-family:Bungee,Pretendard,sans-serif}
+.ppos{font-style:normal;background:var(--tint);color:var(--navy);font-weight:800;font-size:12px;border-radius:999px;padding:3px 9px}
+.ppick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ppick button{border:1.5px solid #D5DBE7;background:#fff;border-radius:12px;min-height:56px;font:inherit;font-weight:900;font-size:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--ink)}
+.ppick button small{font-size:11px;font-weight:600;color:var(--sub)}
+.ppick button.on{border-color:var(--navy);background:var(--tint);color:var(--navy)}
+.ptok .dot{display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:900}
+.sbox label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700;color:var(--sub)}
+.sbox label.f input{min-height:46px;border:1px solid #D5DBE7;border-radius:12px;padding:0 12px;font:inherit;font-size:16px;color:var(--ink)}
+.sbox .wl{font-size:13px;font-weight:700;color:var(--sub)}
