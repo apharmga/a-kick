@@ -885,7 +885,7 @@ function pollsHTML() {
       '<div class="muted">' + (p.multi ? '복수 선택' : '하나만 선택') + (p.allowAdd ? ' · 회원 보기 추가 가능' : '') + ' · ' + (p.deadline ? md(p.deadline.substr(0, 10)) + ' ' + p.deadline.substr(11, 5) + ' 마감' : '마감 없음') + ' · 참여 ' + vs.length + '/' + mem.length + '명</div>' +
       opts.map((o) => '<div class="bar2"><div class="bl"><span>' + esc(o.text) + (o.user ? ' <em class="tag gry">회원 추가</em>' : '') + '</span><b>' + o.who.length + '</b></div><div class="bt"><i style="width:' + (o.who.length / mx * 100) + '%"></i></div>' + (p.anon ? '' : '<small>' + esc(o.who.join(', ')) + '</small>') + '</div>').join('') +
       (p.anon ? '<div class="muted" style="margin-top:6px">🔒 익명 투표라 누가 뭘 골랐는지는 관리자 화면에도 안 나와요</div>' : '') + (not.length ? '<div class="muted" style="margin-top:6px">아직 안 한 사람: ' + esc(not.join(', ')) + '</div>' : '') +
-      '<div class="row" style="margin-top:10px"><button class="btn sm" data-pcopy="' + p.id + '">' + IC.copy + ' 카톡 공지 문구</button>' + (pollOpen(p) ? '<button class="btn sm" data-pclose="' + p.id + '">지금 마감</button>' : '') + '<button class="btn sm ghost" data-pdel="' + p.id + '">삭제</button></div></div>';
+      '<div class="row" style="margin-top:10px"><button class="btn sm" data-pcopy="' + p.id + '">' + IC.copy + ' 카톡 공지 문구</button>' + (pollOpen(p) ? '<button class="btn sm" data-pclose="' + p.id + '">지금 마감</button>' : '') + '<button class="btn sm" data-pedit="' + p.id + '">설정 고치기</button><button class="btn sm ghost" data-pdel="' + p.id + '">삭제</button></div></div>';
   };
   const sugs = (S.sugs || []).slice().sort((a, b) => b.at - a.at);
   return '<div class="pagehead"><h1>투표 · 공지 · 건의함</h1><div class="ph-act"><button class="btn pri" id="newp">+ 새 투표 · 공지</button></div></div>' +
@@ -894,31 +894,42 @@ function pollsHTML() {
     (sugs.length ? sugs.map((x) => '<div class="sug' + (x.done ? ' done' : '') + '"><div class="sh"><b>' + (x.anon ? '익명' : esc(x.name)) + '</b><small>' + new Date(x.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small><button class="btn xs" data-sdone="' + x.id + '">' + (x.done ? '다시 열기' : '확인함') + '</button></div><div class="st2">' + esc(x.text) + '</div></div>').join('') : '<div class="muted">아직 들어온 건의가 없어요</div>') + '</div></div>';
 }
 function bindPolls() {
-  $('#newp').onclick = newPoll;
+  $('#newp').onclick = () => newPoll();
   document.querySelectorAll('[data-pclose]').forEach((b) => (b.onclick = async () => { const p = S.polls.find((x) => x.id === b.dataset.pclose); p.closed = true; await setDoc(D('polls', p.id), clean(p)).catch(fail); render(); }));
   document.querySelectorAll('[data-pdel]').forEach((b) => (b.onclick = async () => { if (!confirm('이 투표를 지울까요? 결과도 같이 사라져요.')) return; await deleteDoc(D('polls', b.dataset.pdel)).catch(fail); S.pvotes.filter((v) => v.pid === b.dataset.pdel).forEach((v) => deleteDoc(D('pollvotes', v.id)).catch(() => {})); (S.avotes || []).filter((v) => v.pid === b.dataset.pdel).forEach((v) => deleteDoc(D('anonvotes', v.id)).catch(() => {})); }));
+  document.querySelectorAll('[data-pedit]').forEach((b) => (b.onclick = () => newPoll(S.polls.find((x) => x.id === b.dataset.pedit))));
   document.querySelectorAll('[data-pcopy]').forEach((b) => (b.onclick = () => {
     const p = S.polls.find((x) => x.id === b.dataset.pcopy);
     copy('📢 ' + p.title + (p.desc ? '\n\n' + p.desc : '') + '\n\n🗳 투표하기 👉 ' + MEMBER_URL + (p.deadline ? '\n⏰ ' + md(p.deadline.substr(0, 10)) + '(' + C.dayName(p.deadline.substr(0, 10)) + ') ' + p.deadline.substr(11, 5) + ' 마감' : ''));
   }));
   document.querySelectorAll('[data-sdone]').forEach((b) => (b.onclick = async () => { const x = S.sugs.find((y) => y.id === b.dataset.sdone); x.done = !x.done; const o = clean(x); delete o.id; await setDoc(D('suggest', x.id), o).catch(fail); render(); }));
 }
-function newPoll() {
-  modal('<h2>새 투표 · 공지</h2><label class="f">제목<input id="pt" placeholder="예: 우리 팀 이름 정하기" maxlength="60"></label>' +
-    '<label class="f">설명 · 공지 내용 (선택)<textarea id="pd" rows="3" placeholder="예: 후보 중에 골라주세요. 좋은 이름 있으면 직접 추가해도 돼요!"></textarea></label>' +
-    '<label class="f">보기 (한 줄에 하나 · 공지만 할 거면 비워두세요)<textarea id="po" rows="4" placeholder="OO FC&#10;킥앤런&#10;일요일의 전설"></textarea></label>' +
-    '<div class="row"><label class="chk"><input type="checkbox" id="pm"> 여러 개 고를 수 있게</label><label class="chk"><input type="checkbox" id="pa" checked> 회원이 보기 추가 가능</label><label class="chk"><input type="checkbox" id="pan"> 🔒 익명 투표 (누가 뭘 골랐는지 안 보임)</label></div>' +
-    '<div class="row"><label class="f">마감 날짜 (비우면 마감 없음)<input id="pdl" type="date"></label><label class="f">마감 시간' + timeSel('pdt', '22:00') + '</label></div>' +
-    '<div class="muted">만들면 회원이 앱을 열 때 아직 안 한 투표가 바로 팝업으로 떠요.</div>' +
-    '<div class="mfoot"><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">만들기</button></div>', (m) => {
+function newPoll(old) {
+  const e = old || {}, voted = old ? pvOf(old).length : 0, dl = e.deadline || '';
+  const ck = (id, on, lbl, dis) => '<label class="chk"><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + (dis ? ' disabled' : '') + '> ' + lbl + '</label>';
+  modal('<h2>' + (old ? '투표 · 공지 고치기' : '새 투표 · 공지') + '</h2><label class="f">제목<input id="pt" placeholder="예: 우리 팀 이름 정하기" maxlength="60" value="' + esc(e.title || '') + '"></label>' +
+    '<label class="f">설명 · 공지 내용 (선택)<textarea id="pd" rows="3" placeholder="예: 후보 중에 골라주세요. 좋은 이름 있으면 직접 추가해도 돼요!">' + esc(e.desc || '') + '</textarea></label>' +
+    '<label class="f">보기 (한 줄에 하나 · 공지만 할 거면 비워두세요)<textarea id="po" rows="4" placeholder="OO FC&#10;킥앤런&#10;일요일의 전설">' + esc((e.options || []).map((o) => o.text).join('\n')) + '</textarea></label>' +
+    (old && voted ? '<div class="muted">이미 ' + voted + '명이 투표했어요. 보기 이름을 고쳐도 그 보기에 들어간 표는 그대로예요. 보기를 지우면 그 표는 결과에서 빠져요.</div>' : '') +
+    '<div class="row">' + ck('pm', e.multi, '여러 개 고를 수 있게') + ck('pa', old ? e.allowAdd : true, '회원이 보기 추가 가능') + ck('pan', e.anon, '🔒 익명 투표 (누가 뭘 골랐는지 안 보임)', voted) + '</div>' +
+    (voted ? '<div class="muted">익명 여부는 투표가 시작되면 바꿀 수 없어요 (이미 낸 표가 섞이지 않게).</div>' : '') +
+    '<div class="row"><label class="f">마감 날짜 (비우면 마감 없음)<input id="pdl" type="date" value="' + dl.substr(0, 10) + '"></label><label class="f">마감 시간' + timeSel('pdt', dl.substr(11, 5) || '22:00') + '</label></div>' +
+    (old ? '' : '<div class="muted">만들면 회원이 앱을 열 때 아직 안 한 투표가 바로 팝업으로 떠요.</div>') +
+    '<div class="mfoot"><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">' + (old ? '저장' : '만들기') + '</button></div>', (m) => {
     m.querySelector('#cx').onclick = closeModal;
     m.querySelector('#ok').onclick = async () => {
       const title = m.querySelector('#pt').value.trim(); if (!title) return toast('제목을 넣어주세요');
       const lines = m.querySelector('#po').value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 20);
-      const id = 'P' + Date.now().toString(36);
-      const p = { title, desc: m.querySelector('#pd').value.trim(), options: lines.map((t, i) => ({ id: 'o' + (i + 1), text: t })), multi: m.querySelector('#pm').checked,
-        allowAdd: m.querySelector('#pa').checked, anon: m.querySelector('#pan').checked, deadline: m.querySelector('#pdl').value ? m.querySelector('#pdl').value + 'T' + timeVal(m, 'pdt') : '', created: new Date().toISOString(), closed: false };
-      await setDoc(D('polls', id), p).catch(fail); closeModal(); toast('만들었어요 · 카톡 공지 문구도 복사해 보세요'); S.view = 'polls'; render();
+      const prev = e.options || []; let n = prev.reduce((a, o) => Math.max(a, +String(o.id).replace(/\D/g, '') || 0), 0);
+      // 같은 자리·같은 이름의 보기는 id 유지 → 이미 들어간 표가 따라감
+      const used = new Set(), ids = lines.map((t) => { const o = prev.find((x) => x.text === t && !used.has(x.id)); if (o) used.add(o.id); return o ? o.id : ''; });
+      const options = lines.map((t, i) => { let oid = ids[i]; if (!oid && prev[i] && !used.has(prev[i].id)) { oid = prev[i].id; used.add(oid); } return { id: oid || 'o' + (++n), text: t }; });
+      const id = old ? old.id : 'P' + Date.now().toString(36);
+      const dlv = m.querySelector('#pdl').value ? m.querySelector('#pdl').value + 'T' + timeVal(m, 'pdt') : '';
+      const p = { title, desc: m.querySelector('#pd').value.trim(), options, multi: m.querySelector('#pm').checked, allowAdd: m.querySelector('#pa').checked,
+        anon: voted ? !!e.anon : m.querySelector('#pan').checked, deadline: dlv, created: e.created || new Date().toISOString(),
+        closed: old ? (e.closed && !(dlv && Date.parse(dlv) > Date.now() && dlv !== e.deadline)) : false };
+      await setDoc(D('polls', id), p).catch(fail); closeModal(); toast(old ? '고쳤어요' : '만들었어요 · 카톡 공지 문구도 복사해 보세요'); S.view = 'polls'; render();
     };
   });
 }
@@ -962,7 +973,7 @@ function openSettingsReal() {
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
     themeHTML() +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
-    '<div class="muted" style="margin-top:8px">A-KICK v0.22</div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK v0.23</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
     bindTheme(m);

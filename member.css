@@ -264,3 +264,6 @@ body{background:var(--bg);background-image:var(--bg-grad);background-attachment:
 .vote button.on,.names span.me,.newc button,.bigbtn,.acrow button,.srow .pri,.pitem em.todo,.login .gbtn,.extbtn,.warn .extbtn{background:var(--btn);border-color:transparent;color:var(--on-btn);box-shadow:0 4px 14px -6px rgba(15,23,42,.35)}
 .tile{border-top:0;box-shadow:0 1px 3px rgba(15,23,42,.06),inset 0 3px 0 0 var(--acc)}
 .hero{animation:var(--aur,none)}.hero::before{opacity:var(--glow,1)}
+/* v0.23 상단 카드: 아래 흰 박스와 같은 폭·둥근 모서리 */
+.hero{margin:12px 16px 0;border-radius:20px;padding:18px 20px 20px;box-shadow:0 6px 20px -12px rgba(15,23,42,.35)}
+.lift{margin-top:0}
