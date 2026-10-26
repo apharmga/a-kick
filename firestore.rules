@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+
+    // 예전(v0.5까지) 도남풋살 데이터: 옮기기용으로 형님 계정만 읽기
+    function legacy() {
+      return signedIn() && request.auth.token.email == 'apharmga@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    match /config/{d}  { allow read: if legacy(); }
+    match /members/{d} { allow read: if legacy(); }
+    match /games/{d}   { allow read: if legacy(); }
+    match /tx/{d}      { allow read: if legacy(); }
+    match /private/{d} { allow read: if legacy(); }
+
+    // 내 팀 목록 (본인만)
+    match /me/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /clubs/{cid} {
+      function club() { return get(/databases/$(database)/documents/clubs/$(cid)).data; }
+      function isOwner() { return signedIn() && club().owner == request.auth.uid; }
+      function myMid() { return get(/databases/$(database)/documents/clubs/$(cid)/users/$(request.auth.uid)).data.mid; }
+      function isMember() { return signedIn() && exists(/databases/$(database)/documents/clubs/$(cid)/users/$(request.auth.uid)); }
+
+      // 팀 이름·주인: 링크 받은 사람이면 읽기, 만든 사람만 수정
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.owner == request.auth.uid
+        && request.resource.data.keys().hasOnly(['name', 'owner', 'created']);
+      allow update: if signedIn() && resource.data.owner == request.auth.uid
+        && request.resource.data.owner == request.auth.uid;
+      allow delete: if signedIn() && resource.data.owner == request.auth.uid;
+
+      // 팀 안의 모든 데이터(거래·실력 점수·설정): 만든 사람(관리자)만
+      match /{col}/{id} {
+        allow read, write: if isOwner();
+      }
+      // 회원 화면 요약 (실력 점수·거래 상세 없음): 링크 받은 사람
+      // 회원 화면 요약: 승인된 회원만
+      match /pub/{id} {
+        allow read: if isMember();
+      }
+      // 가입 신청: 본인 것만 쓰고 읽기 (승인·거절은 관리자)
+      match /requests/{uid} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['name', 'email', 'at'])
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 20
+          && request.resource.data.email == request.auth.token.email;
+      }
+      // 이름-계정 연결과 회원 승인은 관리자만 (위 isOwner 규칙). 본인 것만 읽기
+      match /claims/{mid} {
+        allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      }
+      match /users/{uid} {
+        allow read: if signedIn() && request.auth.uid == uid;
+      }
+      // 골·도움 기록: 회원 누구나 넣기, 지우기는 넣은 사람(관리자는 전부)
+      match /goals/{id} {
+        allow read: if isMember();
+        allow create: if isMember()
+          && request.resource.data.keys().hasOnly(['gid', 'scorer', 'assist', 'by', 'byName', 'at'])
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.scorer is string && request.resource.data.scorer.size() > 0 && request.resource.data.scorer.size() <= 30
+          && request.resource.data.assist is string && request.resource.data.assist.size() <= 30;
+        allow delete: if isMember() && resource.data.by == request.auth.uid;
+      }
+      // 참석 투표: 이름을 고른 회원이 본인 이름으로만
+      // 투표·공지: 관리자가 만들고 회원은 읽기만
+      match /polls/{id} {
+        allow read: if isMember();
+      }
+      // 투표 참여: 내 이름으로만
+      match /pollvotes/{id} {
+        allow read: if isMember();
+        allow create, update: if isMember()
+          && request.resource.data.keys().hasOnly(['pid', 'mid', 'name', 'picks', 'add', 'uid', 'at'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.mid == myMid()
+          && request.resource.data.picks is list && request.resource.data.picks.size() <= 10
+          && request.resource.data.add is string && request.resource.data.add.size() <= 20
+          && id == request.resource.data.pid + '__' + request.resource.data.mid;
+      }
+      // 건의함: 회원은 보내기만, 읽기는 관리자(본인 것은 본인도)
+      match /suggest/{id} {
+        allow read: if signedIn() && resource.data.uid == request.auth.uid;
+        allow create: if isMember()
+          && request.resource.data.keys().hasOnly(['text', 'name', 'anon', 'uid', 'at'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000;
+      }
+      match /votes/{id} {
+        allow read: if isMember();
+        allow create, update: if isMember()
+          && request.resource.data.keys().hasOnly(['gid', 'mid', 'name', 'v', 'uid', 'at'])
+          && request.resource.data.v in ['참석', '불참']
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.mid == myMid()
+          && id == request.resource.data.gid + '__' + request.resource.data.mid;
+      }
+    }
+  }
+}

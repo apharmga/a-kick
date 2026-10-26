@@ -1,0 +1,340 @@
+/* A-KICK core — 화면·서버와 무관한 계산만 모아둔 파일 (브라우저·노드 공용) */
+(function (root) {
+  'use strict';
+
+  /* ---------- MD5 (기존 구글시트 거래ID와 같은 값을 만들기 위해) ---------- */
+  function md5(str) {
+    var bytes = unescape(encodeURIComponent(str));
+    function add(x, y) { var l = (x & 0xffff) + (y & 0xffff); return (((x >> 16) + (y >> 16) + (l >> 16)) << 16) | (l & 0xffff); }
+    function rol(n, c) { return (n << c) | (n >>> (32 - c)); }
+    function cmn(q, a, b, x, s, t) { return add(rol(add(add(a, q), add(x, t)), s), b); }
+    function ff(a, b, c, d, x, s, t) { return cmn((b & c) | (~b & d), a, b, x, s, t); }
+    function gg(a, b, c, d, x, s, t) { return cmn((b & d) | (c & ~d), a, b, x, s, t); }
+    function hh(a, b, c, d, x, s, t) { return cmn(b ^ c ^ d, a, b, x, s, t); }
+    function ii(a, b, c, d, x, s, t) { return cmn(c ^ (b | ~d), a, b, x, s, t); }
+    var n = bytes.length, words = [], i;
+    for (i = 0; i < n; i++) words[i >> 2] |= bytes.charCodeAt(i) << ((i % 4) * 8);
+    words[n >> 2] |= 0x80 << ((n % 4) * 8);
+    words[(((n + 8) >> 6) << 4) + 14] = n * 8;
+    var a = 1732584193, b = -271733879, c = -1732584194, d = 271733878;
+    for (i = 0; i < words.length; i += 16) {
+      var oa = a, ob = b, oc = c, od = d, w = function (k) { return words[i + k] | 0; };
+      a = ff(a, b, c, d, w(0), 7, -680876936); d = ff(d, a, b, c, w(1), 12, -389564586); c = ff(c, d, a, b, w(2), 17, 606105819); b = ff(b, c, d, a, w(3), 22, -1044525330);
+      a = ff(a, b, c, d, w(4), 7, -176418897); d = ff(d, a, b, c, w(5), 12, 1200080426); c = ff(c, d, a, b, w(6), 17, -1473231341); b = ff(b, c, d, a, w(7), 22, -45705983);
+      a = ff(a, b, c, d, w(8), 7, 1770035416); d = ff(d, a, b, c, w(9), 12, -1958414417); c = ff(c, d, a, b, w(10), 17, -42063); b = ff(b, c, d, a, w(11), 22, -1990404162);
+      a = ff(a, b, c, d, w(12), 7, 1804603682); d = ff(d, a, b, c, w(13), 12, -40341101); c = ff(c, d, a, b, w(14), 17, -1502002290); b = ff(b, c, d, a, w(15), 22, 1236535329);
+      a = gg(a, b, c, d, w(1), 5, -165796510); d = gg(d, a, b, c, w(6), 9, -1069501632); c = gg(c, d, a, b, w(11), 14, 643717713); b = gg(b, c, d, a, w(0), 20, -373897302);
+      a = gg(a, b, c, d, w(5), 5, -701558691); d = gg(d, a, b, c, w(10), 9, 38016083); c = gg(c, d, a, b, w(15), 14, -660478335); b = gg(b, c, d, a, w(4), 20, -405537848);
+      a = gg(a, b, c, d, w(9), 5, 568446438); d = gg(d, a, b, c, w(14), 9, -1019803690); c = gg(c, d, a, b, w(3), 14, -187363961); b = gg(b, c, d, a, w(8), 20, 1163531501);
+      a = gg(a, b, c, d, w(13), 5, -1444681467); d = gg(d, a, b, c, w(2), 9, -51403784); c = gg(c, d, a, b, w(7), 14, 1735328473); b = gg(b, c, d, a, w(12), 20, -1926607734);
+      a = hh(a, b, c, d, w(5), 4, -378558); d = hh(d, a, b, c, w(8), 11, -2022574463); c = hh(c, d, a, b, w(11), 16, 1839030562); b = hh(b, c, d, a, w(14), 23, -35309556);
+      a = hh(a, b, c, d, w(1), 4, -1530992060); d = hh(d, a, b, c, w(4), 11, 1272893353); c = hh(c, d, a, b, w(7), 16, -155497632); b = hh(b, c, d, a, w(10), 23, -1094730640);
+      a = hh(a, b, c, d, w(13), 4, 681279174); d = hh(d, a, b, c, w(0), 11, -358537222); c = hh(c, d, a, b, w(3), 16, -722521979); b = hh(b, c, d, a, w(6), 23, 76029189);
+      a = hh(a, b, c, d, w(9), 4, -640364487); d = hh(d, a, b, c, w(12), 11, -421815835); c = hh(c, d, a, b, w(15), 16, 530742520); b = hh(b, c, d, a, w(2), 23, -995338651);
+      a = ii(a, b, c, d, w(0), 6, -198630844); d = ii(d, a, b, c, w(7), 10, 1126891415); c = ii(c, d, a, b, w(14), 15, -1416354905); b = ii(b, c, d, a, w(5), 21, -57434055);
+      a = ii(a, b, c, d, w(12), 6, 1700485571); d = ii(d, a, b, c, w(3), 10, -1894986606); c = ii(c, d, a, b, w(10), 15, -1051523); b = ii(b, c, d, a, w(1), 21, -2054922799);
+      a = ii(a, b, c, d, w(8), 6, 1873313359); d = ii(d, a, b, c, w(15), 10, -30611744); c = ii(c, d, a, b, w(6), 15, -1560198380); b = ii(b, c, d, a, w(13), 21, 1309151649);
+      a = ii(a, b, c, d, w(4), 6, -145523070); d = ii(d, a, b, c, w(11), 10, -1120210379); c = ii(c, d, a, b, w(2), 15, 718787259); b = ii(b, c, d, a, w(9), 21, -343485551);
+      a = add(a, oa); b = add(b, ob); c = add(c, oc); d = add(d, od);
+    }
+    var out = '';
+    [a, b, c, d].forEach(function (v) { for (var j = 0; j < 4; j++) out += ('0' + ((v >> (j * 8)) & 255).toString(16)).slice(-2); });
+    return out;
+  }
+
+  /* ---------- 날짜 도우미 ---------- */
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function dtStr(d) { return d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+  function dtDate(s) { return String(s).substr(0, 10).replace(/\./g, '-'); }          // '2026.10.18 ..' → '2026-10-18'
+  function ymOf(s) { return String(s).substr(0, 7).replace('.', '-'); }
+  function addYM(ym, k) { var y = +ym.substr(0, 4), m = +ym.substr(5, 2) + k; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y + '-' + pad(m); }
+  function addDays(dateS, k) { var d = new Date(dateS + 'T00:00:00'); d.setDate(d.getDate() + k); return ymd(d); }
+  function dayName(dateS) { return '일월화수목금토'[new Date(dateS + 'T00:00:00').getDay()]; }
+  function comma(n) { return (n < 0 ? '−' : '') + String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  function txId(dt, amt, desc, bal) { return md5(dt + '|' + amt + '|' + desc + '|' + bal).substr(0, 12); }
+
+  /* ---------- 카카오뱅크 엑셀 읽기 (rows = 2차원 배열) ---------- */
+  function parseBankRows(rows) {
+    var hr = -1, idx = {};
+    for (var r = 0; r < rows.length && hr < 0; r++) {
+      for (var c = 0; c < rows[r].length; c++) {
+        if (String(rows[r][c] == null ? '' : rows[r][c]).replace(/\s/g, '') === '거래일시') { hr = r; break; }
+      }
+    }
+    if (hr < 0) throw new Error('엑셀에서 "거래일시" 칸을 찾지 못했어요. 카카오뱅크 거래내역 엑셀이 맞는지 확인해 주세요.');
+    rows[hr].forEach(function (h, c) { var k = String(h == null ? '' : h).replace(/\s/g, ''); if (k) idx[k] = c; });
+    ['거래일시', '구분', '거래금액', '거래후잔액'].forEach(function (k) {
+      if (idx[k] === undefined) throw new Error('엑셀에 "' + k + '" 칸이 없어요.');
+    });
+    var out = [];
+    for (var i = hr + 1; i < rows.length; i++) {
+      var row = rows[i], raw = row[idx['거래일시']];
+      if (raw == null || raw === '') continue;
+      var dt = raw instanceof Date ? dtStr(raw) : String(raw).trim().replace(/-/g, '.');
+      if (!/^\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}$/.test(dt)) continue;
+      var g = function (k) { return idx[k] !== undefined && row[idx[k]] != null ? String(row[idx[k]]).trim() : ''; };
+      var amt = Math.abs(num(row[idx['거래금액']])), bal = num(row[idx['거래후잔액']]), desc = g('내용');
+      out.push({ id: txId(dt, amt, desc, bal), dt: dt, kind: g('구분'), amt: amt, bal: bal,
+                 type: g('거래구분'), desc: desc, memo: g('메모') });
+    }
+    return out;
+  }
+  function num(v) { if (typeof v === 'number') return v; var s = String(v == null ? '' : v).replace(/[^\d.-]/g, ''); return s ? +s : 0; }
+
+  /* ---------- 회원 ---------- */
+  /** 회비 시작 월 : 가입일이 1일이면 그 달, 아니면 다음 달 */
+  function startYM(m) {
+    if (!m.join) return '';
+    var ym = m.join.substr(0, 7);
+    return +m.join.substr(8, 2) === 1 ? ym : addYM(ym, 1);
+  }
+  /** 그 달 회비를 내야 하는 회원 */
+  function membersFor(members, ym) {
+    return members.filter(function (m) {
+      var s = startYM(m);
+      if (!s || s > ym) return false;
+      if (m.quit && m.quit < ym + '-01') return false;
+      if (!m.quit && m.state === '탈퇴') return false;
+      return true;
+    });
+  }
+  /** 입금자명 → 회원들 (부부처럼 한 이름에 여러 명) */
+  function aliasMap(members) {
+    var map = {};
+    members.forEach(function (m) {
+      (m.payers || [m.name]).forEach(function (p) {
+        var k = String(p).replace(/\s/g, '');
+        if (!k) return;
+        (map[k] = map[k] || []);
+        if (map[k].indexOf(m) < 0) map[k].push(m);
+      });
+    });
+    return map;
+  }
+
+  /* ---------- 거래 집계 ---------- */
+  function partsOf(t) { return t.state === '무시' ? [] : (t.parts || []); }
+  function duesPaid(txs, ym) {
+    var set = {};
+    txs.forEach(function (t) { partsOf(t).forEach(function (p) { if (p.cls === '회비' && p.ym === ym) (p.names || []).forEach(function (n) { set[n] = 1; }); }); });
+    return set;
+  }
+  function guestCount(txs, gid, attend) { return guestNames(txs, gid, attend || []).length; }
+  /** 경기 참가 게스트 이름 목록 (대납은 '이름 일행1') */
+  function guestNames(txs, gid, memberNames) {
+    var out = [], seen = {};
+    (memberNames || []).forEach(function (n) { seen[n] = 1; });
+    // 회원 본인이 낸 경기비(self)는 게스트가 아님 → 이름만 잡아두고 인원에는 안 셈 (본인 참석은 투표로)
+    txs.forEach(function (t) { partsOf(t).forEach(function (p) { if (p.cls === '게스트비' && p.gid === gid && p.self) seen[p.name || t.desc] = 1; }); });
+    txs.forEach(function (t) {
+      partsOf(t).forEach(function (p) {
+        if (p.cls !== '게스트비' || p.gid !== gid) return;
+        var base = p.name || t.desc || '게스트', cnt = p.cnt || 1;
+        for (var k = 0; k < cnt; k++) {
+          if (k === 0 && p.self) continue;                    // 회원 본인 경기비
+          var nm = base;
+          if (seen[nm] || k > 0) { var j = 1; while (seen[base + ' 일행' + j]) j++; nm = base + ' 일행' + j; }
+          seen[nm] = 1; out.push(nm);
+        }
+      });
+    });
+    return out;
+  }
+  function balance(txs) {
+    var s = txs.slice().sort(function (a, b) { return a.dt < b.dt ? -1 : 1; });
+    return s.length ? s[s.length - 1].bal : 0;
+  }
+  /** 월 장부 (회비는 귀속월, 게스트비·구장비는 경기 달) */
+  function book(txs, games, ym) {
+    var gYM = {}; games.forEach(function (g) { gYM[g.id] = g.date.substr(0, 7); });
+    var o = { fee: 0, guest: 0, guestN: 0, field: 0, etcIn: 0, etcOut: 0 };
+    txs.forEach(function (t) {
+      partsOf(t).forEach(function (p) {
+        var when = p.ym || (p.gid && gYM[p.gid]) || ymOf(t.dt);
+        if (when !== ym) return;
+        if (p.cls === '회비' || p.cls === '첫달회비') o.fee += p.amt;
+        else if (p.cls === '게스트비') { o.guest += p.amt; o.guestN += p.cnt || 1; }
+        else if (p.cls === '구장비') o.field += p.amt;
+        else if (t.kind === '입금') o.etcIn += p.amt; else o.etcOut += p.amt;
+      });
+    });
+    o.net = o.fee + o.guest + o.etcIn - o.field - o.etcOut;
+    return o;
+  }
+
+  /* ---------- 자동 분류 ---------- */
+  /** 입금 날짜 기준 게스트비가 연결될 경기 : 경기 하루 뒤 ~ 7일 전 입금 */
+  function nearestGame(games, dt, cfg) {
+    var d = dtDate(dt), next = null, prev = null;
+    games.forEach(function (g) {
+      if (g.date >= d && g.date <= addDays(d, cfg.before || 7) && (!next || g.date < next.date)) next = g;
+      if (g.date < d && g.date >= addDays(d, -(cfg.after || 1)) && (!prev || g.date > prev.date)) prev = g;
+    });
+    return next || prev;                                // 다가오는 경기 우선, 없으면 바로 전 경기(늦게 낸 돈)
+  }
+  function nextGameAfter(games, dt) {
+    var d = dtDate(dt), best = null;
+    games.forEach(function (g) { if (g.date > d && (!best || g.date < best.date)) best = g; });
+    return best;
+  }
+  function gamesInMonth(games, ym) { return games.filter(function (g) { return g.date.substr(0, 7) === ym; }); }
+  /** 첫 달 회비 = 가입일 이후 그 달 남은 경기 × 게스트비 (월회비를 넘지 않음) */
+  function firstMonth(m, games, cfg) {
+    if (!m.join) return null;
+    var ym = m.join.substr(0, 7);
+    var left = gamesInMonth(games, ym).filter(function (g) { return g.date > m.join; });   // 가입한 날 경기는 게스트비로
+    return { ym: ym, games: left.map(function (g) { return g.id; }), amt: Math.min(left.length * cfg.guestFee, m.fee || cfg.fee) };
+  }
+
+  /**
+   * 새 거래 한 건을 분류. done = 이미 분류된 거래들 (회비 중복 확인용)
+   * 반환 { parts, state: '자동'|'확인필요'|'무시', reason, suggest }
+   */
+  function classify(t, ctx) {
+    var cfg = ctx.cfg, games = ctx.games, members = ctx.members, done = ctx.done;
+    var GF = cfg.guestFee, FEE = cfg.fee;
+    var key = t.desc.replace(/\s/g, ''), hit = ctx.alias[key] || null, partial = false;
+    if (!hit && /[,·+&\/]/.test(t.desc)) {             // '원현정, 정진호' 처럼 여러 이름
+      var multi = [], okAll = t.desc.split(/[,·+&\/]/).every(function (x) {
+        var hs = ctx.alias[x.replace(/\s/g, '')]; if (!hs) return false;
+        hs.forEach(function (m) { if (multi.indexOf(m) < 0) multi.push(m); }); return true;
+      });
+      if (okAll && multi.length) hit = multi;
+    }
+    if (!hit) {                                         // '서유준 용병' → 서유준 대납 후보
+      var first = t.desc.split(/[\s(]/)[0];
+      if (first && first !== t.desc && ctx.alias[first]) { hit = ctx.alias[first]; partial = true; }
+    }
+    if (hit) {                                          // 가입하기 전 입금은 회원 돈이 아님 (게스트)
+      var dd = dtDate(t.dt), ng0 = nextGameAfter(games, t.dt);
+      hit = hit.filter(function (m) {
+        if (!m.join || m.join <= dd) return true;
+        // 가입 직전 입금: 그 돈이 가입 후 경기를 위한 것이면 회원 돈으로 봄 (예: 1일 가입자의 선납, 첫 달 회비)
+        return m.join <= addDays(dd, 14) && ng0 && ng0.date > m.join;
+      });
+      if (!hit.length) { hit = null; partial = false; }
+    }
+    function guestPart(n, name) {
+      var g = nearestGame(games, t.dt, cfg);
+      return { cls: '게스트비', amt: n * GF, cnt: n, name: name, gid: g ? g.id : '' };
+    }
+    function need(reason, suggest) { return { parts: [], state: '확인필요', reason: reason, suggest: suggest || null }; }
+
+    if (t.kind === '입금') {
+      if (/이자/.test(t.desc) || /예금이자/.test(t.type)) return { parts: [{ cls: '이자', amt: t.amt }], state: '자동', reason: '통장 이자' };
+      if (/취소/.test(t.desc)) return need('취소 입금이에요. 같은 금액 출금과 짝이면 "무시"를 눌러주세요.', { label: '무시', state: '무시' });
+
+      if (hit && !partial) {
+        var dtYM = ymOf(t.dt), day = +t.dt.substr(8, 2);
+        // 1) 첫 달 회비 (회비 시작 전 달에 예정 금액이 들어오면)
+        for (var i = 0; i < hit.length; i++) {
+          var m = hit[i];
+          if (dtYM <= startYM(m) && m.name === t.desc.trim()) {
+            var fm = firstMonth(m, games, cfg);
+            if (fm && fm.ym === dtYM && fm.amt === t.amt && fm.games.length)
+              return { parts: [{ cls: '첫달회비', amt: t.amt, names: [m.name], ym: dtYM, games: fm.games }], state: '자동', reason: m.name + ' 첫 달 회비 (' + fm.games.length + '경기)' };
+          }
+        }
+        // 2) 회비 (부부 등 여러 명 포함). 25일부터는 다음 달분
+        var payers = hit.filter(function (m) { return startYM(m); });
+        var self = payers.filter(function (m) { return m.name === t.desc.trim(); });
+        if (payers.length > 1 && !self.length && hit !== ctx.alias[key]) self = [];
+        var sets = [payers]; if (self.length && self.length < payers.length) sets.push(self);
+        for (var s = 0; s < sets.length; s++) {
+          var M = sets[s]; if (!M.length) continue;
+          var total = M.reduce(function (a, m) { return a + (m.fee || FEE); }, 0);
+          var base = day >= (cfg.nextMonthDay || 25) ? addYM(dtYM, 1) : dtYM;
+          var st = M.map(startYM).sort().pop(); if (base < st) base = st;
+          var paid = duesPaid(done, base);
+          if (M.every(function (m) { return paid[m.name]; })) base = addYM(base, 1);
+          var names = M.map(function (m) { return m.name; });
+          if (t.amt === total) return { parts: [{ cls: '회비', amt: total, names: names, ym: base }], state: '자동', reason: base.substr(5, 2) * 1 + '월 회비' + (names.length > 1 ? ' (' + names.join('·') + ')' : '') };
+          var rest = t.amt - total;
+          var ng = nextGameAfter(games, t.dt);
+          if (rest > 0 && rest % GF === 0 && rest < FEE && ng && ng.date <= addDays(dtDate(t.dt), 7)) {
+            return { parts: [{ cls: '회비', amt: total, names: names, ym: base },
+                             { cls: '게스트비', amt: rest, cnt: rest / GF, name: names[0], gid: ng.id, self: true }],
+                     state: '자동', reason: base.substr(5, 2) * 1 + '월 회비 + 경기비 ' + rest / GF + '명' };
+          }
+        }
+        // 3) 회비보다 적은 1만원 단위 = 게스트비(가입 전) 또는 친구 대납
+        if (t.amt % GF === 0 && t.amt < FEE) {
+          var n = t.amt / GF, mm = hit[0];
+          return { parts: [guestPart(n, mm.name)], state: '자동',
+                   reason: (dtYM < startYM(mm) ? '가입 전 게스트비' : '회원 대납') + ' ' + n + '명' };
+        }
+        return need(hit.map(function (m) { return m.name; }).join('·') + ' 님 입금인데 예정 금액과 달라요.', { label: '회비', cls: '회비' });
+      }
+      if (hit && partial && t.amt % GF === 0 && t.amt < FEE) {
+        return { parts: [guestPart(t.amt / GF, hit[0].name)], state: '자동', reason: hit[0].name + ' 님 친구 대납 ' + t.amt / GF + '명' };
+      }
+      if (t.amt % GF === 0 && t.amt < FEE) {
+        var n2 = t.amt / GF;
+        return { parts: [guestPart(n2, t.desc.trim())], state: '자동', reason: '게스트 ' + n2 + '명' };
+      }
+      if (t.amt < GF && t.amt >= GF * 0.8)
+        return need('게스트비에서 수수료가 빠진 금액 같아요.', { label: '게스트 1명', cls: '게스트비', cnt: 1 });
+      return need('예정에 없는 입금이에요.');
+    }
+
+    // 출금
+    var ym0 = ymOf(t.dt);
+    for (var k = 0; k <= 1; k++) {
+      var ymk = addYM(ym0, k), cnt = gamesInMonth(games, ymk).length;
+      if (cfg.rentPerGame && cnt && t.amt === cnt * cfg.rentPerGame)
+        return { parts: [{ cls: '구장비', amt: t.amt, ym: ymk, note: '정기대관 ' + cnt + '회' }], state: '자동', reason: (+ymk.substr(5, 2)) + '월 정기대관 ' + cnt + '회' };
+    }
+    if (cfg.oneOff && t.amt === cfg.oneOff) {
+      var g1 = nextGameAfter(games, t.dt);
+      return { parts: [{ cls: '구장비', amt: t.amt, gid: g1 ? g1.id : '' }], state: '자동', reason: '일회성 구장비' };
+    }
+    var who = (t.desc.match(/\(([^)]+)\)/) || [])[1];
+    if (who) return need(who + ' 님에게 보낸 돈이에요.', { label: '환불', cls: '환불', name: who });
+    return need('예정에 없는 출금이에요.');
+  }
+
+  /** 48시간 안에 같은 사람·같은 금액의 입금과 출금 → 서로 상계(무시) */
+  function pairRefunds(list, hours) {
+    var lim = (hours || 48) * 3600000, out = [];
+    function ms(s) { return new Date(dtDate(s) + 'T' + s.substr(11)).getTime(); }
+    function who(t) { return ((t.desc.match(/\(([^)]+)\)/) || [])[1] || t.desc).replace(/\s/g, ''); }
+    list.forEach(function (a) {
+      if (a.kind !== '출금' || a._paired) return;
+      for (var i = 0; i < list.length; i++) {
+        var b = list[i];
+        if (b === a || b._paired || b.kind !== '입금' || b.amt !== a.amt) continue;
+        if (who(b) !== who(a)) continue;
+        if (Math.abs(ms(a.dt) - ms(b.dt)) > lim) continue;
+        a._paired = b._paired = true; out.push([b, a]); break;
+      }
+    });
+    return out;
+  }
+
+  /** 포메이션 자리는 그대로, 누가 어느 자리에 설지만 랜덤 (같은 경기·팀이면 항상 같은 순서) */
+  function order(names, seed) {
+    return names.map(function (n) { return [md5(String(seed) + '|' + n), n]; }).sort(function (a, b) { return a[0] < b[0] ? -1 : 1; }).map(function (x) { return x[1]; });
+  }
+  /** 골·도움 통계. games: [{id,date,players[]}], goals: [{gid,scorer,assist}], ym: '' 전체 또는 'YYYY-MM', base: 기본 표시할 이름들 */
+  function statTable(games, goals, ym, base) {
+    var R = {}, gs = games.filter(function (g) { return !ym || g.date.substr(0, 7) === ym; }), ids = {};
+    function row(n) { return R[n] = R[n] || { name: n, gp: 0, g: 0, a: 0, ap: 0 }; }
+    (base || []).forEach(row);
+    gs.forEach(function (g) { ids[g.id] = 1; (g.players || []).forEach(function (n) { row(n).gp++; }); });
+    goals.forEach(function (x) { if (!ids[x.gid]) return; if (x.scorer) { row(x.scorer).g++; row(x.scorer).ap++; } if (x.assist) { row(x.assist).a++; row(x.assist).ap++; } });
+    return Object.keys(R).map(function (k) { return R[k]; });
+  }
+  /** 경기 점수: 팀 편성 기준 [A팀 골, B팀 골, C팀 골] */
+  function score(game, goals) {
+    var T = game.teams || [], s = T.map(function () { return 0; });
+    goals.forEach(function (x) { if (x.gid !== game.id) return; T.forEach(function (t, i) { if (t.indexOf(x.scorer) >= 0) s[i]++; }); });
+    return s;
+  }
+  var Core = { statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
+    addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
+    aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
+    balance: balance, book: book, nearestGame: nearestGame, nextGameAfter: nextGameAfter, gamesInMonth: gamesInMonth,
+    firstMonth: firstMonth, classify: classify, pairRefunds: pairRefunds };
+  if (typeof module !== 'undefined' && module.exports) module.exports = Core; else root.Core = Core;
+})(this);
