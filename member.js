@@ -82,7 +82,7 @@ async function start() {
   view('<div class="center">불러오는 중...</div>');
   const meRef = doc(db, 'me', S.uid);
   let me = {}; try { const d = await getDoc(meRef); me = d.exists() ? d.data() : {}; } catch (e) {}
-  S.myClubs = me.clubs || {};
+  S.myClubs = me.clubs || {}; S.seenAll = me.seen || {};
   const urlC = new URLSearchParams(location.search).get('c');
   const cid = urlC || me.last || '';
   if (!cid) return renderHome();
@@ -129,18 +129,44 @@ function askJoin(name) {
 }
 
 /* 팀 삭제 (만든 사람만) · 목록에서 빼기 (회원) */
-async function saveMyClubs() { await setDoc(doc(db, 'me', S.uid), { clubs: S.myClubs, last: '' }).catch(() => {}); }
+async function saveMyClubs() { await setDoc(doc(db, 'me', S.uid), { clubs: S.myClubs, last: '', seen: S.seenAll || {} }).catch(() => {}); }
+/* ---------------- NEW 표시 · 하단 숫자 배지 ----------------
+   회원마다 '언제 무엇을 봤는지'를 me 문서에 기억 → 폰을 바꿔도 같은 기준 */
+const NEWB = '<i class="nb">NEW</i>';
+function seenOf() { const a = (S.seenAll = S.seenAll || {}); if (!a[S.cid]) a[S.cid] = { since: Date.now(), items: {} }; return a[S.cid]; }
+let seenT = null;
+function markSeen(id) {
+  const sn = seenOf(); sn.items[id] = Date.now();
+  clearTimeout(seenT); seenT = setTimeout(() => setDoc(doc(db, 'me', S.uid), { seen: { [S.cid]: sn } }, { merge: true }).catch(() => {}), 800);
+}
+const tsOf = (x) => (typeof x === 'number' ? x : Date.parse(x || 0) || 0);
+function isNewPoll(p) { const sn = seenOf(); return !sn.items[p.id] && tsOf(p.created) > sn.since && !myPV(p); }
+function isNewVid(v) { const sn = seenOf(); return !sn.items[v.id] && tsOf(v.at) > sn.since; }
+/** 영상에 내가 마지막으로 본 뒤 달린 남의 댓글 수 (새 영상이면 영상 NEW로 충분해서 0) */
+function newCmts(v) {
+  const sn = seenOf(), base = sn.items[v.id]; if (!base) return 0;
+  return (S.vcAll || []).filter((c) => c.vid === v.id && c.uid !== S.uid && c.at > base).length;
+}
+function teamKey() { const g = (S.pub.games || [])[0]; return g && (g.teams || []).length >= 2 ? 'T' + g.id + ':' + g.teams.join('/').length : ''; }
+function isNewTeam() { const k = teamKey(), sn = seenOf(); return !!k && !sn.items[k] && sn.since < Date.now() - 1000; }
+function badgeCounts() {
+  const vs = S.videos || [];
+  return { home: (S.polls || []).filter(isNewPoll).length,
+           rec: vs.filter(isNewVid).length + vs.reduce((a, v) => a + newCmts(v), 0),
+           week: isNewTeam() ? 1 : 0 };
+}
 /* ---------------- 하이라이트 영상 (유튜브 일부공개 + 앱 안에서 재생·댓글·시간 태그) ----------------
    전체 화면을 다시 그리는 render()와 분리된 별도 창(#vov)에서 재생 → 투표·기록이 갱신돼도 영상이 끊기지 않음 */
 const ytThumb = (id) => 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg';
 const fmtT = (s) => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
 function vidsSorted() { return (S.videos || []).slice().sort((a, b) => (a.date === b.date ? b.at - a.at : a.date < b.date ? 1 : -1)); }
 function vidCard(v) {
-  return '<button class="vcard" data-vid="' + esc(v.id) + '"><span class="vth"><img src="' + ytThumb(v.yt) + '" alt="" loading="lazy"><i>▶</i></span><span class="vtx"><b>' + esc(v.title || '하이라이트') + '</b><small>' + (v.date ? md(v.date) + ' 경기' : '') + '</small></span></button>';
+  return '<button class="vcard" data-vid="' + esc(v.id) + '"><span class="vth"><img src="' + ytThumb(v.yt) + '" alt="" loading="lazy"><i>▶</i></span><span class="vtx"><b>' + esc(v.title || '하이라이트') + (isNewVid(v) ? NEWB : '') + '</b><small>' + (v.date ? md(v.date) + ' 경기' : '') + '</small>' + (newCmts(v) ? '<em class="ncm">💬 새 댓글 ' + newCmts(v) + '</em>' : '') + '</span></button>';
 }
 function vidsHome() {
   const vs = vidsSorted(); if (!vs.length) return '';
-  return '<section class="card"><div class="h2row"><h2>🎬 하이라이트</h2>' + (vs.length > 3 ? '<button class="more inl" data-go="rec">전체 ›</button>' : '') + '</div><div class="vlist">' + vs.slice(0, 3).map(vidCard).join('') + '</div></section>';
+  const anyNew = vs.some((v) => isNewVid(v) || newCmts(v));
+  return '<section class="card"><div class="h2row"><h2>🎬 하이라이트' + (anyNew ? NEWB : '') + '</h2>' + (vs.length > 3 ? '<button class="more inl" data-go="rec">전체 ›</button>' : '') + '</div><div class="vlist">' + vs.slice(0, 3).map(vidCard).join('') + '</div></section>';
 }
 function vidsRec() {
   const vs = vidsSorted(); if (!vs.length) return '';
@@ -168,13 +194,14 @@ function closeVideo(fromPop) {
   const ov = $('#vov'); if (!ov) return;
   if (VV.unsub) VV.unsub(); VV.unsub = null;
   try { VV.player && VV.player.destroy(); } catch (e) {}
-  VV.player = null; VV.id = ''; ov.remove(); document.body.classList.remove('noscroll');
+  if (VV.id) markSeen(VV.id);
+  VV.player = null; VV.id = ''; ov.remove(); document.body.classList.remove('noscroll'); render();
   if (!fromPop && history.state && history.state.vov) history.back();
 }
 window.addEventListener('popstate', () => { if ($('#vov')) closeVideo(true); });
 async function openVideo(id) {
   const v = (S.videos || []).find((x) => x.id === id); if (!v) return toast('영상을 찾지 못했어요');
-  closeVideo(true);
+  closeVideo(true); markSeen(id);
   history.pushState({ vov: 1 }, '');
   VV.id = id;
   const ov = document.createElement('div'); ov.id = 'vov'; ov.className = 'vov';
@@ -339,6 +366,7 @@ function watchVotes() {
       onSnapshot(collection(db, 'clubs', S.cid, 'anonvotes'), (q) => { S.avotes = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render(); }, () => {})];
   }
   if (S.me && !S.goalSub) S.goalSub = onSnapshot(collection(db, 'clubs', S.cid, 'goals'), (q) => { S.goals = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render(); }, () => {});
+  if (S.me && !S.vcSub) S.vcSub = onSnapshot(collection(db, 'clubs', S.cid, 'vcomments'), (q) => { S.vcAll = q.docs.map((d) => d.data()); if (!$('#vov')) render(); }, () => {});
   if (S.me && !S.vidSub) S.vidSub = onSnapshot(collection(db, 'clubs', S.cid, 'videos'), (q) => {
     S.videos = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render();
     const want = new URLSearchParams(location.search).get('v');                 // 카톡으로 받은 영상 링크(?v=)면 바로 열기
@@ -389,14 +417,15 @@ function render() {
   if (S.me && !S.owner && !members.some((m) => m.id === S.me.mid)) return void view('<header class="hero">' + heroTop() + '<h1>승인됐어요! 🎉</h1><p>명단을 불러오는 중이에요. 잠시 후 자동으로 열려요.</p></header><main class="pad lift"></main>');
   if (!S.me || !members.some((m) => m.id === S.me.mid)) return renderPick(members);
   const body = S.tab === 'home' ? homeHTML() : S.tab === 'week' ? weekHTML() : S.tab === 'dues' ? duesHTML() : S.tab === 'bank' ? bankHTML() : recHTML();
-  const tab = (k, l, ic) => '<button class="tab' + (S.tab === k ? ' on' : '') + '" data-t="' + k + '">' + ic + '<span>' + l + '</span></button>';
+  const bc = badgeCounts();
+  const tab = (k, l, ic) => '<button class="tab' + (S.tab === k ? ' on' : '') + '" data-t="' + k + '">' + ic + '<span>' + l + '</span>' + (bc[k] ? '<i class="tb">' + (bc[k] > 9 ? '9+' : bc[k]) + '</i>' : '') + '</button>';
   view(body + '<nav class="tabs" aria-label="메뉴">' +
     tab('home', '홈', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>') +
     tab('week', '이번 주', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7l3 2-1 4h-4l-1-4z"/></svg>') +
     tab('dues', '회비', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>') +
     tab('bank', '통장', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/></svg>') +
     tab('rec', '경기기록', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>') + '</nav>');
-  document.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.t; render(); window.scrollTo(0, 0); }));
+  document.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.t; if (S.tab === 'week' && teamKey()) markSeen(teamKey()); render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.go; render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-vote]').forEach((b) => (b.onclick = () => vote(b.dataset.vote)));
   const acc = $('#acc'); if (acc) acc.onclick = () => copy(accNo(), '계좌번호를 복사했어요');
@@ -590,11 +619,12 @@ function pollsCard() {
   if (!ps.length) return '';
   return '<section class="card"><h2>투표 · 공지</h2><div class="plist">' + ps.map((p) => {
     const mine = myPV(p), open = pollOpen(p), notice = !(p.options || []).length && !p.allowAdd;
-    return '<button class="pitem' + (open && !mine ? ' glow' : '') + '" data-poll="' + esc(p.id) + '"><span><b>' + esc(p.title) + '</b><small>' + (open ? (p.deadline ? md(p.deadline.substr(0, 10)) + ' ' + p.deadline.substr(11, 5) + ' 마감' : '진행 중') : '마감됨') + '</small></span>' +
+    return '<button class="pitem' + (open && !mine ? ' glow' : '') + '" data-poll="' + esc(p.id) + '"><span><b>' + esc(p.title) + (isNewPoll(p) ? NEWB : '') + '</b><small>' + (open ? (p.deadline ? md(p.deadline.substr(0, 10)) + ' ' + p.deadline.substr(11, 5) + ' 마감' : '진행 중') : '마감됨') + '</small></span>' +
       '<em class="' + (mine ? 'done' : open ? 'todo' : '') + '">' + (mine ? (notice ? '확인함' : '참여함') : open ? (notice ? '새 공지' : '참여하기') : '결과 보기') + '</em></button>';
   }).join('') + '</div></section>';
 }
 function openPoll(pid) {
+  markSeen(pid);
   const p = (S.polls || []).find((x) => x.id === pid); if (!p) return;
   const mine = myPV(p), open = pollOpen(p), notice = !(p.options || []).length && !p.allowAdd;
   let picks = new Set(mine ? mine.picks || [] : []);
