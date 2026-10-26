@@ -346,10 +346,29 @@
   function mix(a, b, t) { var x = hexRgb(a), y = hexRgb(b); return rgbHex(x.map(function (v, i) { return v + (y[i] - v) * t; })); }
   function lum(h) { var c = hexRgb(h).map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
   function darkTo(c, L) { var k = 0; while (lum(c) > L && k++ < 20) c = mix(c, '#000000', 0.08); return c; }
+  function toHsl(h) { var c = hexRgb(h).map(function (v) { return v / 255; }), mx = Math.max.apply(0, c), mn = Math.min.apply(0, c), l = (mx + mn) / 2, d = mx - mn, hh = 0, s = 0;
+    if (d) { s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); hh = mx === c[0] ? (c[1] - c[2]) / d + (c[1] < c[2] ? 6 : 0) : mx === c[1] ? (c[2] - c[0]) / d + 2 : (c[0] - c[1]) / d + 4; hh *= 60; } return [hh, s * 100, l * 100]; }
+  function hsl(h, s, l) { h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(100, s)) / 100; l = Math.max(0, Math.min(100, l)) / 100;
+    var k = function (n) { return (n + h / 30) % 12; }, a = s * Math.min(l, 1 - l), f = function (n) { return l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); };
+    return rgbHex([f(0) * 255, f(8) * 255, f(4) * 255]); }
+  /** 직접 고른 색: 검정을 섞지 않고 같은 색 계열 안에서 밝기만 조절 (메인=상단 오로라, 서브1=버튼, 서브2=글씨·테두리) */
+  function customTheme(main, s1, s2) {
+    var M = toHsl(main), h = M[0], S = Math.max(M[1], 45), O = toHsl(s1), os = Math.max(O[1], 70), B = toHsl(s2);
+    var ink = hsl(B[0], Math.max(B[1], 55), Math.min(B[2], 38));
+    if (B[1] < 12) ink = hsl(h, 65, 28);                                  // 서브2가 무채색(검정·회색)이면 메인 계열 진한 색으로
+    var btn = O[1] < 12 ? [hsl(h, 70, 50), hsl(h + 15, 70, 58)] : [hsl(O[0], os, 54), hsl(O[0] + 12, os, 62)];
+    var g = [hsl(h, S, 87), hsl(h + 8, S, 93), O[1] < 12 ? hsl(h - 15, S, 90) : hsl(O[0], os, 93)];
+    return { '--hdr': g[0], '--grad': 'linear-gradient(120deg,' + g[0] + ' 0%,' + g[1] + ' 50%,' + g[2] + ' 100%)', '--on-hdr': ink,
+      '--btn': 'linear-gradient(120deg,' + btn[0] + ',' + btn[1] + ')', '--on-btn': '#FFFFFF', '--navy': ink, '--navy-d': hsl(B[0], Math.max(B[1], 55), 24), '--navy-l': hsl(h, S, 94),
+      '--tint': hsl(h, S, 95), '--acc': ink, '--on-acc': '#FFFFFF', '--bg': hsl(h, S, 97), '--bg-grad': 'linear-gradient(180deg,' + hsl(h, S, 95) + ' 0%,' + hsl(h + 8, S, 97) + ' 100%)',
+      '--glow': '1', '--aur': 'aur 14s ease-in-out infinite alternate', _top: g[0] };
+  }
   /** 상단·버튼은 메인색 기반 오로라 그라데이션, 글씨색은 자동 대비 */
   function applyTheme(t) {
     var d = THEMES[0].c, main = (t && t.main) || d[0], s1 = (t && t.sub1) || d[1], acc = (t && t.sub2) || d[2];
     var pre = THEMES.filter(function (x) { return x.c[0].toLowerCase() === String(main).toLowerCase() && x.c[1].toLowerCase() === String(s1).toLowerCase() && x.c[2].toLowerCase() === String(acc).toLowerCase(); })[0];
+    if (!pre) { var cv = customTheme(main, s1, acc); if (typeof document === 'undefined') return cv; var rs = document.documentElement.style;
+      Object.keys(cv).forEach(function (k3) { if (k3[0] === '-') rs.setProperty(k3, cv[k3]); }); var mt = document.querySelector('meta[name="theme-color"]'); if (mt) mt.setAttribute('content', cv._top); return cv; }
     var g = pre ? (pre.g || [main, main, main]) : [main, mix(main, '#FFFFFF', 0.4), mix(main, s1, 0.22)];
     var light = (lum(g[0]) + lum(g[1]) + lum(g[2])) / 3 > 0.4;
     var ink = darkTo(s1, 0.12), onHdr = light ? ink : '#FFFFFF';
