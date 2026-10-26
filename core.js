@@ -133,8 +133,8 @@
         var base = p.name || t.desc || '게스트', cnt = p.cnt || 1;
         for (var k = 0; k < cnt; k++) {
           if (k === 0 && p.self) continue;                    // 회원 본인 경기비
-          var nm = base;
-          if (seen[nm] || k > 0) { var j = 1; while (seen[base + ' 일행' + j]) j++; nm = base + ' 일행' + j; }
+          var nm = (p.names && p.names[k]) || base;      // 이름을 여러 개 적어두면 그 이름으로
+          if (seen[nm] || (k > 0 && !(p.names && p.names[k]))) { var j = 1; while (seen[base + ' 일행' + j]) j++; nm = base + ' 일행' + j; }
           seen[nm] = 1; out.push(nm);
         }
       });
@@ -445,7 +445,7 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.31';
+  var VERSION = 'v0.32';
   var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,

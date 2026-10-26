@@ -364,3 +364,4 @@ body{background:var(--bg);background-image:var(--bg-grad);background-attachment:
 .chk span{color:var(--ink2)}
 button.pill{cursor:pointer;border:0;font:inherit}
 .mtool .row{width:100%}
+.req{color:#B91C1C;font-size:11px}select.need{border-color:#EF4444;box-shadow:0 0 0 2px #FEE2E2}

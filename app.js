@@ -659,14 +659,15 @@ function editTx(id, presetCls) {
   const t = S.txs.find((x) => x.id === id);
   let parts = JSON.parse(JSON.stringify(t.parts || []));
   if (!parts.length) parts = [{ cls: presetCls || (t.kind === '입금' ? '게스트비' : '기타지출'), amt: t.amt }];
+  parts.forEach((p) => { if (p.cls === '게스트비' && !p.cnt && S.cfg.guestFee && p.amt % S.cfg.guestFee === 0) p.cnt = p.amt / S.cfg.guestFee; });
   if (presetCls === '회비') Object.assign(parts[0], { names: [t.desc], ym: payYM() });
-  const gOpts = (sel) => '<option value="">(없음)</option>' + S.games.slice(-12).map((g) => '<option value="' + g.id + '"' + (g.id === sel ? ' selected' : '') + '>' + md(g.date) + ' (' + C.dayName(g.date) + ')</option>').join('');
+  const gOpts = (sel) => '<option value="">— 경기 선택 —</option>' + S.games.slice(-12).map((g) => '<option value="' + g.id + '"' + (g.id === sel ? ' selected' : '') + '>' + md(g.date) + ' (' + C.dayName(g.date) + ')</option>').join('');
   const partHTML = (p, i) => '<div class="part" data-i="' + i + '"><div class="row">' +
     '<label class="f">분류<select data-k="cls">' + CLS.map((c) => '<option' + (c === p.cls ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>' +
     '<label class="f">금액<input data-k="amt" type="number" value="' + (p.amt || 0) + '"></label>' +
-    '<label class="f">이름 (여러 명은 쉼표)<input data-k="names" value="' + esc((p.names || [p.name || '']).join(', ')) + '"></label></div><div class="row">' +
+    '<label class="f">이름 (여러 명은 쉼표)<input data-k="names" value="' + esc((p.names && p.names.length ? p.names : [p.name || '']).join(', ')) + '"></label></div><div class="row">' +
     '<label class="f">귀속월 (회비·정기대관)<input data-k="ym" placeholder="2026-11" value="' + esc(p.ym || '') + '"></label>' +
-    '<label class="f">경기 (게스트비)<select data-k="gid">' + gOpts(p.gid) + '</select></label>' +
+    '<label class="f">경기 (게스트비)' + (p.cls === '게스트비' ? ' <b class="req">필수</b>' : '') + '<select data-k="gid"' + (p.cls === '게스트비' && !p.gid ? ' class="need"' : '') + '>' + gOpts(p.gid) + '</select></label>' +
     '<label class="f">인원<input data-k="cnt" type="number" min="1" value="' + (p.cnt || 1) + '"></label></div>' +
     (parts.length > 1 ? '<button class="btn ghost" data-del="' + i + '">이 항목 삭제</button>' : '') + '</div>';
   const draw = () => modal('<h2>' + esc(t.desc) + ' · ' + (t.kind === '입금' ? '' : '−') + won(t.amt) + '원</h2><div class="muted">' + esc(t.dt) + (t.note ? ' · ' + esc(t.note) : '') + '</div>' +
@@ -679,7 +680,9 @@ function editTx(id, presetCls) {
       const p = parts[+el.dataset.i], v = (k) => el.querySelector('[data-k="' + k + '"]').value.trim();
       p.cls = v('cls'); p.amt = +v('amt') || 0; p.cnt = +v('cnt') || 1; p.ym = v('ym'); p.gid = v('gid');
       const ns = v('names').split(',').map((x) => x.trim()).filter(Boolean);
-      if (p.cls === '회비' || p.cls === '첫달회비') { p.names = ns; delete p.name; } else { p.name = ns[0] || ''; delete p.names; }
+      if (p.cls === '회비' || p.cls === '첫달회비') { p.names = ns; delete p.name; }
+      else if (p.cls === '게스트비' && ns.length > 1) { p.name = ns[0]; p.names = ns; p.cnt = Math.max(p.cnt, ns.length); }   // 게스트 이름 여러 명 → 인원도 맞춤
+      else { p.name = ns[0] || ''; delete p.names; }
       if (p.cls !== '게스트비') { delete p.cnt; }
       if (!p.ym) delete p.ym; if (!p.gid) delete p.gid;
     });
@@ -696,10 +699,27 @@ function editTx(id, presetCls) {
     m.querySelector('#ign').onclick = async () => { t.state = '무시'; t.parts = []; t.reason = '무시'; delete t.suggest; closeModal(); render(); await putTx(t); };
     m.querySelector('#save').onclick = async () => {
       read();
+      if (t.manual) {                                    // 직접 입력 건: 날짜·이름·금액 고친 것도 함께 저장
+        const d = m.querySelector('#fxd').value, n = m.querySelector('#fxn').value.trim(), a = +m.querySelector('#fxa').value || 0;
+        if (!d || !n || !a) return toast('날짜·이름·금액을 넣어주세요');
+        const amtChanged = a !== t.amt; t.dt = d.replace(/-/g, '.') + ' 12:00:00'; t.desc = n; t.amt = a;
+        if (amtChanged) {
+          const r = C.classify(t, { cfg: cfgC(), games: S.games, members: S.members, alias: C.aliasMap(S.members), done: S.txs.filter((x) => x.id !== t.id) });
+          t.parts = r.parts; t.state = r.state; t.reason = r.reason || ''; if (r.suggest) t.suggest = r.suggest; else delete t.suggest;
+          t.note = m.querySelector('#note').value.trim(); S.txs.sort((x, y) => (x.dt < y.dt ? -1 : 1));
+          const g2 = (t.parts || []).filter((p) => p.cls === '게스트비');
+          if (g2.length) { g2.forEach((p) => delete p.gid); t.state = '확인필요'; t.reason = '게스트비 경기 선택 필요'; closeModal(); render(); await putTx(t); editTx(t.id); return toast('금액을 바꿨어요 · 게스트 ' + g2.reduce((a, p) => a + (p.cnt || 1), 0) + '명 · 어느 경기인지 골라주세요', 6000); }
+          closeModal(); render(); await putTx(t); toast('금액을 바꿔서 분류를 다시 잡았어요 · ' + (t.reason || '확인 필요'), 6000); return;
+        }
+        S.txs.sort((x, y) => (x.dt < y.dt ? -1 : 1));
+      }
+      if (parts.some((p) => p.cls === '게스트비' && !p.gid)) { m.querySelectorAll('[data-k="gid"]').forEach((el) => !el.value && el.classList.add('need')); return toast('게스트비는 어느 경기인지 꼭 골라주세요', 5000); }
       const sum = parts.reduce((a, p) => a + p.amt, 0);
       if (sum !== t.amt) return toast('나눈 금액 합계(' + won(sum) + ')가 거래 금액(' + won(t.amt) + ')과 달라요', 5000);
       t.parts = parts; t.state = '확인'; t.reason = ''; t.note = m.querySelector('#note').value.trim(); delete t.suggest;
-      closeModal(); render(); await putTx(t); toast('저장했어요');
+      closeModal(); render(); await putTx(t);
+      const gp = parts.filter((p) => p.cls === '게스트비'), gg = gp.length && S.games.find((g) => g.id === gp[0].gid);
+      toast(gg ? '저장했어요 · ' + md(gg.date) + ' 경기 게스트 ' + gp.reduce((a, p) => a + (p.cnt || 1), 0) + '명으로 잡혔어요' : '저장했어요', 5000);
     };
   });
   draw();
@@ -721,6 +741,7 @@ function addManual() {
     '<div class="seg"><button data-kind="입금" class="on">입금</button><button data-kind="출금">출금</button></div>' +
     '<div class="row"><label class="f">날짜<input id="md" type="date" value="' + F.date + '"></label><label class="f"><span id="mnl">보낸 사람</span><input id="mn" list="mnlist" placeholder="통장에 찍힌 이름"></label></div><datalist id="mnlist">' + names.map((n) => '<option value="' + esc(n) + '">').join('') + '</datalist>' +
     '<label class="f">금액<input id="ma" type="number" inputmode="numeric" placeholder="원"></label><div class="row" id="mchips">' + chips() + '</div>' +
+    '<label class="f" id="mgw" hidden>어느 경기 게스트비인가요? <b class="req">필수</b><select id="mg"><option value="">— 경기 선택 —</option>' + S.games.filter((g) => !g.postponed).slice(-8).reverse().map((g) => '<option value="' + g.id + '">' + md(g.date) + ' (' + C.dayName(g.date) + ')</option>').join('') + '</select></label>' +
     '<label class="f">메모 (선택)<input id="mm" maxlength="40"></label>' +
     '<div class="mprev" id="mprev">이름과 금액을 넣으면 어떻게 분류될지 보여드려요</div>' +
     '<div class="mfoot"><span style="flex:1"></span><button class="btn" id="mx">취소</button><button class="btn pri" id="mok">저장</button></div>', (m) => {
@@ -737,6 +758,7 @@ function addManual() {
         : dupMan ? '⚠ 같은 건을 이미 직접 입력했어요 (' + esc(dupMan.dt.substr(5, 5)) + '). 진짜 두 번째 입금일 때만 저장하세요'
         : (dg = C.diagnoseManual(t, S.txs)).code !== 'wait' ? '⚠ ' + esc(dg.msg) + '<br><small>그래도 맞으면 저장하세요. 자동 분류: ' + esc(r.reason || '확인 필요') + '</small>'
         : '자동 분류: <b>' + esc(r.state === '확인필요' ? '확인 필요 — ' + (r.reason || '') : r.reason || '') + '</b> <small>(저장 후 눌러서 바꿀 수 있어요)</small>';
+      m.querySelector('#mgw').hidden = !(r.parts || []).some((p) => p.cls === '게스트비');
       return { t, r, dupBank, dupMan };
     };
     const bindChips = () => m.querySelectorAll('[data-amt]').forEach((b) => (b.onclick = () => { m.querySelector('#ma').value = b.dataset.amt; prev(); }));
@@ -747,14 +769,19 @@ function addManual() {
     }));
     bindChips();
     ['#md', '#mn', '#ma', '#mm'].forEach((id) => (m.querySelector(id).oninput = prev));
+    m.querySelector('#mg').onchange = (e) => e.target.classList.remove('need');
     m.querySelector('#mx').onclick = closeModal;
     m.querySelector('#mok').onclick = async () => {
       const x = prev(); if (!x) return toast('날짜·이름·금액을 넣어주세요');
       if (x.dupBank && !confirm('통장 내역에 같은 거래가 이미 있어요.\n그래도 따로 저장할까요? (다른 입금일 때만)')) return;
       if (x.dupMan && !confirm('같은 건을 이미 직접 입력했어요.\n진짜 두 번째 입금이에요?')) return;
+      const isGuest = (x.r.parts || []).some((p) => p.cls === '게스트비'), gsel = m.querySelector('#mg').value;
+      if (isGuest && !gsel) { m.querySelector('#mg').classList.add('need'); return toast('게스트비는 어느 경기인지 꼭 골라주세요', 5000); }
+      if (isGuest) x.r.parts.forEach((p) => { if (p.cls === '게스트비') p.gid = gsel; });
       const t = x.t; t.parts = x.r.parts; t.state = x.r.state; t.reason = x.r.reason || ''; if (x.r.suggest) t.suggest = x.r.suggest; t.addedAt = new Date().toISOString();
       S.txs = S.txs.concat([t]).sort((a, b) => (a.dt < b.dt ? -1 : 1)); closeModal(); render(); await putTx(t);
-      toast('저장했어요 · ' + (t.state === '확인필요' ? '분류를 골라주세요' : t.reason));
+      const gg = isGuest && S.games.find((g) => g.id === gsel);
+      toast('저장했어요 · ' + (t.state === '확인필요' ? '분류를 골라주세요' : gg ? md(gg.date) + ' 경기 ' + t.reason : t.reason), 5000);
       if (t.state === '확인필요') editTx(t.id);
     };
   });
@@ -765,7 +792,7 @@ function manualTools(t) {
     '<div class="mdiag ' + (dg.code === 'wait' ? '' : 'warn') + '">' + (dg.code === 'wait' ? '⏳ ' : '⚠ ') + esc(dg.msg) + '</div>' +
     dg.cands.map((x) => '<button class="btn xs" data-merge="' + x.id + '">' + esc(x.dt.substr(5, 11)) + ' ' + esc(x.desc) + ' ' + won(x.amt) + '원' + (x.amt !== t.amt ? '이 맞아요 (통장 기준으로 합치기)' : '과 합치기') + '</button>').join('') +
     '<div class="row"><label class="f">날짜<input id="fxd" type="date" value="' + C.dtDate(t.dt) + '"></label><label class="f">이름<input id="fxn" value="' + esc(t.desc) + '"></label><label class="f">금액<input id="fxa" type="number" value="' + t.amt + '"></label></div>' +
-    '<div class="row"><button class="btn xs" id="fix">잘못 넣은 것 고치기</button><button class="btn xs danger" id="mdel">🗑 직접 입력 삭제</button></div></div>';
+    '<div class="muted">날짜·이름·금액을 고치고 아래 [저장]을 누르세요. 금액을 바꾸면 분류는 새 금액으로 다시 잡혀요.</div><button class="btn xs danger" id="mdel">🗑 직접 입력 삭제</button></div>';
 }
 function bindManualTools(m, t) {
   if (!t.manual) return;
@@ -777,17 +804,6 @@ function bindManualTools(m, t) {
     S.txs = S.txs.filter((y) => y.id !== t.id); closeModal(); render();
     await putTx(x); await deleteDoc(D('tx', t.id)).catch(fail); toast('합쳤어요');
   }));
-  m.querySelector('#fix').onclick = async () => {
-    const d = m.querySelector('#fxd').value, n = m.querySelector('#fxn').value.trim(), a = +m.querySelector('#fxa').value || 0;
-    if (!d || !n || !a) return toast('날짜·이름·금액을 넣어주세요');
-    const amtChanged = a !== t.amt; t.dt = d.replace(/-/g, '.') + ' 12:00:00'; t.desc = n; t.amt = a;
-    if (amtChanged) {                                  // 금액이 바뀌면 분류를 다시 계산
-      const r = C.classify(t, { cfg: cfgC(), games: S.games, members: S.members, alias: C.aliasMap(S.members), done: S.txs.filter((x) => x.id !== t.id) });
-      t.parts = r.parts; t.state = r.state; t.reason = r.reason || ''; if (r.suggest) t.suggest = r.suggest; else delete t.suggest;
-    }
-    S.txs.sort((x, y) => (x.dt < y.dt ? -1 : 1)); await putTx(t); const dg = C.diagnoseManual(t, S.txs);
-    toast(dg.code === 'wait' ? '고쳤어요 · 통장 엑셀이 들어오면 자동으로 맞춰봐요' : '고쳤어요 · ' + dg.msg, 6000); editTx(t.id);
-  };
   m.querySelector('#mdel').onclick = async () => {
     if (!confirm(t.desc + ' ' + won(t.amt) + '원 직접 입력을 삭제할까요?\n(통장 엑셀로 들어온 거래는 그대로 남아요)')) return;
     S.txs = S.txs.filter((y) => y.id !== t.id); closeModal(); render(); schedulePublish();
