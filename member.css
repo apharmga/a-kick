@@ -11,9 +11,9 @@ button{font-family:inherit;cursor:pointer}
 .hero{background:var(--navy);color:#fff;padding:20px 20px 34px}
 .hero b{font-size:16px}
 .hrow{display:flex;justify-content:space-between;align-items:center}
-.who{font-size:13px;color:#C7D2FE}
+.who{font-size:13px;color:rgba(255,255,255,.78)}
 .hero h1{margin:14px 0 2px;font-size:26px;font-weight:800}
-.hero p{margin:0;font-size:13px;color:#C7D2FE}
+.hero p{margin:0;font-size:13px;color:rgba(255,255,255,.78)}
 .pad{padding:16px;display:flex;flex-direction:column;gap:12px}
 .lift{margin-top:-22px}
 .card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 1px 3px rgba(15,23,42,.06)}
@@ -88,7 +88,7 @@ td.p{color:var(--pos)}td.n{color:var(--neg)}
 .clist{display:flex;flex-direction:column}
 .clist a{display:flex;justify-content:space-between;align-items:center;padding:14px 4px;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:700;font-size:16px}
 .clist a:last-child{border-bottom:0}
-.clist em{font-style:normal;font-size:12px;color:var(--navy);background:#EEF3FF;border-radius:999px;padding:3px 9px}
+.clist em{font-style:normal;font-size:12px;color:var(--navy);background:var(--tint);border-radius:999px;padding:3px 9px}
 .newc{display:flex;gap:8px;margin-top:12px}
 .newc input{flex:1;min-width:0;min-height:46px;border:1px solid #C3CCE3;border-radius:12px;padding:0 12px;font:inherit}
 .newc button{min-height:46px;border:0;border-radius:12px;background:var(--navy);color:#fff;font-weight:800;padding:0 16px}
@@ -133,7 +133,7 @@ td.p{color:var(--pos)}td.n{color:var(--neg)}
 .cd::before{content:"";position:absolute;left:50%;top:50%;width:200%;aspect-ratio:1;transform:translate(-50%,-50%);background:conic-gradient(#22D3EE,#6366F1,#F472B6,#FACC15,#22D3EE);animation:cdspin 2.4s linear infinite;z-index:-2}
 .cd::after{content:"";position:absolute;inset:2.5px;border-radius:11.5px;background:#fff;z-index:-1}
 .cd span{font-size:13px;font-weight:700;color:#5B6478}
-.cd b{font-size:20px;font-weight:900;color:#1E3A8A;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.cd b{font-size:20px;font-weight:900;color:var(--navy);font-variant-numeric:tabular-nums;letter-spacing:.01em}
 .cd.done{animation:none;background:#F1F3F7}
 .cd.done::before,.cd.done::after{display:none}
 .cd.done b{font-size:15px;color:#5B6478}
@@ -144,7 +144,7 @@ td.p{color:var(--pos)}td.n{color:var(--neg)}
 .hero.home h1{font-size:23px}
 .lbl{font-size:12px;font-weight:800;color:var(--navy);letter-spacing:.02em}
 .mystat{font-size:12px;font-weight:800;border-radius:999px;padding:4px 10px;background:var(--bg);color:var(--sub)}
-.mystat.in{background:#E8EEFF;color:var(--navy)}.mystat.out{background:#F1F3F7;color:#64748B}.mystat.none{background:#FFF7E6;color:#B45309}
+.mystat.in{background:var(--tint);color:var(--navy)}.mystat.out{background:#F1F3F7;color:#64748B}.mystat.none{background:#FFF7E6;color:#B45309}
 .ng-date{font-size:28px;font-weight:900;margin-top:8px;letter-spacing:-.02em}
 .ng-date small{font-size:16px;color:var(--sub);font-weight:700}
 .ng-sub{font-size:14px;color:var(--sub);margin-top:2px}
@@ -167,7 +167,7 @@ td.p{color:var(--pos)}td.n{color:var(--neg)}
 select#sym{min-height:36px;border:1px solid var(--line);border-radius:10px;padding:0 8px;font:inherit;font-size:13px;background:#fff}
 .stab{margin-top:8px}
 .stab td{text-align:right}.stab td:first-child{text-align:left;color:var(--ink);font-weight:600}
-.stab tr.me td{background:#EEF3FF;color:var(--navy)}
+.stab tr.me td{background:var(--tint);color:var(--navy)}
 th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
 th.sortable i{font-style:normal;font-size:10px;margin-left:3px;color:#A3ADBD}
 th.sortable.on{color:var(--navy)}th.sortable.on i{color:var(--navy)}
@@ -201,7 +201,7 @@ th.sortable.on{color:var(--navy)}th.sortable.on i{color:var(--navy)}
 .popts{display:flex;flex-direction:column;gap:6px;max-height:44vh;overflow:auto}
 .popt{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:center;min-height:50px;border:1.5px solid #C3CCE3;border-radius:12px;background:#fff;padding:0 14px;font-size:15px;font-weight:700;color:var(--ink);text-align:left}
 .popt span,.popt b{position:relative;z-index:1}
-.popt i{position:absolute;left:0;top:0;bottom:0;background:#EEF3FF;z-index:0}
+.popt i{position:absolute;left:0;top:0;bottom:0;background:var(--tint);z-index:0}
 .popt.on{border-color:var(--navy);box-shadow:0 0 0 1px var(--navy)}
 .popt.on span::before{content:"✓ ";color:var(--navy)}
 .pwho{font-size:12px;color:var(--sub);margin:-2px 4px 4px}
@@ -216,26 +216,28 @@ th.sortable.on{color:var(--navy)}th.sortable.on i{color:var(--navy)}
 /* v0.11 로고(스티커 · 앱 파랑 테마) */
 .login{background:#fff}
 .logo8{display:flex;flex-direction:column;align-items:center;gap:0;margin-bottom:4px}
-.stk{transform:rotate(-6deg);background:#fff;border:5px solid var(--navy);border-radius:22px;padding:14px 24px;box-shadow:8px 8px 0 #60A5FA;font-family:Bungee,Pretendard,sans-serif;font-size:50px;line-height:1;color:var(--navy);letter-spacing:.5px}
+.stk{transform:rotate(-6deg);background:#fff;border:5px solid var(--navy);border-radius:22px;padding:14px 24px;box-shadow:8px 8px 0 var(--acc);font-family:Bungee,Pretendard,sans-serif;font-size:50px;line-height:1;color:var(--navy);letter-spacing:.5px}
 .pills{display:flex;gap:8px;transform:rotate(-6deg);margin-top:10px}
 .pills span{border:3px solid var(--navy);border-radius:999px;padding:4px 12px;font-weight:900;font-size:13px;color:var(--navy)}
-.pills .p1{background:#DBEAFE}.pills .p2{background:#E0F2FE}
+.pills .p1{background:var(--tint)}.pills .p2{background:var(--tint)}
 .lt{margin:18px 0 6px;color:var(--navy);font-weight:800;font-size:17px;line-height:1.6}
 .lt span{color:var(--sub);font-weight:500;font-size:14px}
-.login .gbtn{background:var(--navy);color:#fff;border:0;box-shadow:5px 5px 0 #60A5FA;font-weight:800}
+.login .gbtn{background:var(--navy);color:#fff;border:0;box-shadow:5px 5px 0 var(--acc);font-weight:800}
 .login .gbtn svg{background:#fff;border-radius:50%;padding:3px;width:26px;height:26px}
 .warn{text-align:center}
-.extbtn{display:block;width:100%;min-height:52px;margin-top:10px;border:0;border-radius:14px;background:var(--navy);color:#fff;font-weight:800;font-size:16px;box-shadow:4px 4px 0 #60A5FA}
+.extbtn{display:block;width:100%;min-height:52px;margin-top:10px;border:0;border-radius:14px;background:var(--navy);color:#fff;font-weight:800;font-size:16px;box-shadow:4px 4px 0 var(--acc)}
 .warn .lnk{display:block;margin:10px auto 0;border:0;background:transparent;color:#92400E;text-decoration:underline;font-size:13px;min-height:auto;padding:0}
 /* 아직 안 한 투표: 카운트다운처럼 빛나는 테두리 */
 .pitem.glow{position:relative;isolation:isolate;overflow:hidden;border:0;border-radius:14px;padding:12px 14px;margin:6px 0;animation:cdglow 1.6s ease-in-out infinite}
 .pitem.glow::before{content:"";position:absolute;left:50%;top:50%;width:200%;aspect-ratio:1;transform:translate(-50%,-50%);background:conic-gradient(#22D3EE,#6366F1,#F472B6,#FACC15,#22D3EE);animation:cdspin 2.4s linear infinite;z-index:-2}
 .pitem.glow::after{content:"";position:absolute;inset:2.5px;border-radius:11.5px;background:#fff;z-index:-1}
 @media (prefers-reduced-motion:reduce){.pitem.glow,.pitem.glow::before{animation:none}}
-.login .warn{background:#EFF6FF;color:var(--navy);border:2px solid #BFDBFE}
-.warn .extbtn{background:var(--navy);color:#fff;display:block;width:100%;min-height:52px;margin:12px 0 0;border-radius:14px;font-size:16px;box-shadow:4px 4px 0 #60A5FA}
+.login .warn{background:var(--tint);color:var(--navy);border:2px solid var(--tint)}
+.warn .extbtn{background:var(--navy);color:#fff;display:block;width:100%;min-height:52px;margin:12px 0 0;border-radius:14px;font-size:16px;box-shadow:4px 4px 0 var(--acc)}
 .warn .lnk{color:var(--sub)}
 .crow{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
 .crow:last-child{border-bottom:0}
 .crow a{flex:1;border-bottom:0!important}
 .cdel{flex:none;border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:9px;min-height:34px;padding:0 10px;font-size:12px;font-weight:700}
+
+:root{--acc:#60A5FA;--tint:#EEF3FF}

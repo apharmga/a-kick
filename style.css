@@ -83,7 +83,7 @@ em{font-style:normal}
 .acts{display:flex;flex-wrap:wrap;gap:5px;padding:0 10px 10px}
 
 /* 경기 카드 */
-.game{background:#EEF3FF;border:1px solid #D6E0FA;color:var(--ink);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:14px}
+.game{background:var(--tint);border:1px solid #D6E0FA;color:var(--ink);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:14px}
 .g-head{display:flex;justify-content:space-between;align-items:baseline}
 .g-head b{font-size:16px;color:var(--navy)}
 .g-head span{font-size:12px;color:var(--sub)}
@@ -243,7 +243,7 @@ a.logo{text-decoration:none}
 .cd::before{content:"";position:absolute;left:50%;top:50%;width:200%;aspect-ratio:1;transform:translate(-50%,-50%);background:conic-gradient(#22D3EE,#6366F1,#F472B6,#FACC15,#22D3EE);animation:cdspin 2.4s linear infinite;z-index:-2}
 .cd::after{content:"";position:absolute;inset:2.5px;border-radius:11.5px;background:#fff;z-index:-1}
 .cd span{font-size:13px;font-weight:700;color:#5B6478}
-.cd b{font-size:20px;font-weight:900;color:#1E3A8A;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.cd b{font-size:20px;font-weight:900;color:var(--navy);font-variant-numeric:tabular-nums;letter-spacing:.01em}
 .cd.done{animation:none;background:#F1F3F7}
 .cd.done::before,.cd.done::after{display:none}
 .cd.done b{font-size:15px;color:#5B6478}
@@ -282,12 +282,12 @@ th.sortable.on,th.sortable.on i{color:var(--navy)}
 .st2{white-space:pre-wrap;font-size:14px;margin-top:4px}
 .chk{display:flex;align-items:center;gap:6px;font-size:13px}
 .box textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;resize:vertical}
-.reqbox{margin-bottom:16px;border-color:#BFDBFE;background:#F5F9FF}
+.reqbox{margin-bottom:16px;border-color:var(--tint);background:#F5F9FF}
 .req{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding:10px 0}
 .req:first-of-type{border-top:0}
 .rq{display:flex;flex-direction:column;min-width:160px;margin-right:auto}.rq small{color:var(--sub);font-size:12px}
 .req select{min-height:38px;border:1px solid var(--line);border-radius:10px;padding:0 8px;font:inherit;background:#fff;max-width:320px}
-.pullg{width:100%;margin-top:8px;min-height:40px;border:1.5px dashed #93C5FD;background:#EFF6FF;color:var(--navy);border-radius:10px;font-weight:800;font-size:13px;cursor:pointer}
+.pullg{width:100%;margin-top:8px;min-height:40px;border:1.5px dashed #93C5FD;background:var(--tint);color:var(--navy);border-radius:10px;font-weight:800;font-size:13px;cursor:pointer}
 .game.off{background:#F3F4F6;border-color:#E5E7EB;opacity:.85}
 .pp{font-size:12px;font-weight:800;color:#B45309;background:#FFF7E6;border-radius:999px;padding:3px 10px}
 .pinbox{font-size:28px;letter-spacing:14px;text-align:center;font-weight:800}
@@ -304,7 +304,7 @@ th.sortable.on,th.sortable.on i{color:var(--navy)}
 .wbig{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .wsport{display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;min-height:130px;border:2px solid var(--line);border-radius:18px;background:#fff;cursor:pointer;font:inherit}
 .wsport b{font-size:22px}.wsport span{font-size:13px;color:var(--sub)}
-.wsport.on{border-color:var(--navy);background:#EEF3FF;box-shadow:4px 4px 0 #60A5FA}
+.wsport.on{border-color:var(--navy);background:var(--tint);box-shadow:4px 4px 0 var(--acc)}
 .wchips{display:flex;flex-wrap:wrap;gap:8px}
 .wchip{min-height:44px;min-width:52px;padding:0 14px;border:1.5px solid #C3CCE3;border-radius:12px;background:#fff;font:inherit;font-weight:700;cursor:pointer}
 .wchip.on{background:var(--navy);border-color:var(--navy);color:#fff}
@@ -312,7 +312,7 @@ th.sortable.on,th.sortable.on i{color:var(--navy)}
 textarea.win{resize:vertical}
 .wnav{display:flex;gap:8px;margin-top:auto;padding-top:16px}
 .wback{flex:1;min-height:54px;border:1px solid var(--line);border-radius:14px;background:#fff;font:inherit;font-weight:800;font-size:16px;cursor:pointer}
-.wnext{flex:2;min-height:54px;border:0;border-radius:14px;background:var(--navy);color:#fff;font:inherit;font-weight:800;font-size:17px;box-shadow:4px 4px 0 #60A5FA;cursor:pointer}
+.wnext{flex:2;min-height:54px;border:0;border-radius:14px;background:var(--navy);color:#fff;font:inherit;font-weight:800;font-size:17px;box-shadow:4px 4px 0 var(--acc);cursor:pointer}
 .wold{margin-top:8px;font-size:13px;color:var(--sub)}.wold summary{cursor:pointer;padding:6px 0}
 /* 폰에서 관리자 상단 메뉴 정리 */
 @media (max-width:700px){
@@ -327,3 +327,11 @@ textarea.win{resize:vertical}
 }
 .tsel{display:flex;gap:6px}
 .tsel select{flex:1;min-height:46px;border:1.5px solid #C3CCE3;border-radius:12px;padding:0 10px;font:inherit;font-size:16px;background:#fff}
+
+:root{--acc:#60A5FA;--tint:#EEF3FF}
+.thlist{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.thp{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px 6px 6px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.sw{display:flex}.sw i{width:18px;height:18px;border-radius:50%;border:2px solid #fff;margin-left:-6px;box-shadow:0 0 0 1px rgba(0,0,0,.08)}.sw i:first-child{margin-left:0}
+.thpick{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0}
+.thpick label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:var(--sub)}
+.thpick input[type=color]{width:64px;height:44px;border:1px solid var(--line);border-radius:10px;padding:2px;background:#fff;cursor:pointer}

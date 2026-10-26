@@ -62,7 +62,7 @@ async function start() {
   try {
     const c = await getDoc(doc(db, 'clubs', cid));
     if (!c.exists()) { toast('없어진 팀이에요'); delete S.myClubs[cid]; await saveMyClubs(); return renderHome(); }
-    S.cid = cid; S.club = c.data(); S.owner = S.club.owner === S.uid;
+    S.cid = cid; S.club = c.data(); S.owner = S.club.owner === S.uid; window.Core.applyTheme(S.club.theme);
     if (!urlC) history.replaceState(null, '', './?c=' + cid);
     S.myClubs[cid] = S.club.name;
     setDoc(meRef, { clubs: S.myClubs, last: cid }, { merge: true }).catch(() => {});

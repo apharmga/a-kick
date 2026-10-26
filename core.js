@@ -331,7 +331,31 @@
     goals.forEach(function (x) { if (x.gid !== game.id) return; T.forEach(function (t, i) { if (t.indexOf(x.scorer) >= 0) s[i]++; }); });
     return s;
   }
-  var Core = { statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
+  /* ---- 팀 테마: 메인 · 서브1(포인트) · 서브2(바탕) ---- */
+  var THEMES = [
+    { id: 'navy', name: '기본 네이비', c: ['#1E3A8A', '#60A5FA', '#EEF1F5'] },
+    { id: 'lavender', name: '오로라 라벤더', c: ['#5B4B9A', '#B4A2F0', '#F4F1FC'] },
+    { id: 'peach', name: '선셋 피치', c: ['#B4553E', '#F5B48F', '#FFF4EE'] },
+    { id: 'lemon', name: '레몬 소다', c: ['#1F7A70', '#F2D45C', '#F7FAEF'] },
+    { id: 'cotton', name: '코튼 캔디', c: ['#B34A86', '#9AD1F0', '#FDF2F8'] }
+  ];
+  function hexRgb(h) { h = String(h || '').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); var n = parseInt(h, 16) || 0; return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function rgbHex(c) { return '#' + c.map(function (x) { return ('0' + Math.round(Math.max(0, Math.min(255, x))).toString(16)).slice(-2); }).join(''); }
+  function mix(a, b, t) { var x = hexRgb(a), y = hexRgb(b); return rgbHex(x.map(function (v, i) { return v + (y[i] - v) * t; })); }
+  function lum(h) { var c = hexRgb(h).map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+  /** 테마 적용. 메인색이 너무 밝으면 흰 글씨가 읽히도록 자동으로 진하게 보정 */
+  function applyTheme(t) {
+    var d = THEMES[0].c, main = (t && t.main) || d[0], acc = (t && t.sub1) || d[1], bg = (t && t.sub2) || d[2], k = 0;
+    while (lum(main) > 0.18 && k++ < 20) main = mix(main, '#000000', 0.08);
+    if (lum(bg) < 0.75) bg = mix(bg, '#FFFFFF', 0.85);
+    if (typeof document === 'undefined') return { main: main, sub1: acc, sub2: bg };
+    var r = document.documentElement.style;
+    r.setProperty('--navy', main); r.setProperty('--navy-d', mix(main, '#000000', 0.2)); r.setProperty('--navy-l', mix(main, '#FFFFFF', 0.88));
+    r.setProperty('--tint', mix(main, '#FFFFFF', 0.9)); r.setProperty('--acc', acc); r.setProperty('--bg', bg);
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', main);
+    return { main: main, sub1: acc, sub2: bg };
+  }
+  var Core = { THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
     balance: balance, book: book, nearestGame: nearestGame, nextGameAfter: nextGameAfter, gamesInMonth: gamesInMonth,

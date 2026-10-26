@@ -63,7 +63,7 @@ onAuthStateChanged(auth, async (u) => {
   try {
     const club = await getDoc(doc(db, 'clubs', CID));
     if (!club.exists() || club.data().owner !== u.uid) return deny(u);
-    S.club = club.data(); S.uid = u.uid; document.title = S.club.name + ' 관리자';
+    S.club = club.data(); S.uid = u.uid; document.title = S.club.name + ' 관리자'; C.applyTheme(S.club.theme);
     let ok = false; try { ok = sessionStorage.getItem('afutsal_pin_' + CID) === '1'; } catch (e) {}
     if (ok) { S.unlocked = true; return loadAll(); }
     const cfg = await getDoc(D('config', 'main'));
@@ -941,19 +941,37 @@ const CFG = [['fee', '월회비', 'number'], ['guestFee', '게스트비', 'numbe
   ['cap', '기본 정원', 'number'], ['perSide', '한 팀 최소 인원 (풋살 5 · 축구 11)', 'number'], ['maxSide', '한 팀 최대 인원 (풋살 6 · 축구 11)', 'number'], ['time', '경기 시간', 'text'], ['nextMonthDay', '이 날짜부터 들어온 회비는 다음 달분', 'number'], ['dueDay', '회비 마감일', 'number'],
   ['reserve', '곶간(비상금)', 'number'], ['statFrom', '골·도움 스탯 집계 시작일', 'date'], ['place', '구장 이름', 'text'], ['account', '모임통장 (예: 카카오뱅크 3333-00-0000000)', 'text'], ['openChat', '오픈채팅 링크', 'text']];
 function openSettings() { openSettingsReal(); }
+/* ---- 팀 테마 고르기 (추천 5개 + 직접 고르기) ---- */
+function themeHTML() {
+  const cur = S.club.theme || { main: C.THEMES[0].c[0], sub1: C.THEMES[0].c[1], sub2: C.THEMES[0].c[2] };
+  return '<div class="sgrp"><div class="g-lbl2">팀 테마 · 회원 화면에도 똑같이 적용돼요</div><div class="thlist">' +
+    C.THEMES.map((t) => '<button class="thp" data-th="' + t.c.join(',') + '"><span class="sw">' + t.c.map((c) => '<i style="background:' + c + '"></i>').join('') + '</span>' + esc(t.name) + '</button>').join('') + '</div>' +
+    '<div class="thpick"><label>메인<input type="color" id="thm" value="' + cur.main + '"></label><label>서브1<input type="color" id="th1" value="' + cur.sub1 + '"></label><label>서브2 (바탕)<input type="color" id="th2" value="' + cur.sub2 + '"></label></div>' +
+    '<div class="muted">색 칸을 누르면 색상판이 열려요. 메인이 너무 밝으면 글씨가 보이게 자동으로 진하게 맞춰요.</div></div>';
+}
+function readTheme(m) { return { main: m.querySelector('#thm').value, sub1: m.querySelector('#th1').value, sub2: m.querySelector('#th2').value }; }
+function bindTheme(m) {
+  const live = () => C.applyTheme(readTheme(m));
+  ['#thm', '#th1', '#th2'].forEach((id) => (m.querySelector(id).oninput = live));
+  m.querySelectorAll('[data-th]').forEach((b) => (b.onclick = () => { const c = b.dataset.th.split(','); m.querySelector('#thm').value = c[0]; m.querySelector('#th1').value = c[1]; m.querySelector('#th2').value = c[2]; live(); }));
+}
 function openSettingsReal() {
   const grp = (title, keys) => '<div class="sgrp"><div class="g-lbl2">' + title + '</div><div class="row2">' + CFG.filter(([k]) => keys.indexOf(k) >= 0).map(([k, l, ty]) => '<label class="f">' + l + '<input data-c="' + k + '" type="' + ty + '" value="' + esc(S.cfg[k] == null ? '' : S.cfg[k]) + '"></label>').join('') + '</div></div>';
   modal('<h2>설정</h2><div class="muted">팀 만든 구글 계정 + 관리자 비밀번호로만 열려요. 회원 화면에는 나오지 않아요.</div>' +
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
+    themeHTML() +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
-    '<div class="muted" style="margin-top:8px">A-KICK v0.16</div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK v0.17</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
-    m.querySelector('#cx').onclick = closeModal;
+    m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
+    bindTheme(m);
     m.querySelector('#bk').onclick = backup;
     m.querySelector('#lo').onclick = () => { closeModal(); try { sessionStorage.clear(); } catch (e) {} signOut(auth); };
     m.querySelector('#sv').onclick = async () => {
       m.querySelectorAll('[data-c]').forEach((i) => (S.cfg[i.dataset.c] = i.type === 'number' ? +i.value : i.value.trim()));
       const np = m.querySelector('#newpin').value.trim(); if (np) { if (!/^\d{4}$/.test(np)) return toast('비밀번호는 숫자 4자리로 해주세요'); S.cfg.pinHash = await pinHash(np); }
+      const th = readTheme(m);
+      if (JSON.stringify(th) !== JSON.stringify(S.club.theme || null)) { S.club.theme = th; await setDoc(doc(db, 'clubs', CID), clean(S.club)).catch(fail); }
       await putCfg(); closeModal(); toast('저장했어요'); render();
     };
   });
