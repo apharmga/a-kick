@@ -338,3 +338,10 @@ textarea.win{resize:vertical}
 :root{--hdr:#1E3A8A;--on-hdr:#fff;--on-acc:#0F172A}
 .bar{border-top:4px solid var(--hdr)}
 .game{border-top:3px solid var(--acc)}
+
+/* v0.19 오로라 그라데이션 */
+body{background:var(--bg);background-image:var(--bg-grad);background-attachment:fixed;min-height:100vh}
+.bar{border-top:0;background:#fff;box-shadow:inset 0 4px 0 0 transparent}
+.bar::before{content:"";display:block;height:5px;background:var(--grad)}
+.btn.pri,.g-btn,.wnext{background:var(--btn);border-color:transparent;color:var(--on-btn)}
+.btn.pri:hover,.g-btn:hover{filter:brightness(.96);background:var(--btn)}

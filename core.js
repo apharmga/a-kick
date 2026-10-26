@@ -333,26 +333,36 @@
   }
   /* ---- 팀 테마: 메인 · 서브1(포인트) · 서브2(바탕) ---- */
   // 색 역할: c[0] 메인(상단 배경) · c[1] 서브1(버튼·강조 글씨) · c[2] 서브2(포인트: 배지·카드 선)
+  // c: [메인, 서브1, 서브2] · g: 오로라 그라데이션 3색(프리셋 전용)
   var THEMES = [
-    { id: 'navy', name: '기본 네이비', c: ['#1E3A8A', '#1E3A8A', '#60A5FA'] },
-    { id: 'lavender', name: '오로라 라벤더', c: ['#6D5BB8', '#4C3F8F', '#C4B5FD'] },
-    { id: 'peach', name: '선셋 피치', c: ['#E8896B', '#B4553E', '#FFD1B8'] },
-    { id: 'lemon', name: '레몬 소다', c: ['#2A9D8F', '#1F7A70', '#F2D45C'] },
-    { id: 'cotton', name: '코튼 캔디', c: ['#E58BB5', '#B34A86', '#9AD1F0'] }
+    { id: 'navy', name: '기본 네이비', c: ['#1E3A8A', '#1E3A8A', '#60A5FA'], g: ['#1E3A8A', '#2C4FB0', '#3E74D6'] },
+    { id: 'lavender', name: '오로라 라벤더', c: ['#E2D9FF', '#4B3A99', '#A78BFA'], g: ['#E2D9FF', '#D3CBF6', '#C6E6F4'] },
+    { id: 'peach', name: '선셋 피치', c: ['#FFDCC8', '#A9472F', '#FF9F7A'], g: ['#FFDCC8', '#FFCDC3', '#FBE6B2'] },
+    { id: 'lemon', name: '레몬 소다', c: ['#FAF0A2', '#2C6A4D', '#F2A93B'], g: ['#FAF0A2', '#CDEFC6', '#ACDDF1'] },
+    { id: 'cotton', name: '코튼 캔디', c: ['#FFD4E6', '#A33A76', '#F48FB8'], g: ['#FFD4E6', '#EED3F3', '#CBE4FA'] }
   ];
   function hexRgb(h) { h = String(h || '').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); var n = parseInt(h, 16) || 0; return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
   function rgbHex(c) { return '#' + c.map(function (x) { return ('0' + Math.round(Math.max(0, Math.min(255, x))).toString(16)).slice(-2); }).join(''); }
   function mix(a, b, t) { var x = hexRgb(a), y = hexRgb(b); return rgbHex(x.map(function (v, i) { return v + (y[i] - v) * t; })); }
   function lum(h) { var c = hexRgb(h).map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
-  /** 고른 색은 그대로 쓰고, 그 위 글씨 색만 자동으로(밝으면 검정·어두우면 흰색). 버튼색만 흰 글씨가 읽히게 살짝 보정 */
+  function darkTo(c, L) { var k = 0; while (lum(c) > L && k++ < 20) c = mix(c, '#000000', 0.08); return c; }
+  /** 상단·버튼은 메인색 기반 오로라 그라데이션, 글씨색은 자동 대비 */
   function applyTheme(t) {
-    var d = THEMES[0].c, hdr = (t && t.main) || d[0], btn = (t && t.sub1) || d[1], acc = (t && t.sub2) || d[2], k = 0;
-    while (lum(btn) > 0.22 && k++ < 12) btn = mix(btn, '#000000', 0.07);
-    var v = { '--hdr': hdr, '--on-hdr': lum(hdr) > 0.4 ? '#0F172A' : '#FFFFFF', '--navy': btn, '--navy-d': mix(btn, '#000000', 0.2), '--navy-l': mix(btn, '#FFFFFF', 0.88),
-      '--tint': mix(btn, '#FFFFFF', 0.9), '--acc': acc, '--on-acc': lum(acc) > 0.4 ? '#0F172A' : '#FFFFFF', '--bg': mix(hdr, '#FFFFFF', lum(hdr) > 0.4 ? 0.6 : 0.92) };
+    var d = THEMES[0].c, main = (t && t.main) || d[0], s1 = (t && t.sub1) || d[1], acc = (t && t.sub2) || d[2];
+    var pre = THEMES.filter(function (x) { return x.c[0].toLowerCase() === String(main).toLowerCase() && x.c[1].toLowerCase() === String(s1).toLowerCase() && x.c[2].toLowerCase() === String(acc).toLowerCase(); })[0];
+    var g = pre ? pre.g : [main, mix(main, '#FFFFFF', 0.4), mix(main, s1, 0.22)];
+    var light = (lum(g[0]) + lum(g[1]) + lum(g[2])) / 3 > 0.4;
+    var ink = darkTo(s1, 0.12), onHdr = light ? ink : '#FFFFFF';
+    var grad = 'linear-gradient(120deg,' + g[0] + ' 0%,' + g[1] + ' 50%,' + g[2] + ' 100%)';
+    var btn = light ? 'linear-gradient(120deg,' + mix(g[0], ink, 0.1) + ',' + mix(g[1], ink, 0.1) + ',' + mix(g[2], ink, 0.1) + ')'
+                    : 'linear-gradient(120deg,' + ink + ',' + mix(ink, acc, 0.45) + ')';
+    var v = { '--hdr': g[0], '--grad': grad, '--on-hdr': onHdr, '--btn': btn, '--on-btn': light ? ink : '#FFFFFF',
+      '--navy': ink, '--navy-d': mix(ink, '#000000', 0.2), '--navy-l': mix(ink, '#FFFFFF', 0.88),
+      '--tint': mix(light ? g[1] : ink, '#FFFFFF', light ? 0.6 : 0.9), '--acc': acc, '--on-acc': lum(acc) > 0.4 ? '#0F172A' : '#FFFFFF',
+      '--bg': mix(g[0], '#FFFFFF', 0.86), '--bg-grad': 'linear-gradient(180deg,' + mix(g[0], '#FFFFFF', 0.8) + ' 0%,' + mix(g[1], '#FFFFFF', 0.86) + ' 45%,' + mix(g[2], '#FFFFFF', 0.82) + ' 100%)' };
     if (typeof document === 'undefined') return v;
     var r = document.documentElement.style; Object.keys(v).forEach(function (k2) { r.setProperty(k2, v[k2]); });
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', hdr);
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
   var Core = { THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,

@@ -947,7 +947,7 @@ function themeHTML() {
   return '<div class="sgrp"><div class="g-lbl2">팀 테마 · 회원 화면에도 똑같이 적용돼요</div><div class="thlist">' +
     C.THEMES.map((t) => '<button class="thp" data-th="' + t.c.join(',') + '"><span class="sw">' + t.c.map((c) => '<i style="background:' + c + '"></i>').join('') + '</span>' + esc(t.name) + '</button>').join('') + '</div>' +
     '<div class="thpick"><label>메인 · 상단 배경<input type="color" id="thm" value="' + cur.main + '"></label><label>서브1 · 버튼·글씨<input type="color" id="th1" value="' + cur.sub1 + '"></label><label>서브2 · 포인트<input type="color" id="th2" value="' + cur.sub2 + '"></label></div>' +
-    '<div class="muted">색 칸을 누르면 색상판이 열려요. 고른 색은 그대로 쓰고, 글씨 색은 배경에 맞춰 자동으로 바뀌어요. 바탕은 메인색을 연하게 깔아요.</div></div>';
+    '<div class="muted">색 칸을 누르면 색상판이 열려요. 메인색을 중심으로 오로라 그라데이션을 만들어요. 글씨 색은 배경에 맞춰 자동으로 바뀌어요.</div></div>';
 }
 function readTheme(m) { return { main: m.querySelector('#thm').value, sub1: m.querySelector('#th1').value, sub2: m.querySelector('#th2').value }; }
 function bindTheme(m) {
@@ -961,7 +961,7 @@ function openSettingsReal() {
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
     themeHTML() +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
-    '<div class="muted" style="margin-top:8px">A-KICK v0.18</div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK v0.19</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
     bindTheme(m);
