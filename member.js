@@ -918,7 +918,86 @@ function achSyncProf() {
   if (p.ach === n && (p.plat || 0) === plat) return;
   setDoc(doc(db, 'clubs', S.cid, 'profiles', S.me.mid), { num: p.num || 0, pos: p.pos || [], uid: S.uid, at: Date.now(), ach: n, plat }).catch(() => {});
 }
-const medal = (a, on, big) => '<span class="md ' + a[2] + (on ? '' : ' off') + (big ? ' big' : '') + '">' + (on || !a[8] ? a[3] : '❓') + '</span>';
+/* ---- 업적 뱃지 그림 (방패 엠블럼) : 테마와 상관없이 남색 코어 + 금속 테두리 ---- */
+const AIC = {
+  d1: '<path d="M3 15.5h13.8a3.7 3.7 0 0 0 3.7-3.7V11l-5.6-1.2L12.5 6H8.2L7 9.4 3 10.6z"/><path d="M3 19h18M10 9.5l1.5 1.5M8.6 11.6l1.4 1.4"/>',
+  s3: '<path d="M12 2.5c.8 3.6 5.5 5.6 5.5 11a5.5 5.5 0 0 1-11 0c0-2.8 1.6-4.4 2.7-5.4.3 1.7 1 2.6 2.1 3.1 0-3.4.7-5.9.7-8.7z"/><path d="M12 20.5a2.4 2.4 0 0 1-2.4-2.4c0-1.6 1.3-2.4 2.4-4 1.1 1.6 2.4 2.4 2.4 4a2.4 2.4 0 0 1-2.4 2.4z"/>',
+  s7: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 2.8v4M16 2.8v4M9 14.2l2.2 2.2 4-4"/>',
+  s14: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 2.8v4M16 2.8v4M6.5 15l1.6 1.6 2.7-2.9M13.2 15l1.6 1.6 2.7-2.9"/>',
+  s30: '<path d="M19.5 14.6A8 8 0 1 1 9.4 4.5a6.4 6.4 0 0 0 10.1 10.1z"/><path d="M16.5 3.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/>',
+  s100: '<path d="M8.5 21a4.5 4.5 0 0 1-4.5-4.5c0-3.3 2.7-4.6 3-8 1.8 1.4 2.8 3.2 2.8 5"/><path d="M14 21a5 5 0 0 1-5-5c0-4.5 4-6.3 4.6-13 3.4 2.6 6.4 6.5 6.4 11.6A6.4 6.4 0 0 1 14 21z"/>',
+  s365: '<path d="M3 8.5l4.6 3.8L12 5l4.4 7.3L21 8.5l-1.8 9.5H4.8z"/><path d="M5 21h14"/><circle cx="12" cy="13.6" r="1.3"/>',
+  d10: '<path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/>',
+  d50: '<path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M12 17.5s-3-1.8-3-3.6a1.5 1.5 0 0 1 3-.4 1.5 1.5 0 0 1 3 .4c0 1.8-3 3.6-3 3.6z"/>',
+  d150: '<path d="M4 20V8h2.5v2H9V8h2v2h2V8h2v2h2.5V8H20v12z"/><path d="M10 20v-4a2 2 0 0 1 4 0v4M4 13h16"/>',
+  d300: '<path d="M2.5 20l6.5-11 3.5 5.5L15 11l6.5 9z"/><path d="M7 11.6l2 1.6 1.6-1.4"/><path d="M15 4v3.5M15 4l3 1-3 1"/>',
+  v1: '<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11V4a1.5 1.5 0 0 1 3 0v7V5.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7 6.3 6.3 0 0 1-5.2-2.7L3.6 14.6a1.6 1.6 0 0 1 2.6-1.8L8 15"/>',
+  v10: '<circle cx="12" cy="12" r="9"/><path d="M7.8 12.2l2.8 2.8 5.6-5.8"/>',
+  v30: '<path d="M3 10v4h3l7 4.5v-13L6 10z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/><path d="M6 14l1.2 5h2.3l-1-4.2"/>',
+  v100: '<circle cx="12" cy="14.5" r="6.5"/><path d="M8.5 9L5.5 2.8h4L12 8M15.5 9l3-6.2h-4L12 8"/><path d="M12 11.6l.9 1.9 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3z"/>',
+  early5: '<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.6 1.8M4 5.5L7 3M20 5.5L17 3"/>',
+  gday: '<path d="M3 18h18M5.5 18a6.5 6.5 0 0 1 13 0"/><path d="M12 4.5V8M4.8 8.6l2.4 2.4M19.2 8.6l-2.4 2.4M7 21h10"/>',
+  a1: '<circle cx="12" cy="12" r="9"/><path d="M12 7.6l3.4 2.5-1.3 4H9.9l-1.3-4z"/><path d="M12 7.6V3.2M15.4 10.1l4.1-1.4M14.1 14.1l2.6 3.6M9.9 14.1l-2.6 3.6M8.6 10.1L4.5 8.7"/>',
+  a10: '<path d="M6 3h6v7.5l5.5 2.3A3.5 3.5 0 0 1 20 16v2H4.5L6 3z"/><path d="M4.5 18v2.5H20V18M12 13.5l-1.5 1.8M15 14.5l-1.3 1.8"/>',
+  a30: '<circle cx="15" cy="4.5" r="1.8"/><path d="M8 21l3.2-5.5L14 17v4M6.5 11.5L9 8.4h4.2l2.6 3.4 3 .8M13 8.6l-2 5.2 3.2 2.1"/>',
+  a50: '<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/><path d="M12 8v7.5M8.3 11.8h7.4"/>',
+  a100: '<ellipse cx="12" cy="9" rx="9" ry="3.5"/><path d="M3 9v6c0 1.9 4 3.5 9 3.5s9-1.6 9-3.5V9"/><path d="M8 12.3v6M16 12.3v6M12 12.5v6"/>',
+  row5: '<path d="M9.8 14.2a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6l-1.2 1.2"/><path d="M14.2 9.8a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6l1.2-1.2"/>',
+  row15: '<rect x="2.5" y="8.5" width="7" height="7" rx="3.5"/><rect x="8.5" y="8.5" width="7" height="7" rx="3.5"/><rect x="14.5" y="8.5" width="7" height="7" rx="3.5"/>',
+  g1: '<path d="M2.5 19V6h19v13"/><path d="M2.5 9.5h19M6 6v13M10 6v13M14 6v13M18 6v13" stroke-opacity=".5"/><circle cx="12" cy="16" r="3" fill="currentColor"/>',
+  as1: '<path d="M2.5 11l3.5-3.5 3 1 3-2 4.5 4.5M21.5 11L18 7.5l-2.5.7"/><path d="M5 11l5.5 5.5a1.4 1.4 0 0 0 2-2M9 13.5l3 3a1.4 1.4 0 0 0 2-2l-1.5-1.5M12 13l2 2a1.4 1.4 0 0 0 2-2l-3.5-3.5"/>',
+  hat: '<path d="M7 16V5.5h10V16"/><path d="M3 17.5c0 1.3 4 2.5 9 2.5s9-1.2 9-2.5c0-1-1.6-1.6-4-2H7c-2.4.4-4 1-4 2z"/><path d="M7 12.5h10"/>',
+  ap10: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5.2"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
+  ap30: '<path d="M12 2.5l1.9 5 5.3-1.8-2.8 4.7 4.6 3-5.4.6.5 5.4L12 15.9l-4.1 3.5.5-5.4-5.4-.6 4.6-3L4.8 5.7l5.3 1.8z"/>',
+  rec10: '<path d="M15.5 4.5l4 4L9 19H5v-4z"/><path d="M13 7l4 4M4 21.5h16"/>',
+  rec50: '<path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5z"/><path d="M4 19.5A1.5 1.5 0 0 0 5.5 21H20v-3M8.5 7.5h7M8.5 11h5"/>',
+  p1: '<circle cx="12" cy="12" r="9"/><path d="M8 8.5l1.6 7 2.4-5 2.4 5 1.6-7M7 12h10"/>',
+  p3: '<rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19M6 15h4"/>',
+  p12: '<path d="M3 9.5L12 4l9 5.5M4.5 9.5h15"/><path d="M6 11.5v6M10 11.5v6M14 11.5v6M18 11.5v6M3.5 20h17"/>',
+  pe3: '<path d="M13.5 2.5L4.5 13.5H11l-1 8 9-11h-6.5z"/>',
+  pv1: '<path d="M4 11.5h16V20H4z"/><path d="M8 11.5V4h8v7.5M10 7.5l1.4 1.4 2.6-2.6M4 11.5L2.5 14M20 11.5l1.5 2.5"/>',
+  pv20: '<path d="M4 20V11M9.3 20V6M14.6 20v-7M20 20V3.5M2.5 20h19"/>',
+  sug: '<path d="M4 5.5h16v10H9.5L5 19.5v-4H4z"/><path d="M8 9.5h8M8 12.5h5"/>',
+  vw1: '<circle cx="12" cy="12" r="9"/><path d="M10 8.3l5.5 3.7-5.5 3.7z" fill="currentColor"/>',
+  vw20: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 8h4M3 12h4M3 16h4M17 8h4M17 12h4M17 16h4"/>',
+  c1: '<path d="M12 4c5 0 9 3.1 9 7s-4 7-9 7c-1 0-2-.1-2.9-.4L5 20l1-3.5C4.2 15.2 3 13.2 3 11c0-3.9 4-7 9-7z"/>',
+  ct: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4h3M9.5 2.5h5M12 2.5V6M18.5 6.5l1.5-1.5"/>',
+  c30: '<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v4M8.5 21.5h7"/>',
+  inst: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3M10.5 18.5h3"/>',
+  push: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0M12 3v2"/>',
+  num: '<path d="M8.5 3L4 5.5 2.5 10l3 1V21h13V11l3-1L20 5.5 15.5 3a3.5 3.5 0 0 1-7 0z"/><path d="M10.5 11.5h2.5l-1.5 6"/>',
+  bank: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5l5 5M8 10.5h5M10.5 8v5"/>',
+  ny: '<path d="M12 3l1.2 3.4L17 7l-2.8 2.3.9 3.7L12 11.2 8.9 13l.9-3.7L7 7l3.8-.6z"/><path d="M12 15v6.5M8 18.5l4-3.5 4 3.5M5 21.5h14"/>',
+  yr1: '<path d="M4 21V13a1.5 1.5 0 0 1 1.5-1.5h13A1.5 1.5 0 0 1 20 13v8"/><path d="M4 16c1.3 1 2.7 1 4 0s2.7-1 4 0 2.7 1 4 0 2.7-1 4 0M2.5 21h19M12 11.5V8"/><path d="M12 3.5c1 1 1.3 1.8 0 3-1.3-1.2-1-2 0-3z"/>',
+  plat: '<path d="M6.5 3.5h11l4 5.5-9.5 12L2.5 9z"/><path d="M2.5 9h19M9 3.5L7.5 9l4.5 12 4.5-12L15 3.5"/>',
+  '?': '<path d="M9 9a3 3 0 1 1 4.3 2.7c-.8.4-1.3 1.1-1.3 2v.8"/><circle cx="12" cy="18" r=".6" fill="currentColor"/>'
+};
+const AMET = { B: ['#FFE2C6', '#C98450', '#6E3B1C', '#FFD3AE'], S: ['#FFFFFF', '#B9C3D1', '#5E6B7E', '#EEF3FA'], G: ['#FFF4BF', '#E5B21E', '#8A5E00', '#FFE58A'], P: [0, 0, '#6B5FB0', '#E7F0FF'] };
+const SH = 'M60 6L104 20V58C104 88 84 106 60 116C36 106 16 88 16 58V20Z', SH2 = 'M60 14L96 25.5V58C96 83 79 98.5 60 107C41 98.5 24 83 24 58V25.5Z';
+(function achDefs() {
+  const st = (t) => t === 'P' ? '<stop offset="0" stop-color="#F4F8FF"/><stop offset=".25" stop-color="#C9D8FF"/><stop offset=".5" stop-color="#F3DDFF"/><stop offset=".72" stop-color="#C8F3EC"/><stop offset="1" stop-color="#8E86D6"/>'
+    : (([a, b, c]) => '<stop offset="0" stop-color="' + a + '"/><stop offset=".45" stop-color="' + b + '"/><stop offset=".55" stop-color="' + c + '"/><stop offset=".8" stop-color="' + b + '"/><stop offset="1" stop-color="' + a + '"/>')(AMET[t]);
+  const d = document.createElement('div'); d.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+  d.innerHTML = '<svg aria-hidden="true"><defs>' + 'BSGP'.split('').map((t) => '<linearGradient id="akm' + t + '" x1="0" y1="0" x2="1" y2="1">' + st(t) + '</linearGradient><linearGradient id="akr' + t + '" x1="1" y1="0" x2="0" y2="1">' + st(t) + '</linearGradient>' +
+    '<linearGradient id="aki' + t + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="' + AMET[t][3] + '"/></linearGradient>').join('') +
+    '<radialGradient id="akc" cx=".5" cy=".3" r=".8"><stop offset="0" stop-color="#2A3352"/><stop offset="1" stop-color="#0E1222"/></radialGradient>' +
+    '<linearGradient id="akg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+    '<linearGradient id="aksh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+    '<clipPath id="akclip"><path d="' + SH + '"/></clipPath></defs></svg>';
+  document.body.appendChild(d);
+})();
+const TWORD = { B: 'BRONZE', S: 'SILVER', G: 'GOLD', P: 'PLATINUM' };
+function medal(a, on, big) {
+  const t = a[2], ic = on || !a[8] ? a[0] : '?', sm = !big;
+  const star = (x, y, r) => '<path d="M' + x + ' ' + (y - r) + 'L' + (x + r * .28) + ' ' + (y - r * .28) + 'L' + (x + r) + ' ' + y + 'L' + (x + r * .28) + ' ' + (y + r * .28) + 'L' + x + ' ' + (y + r) + 'L' + (x - r * .28) + ' ' + (y + r * .28) + 'L' + (x - r) + ' ' + y + 'L' + (x - r * .28) + ' ' + (y - r * .28) + 'Z" fill="#fff"/>';
+  return '<span class="md ' + t + (on ? '' : ' off') + (big ? ' big' : '') + '"><svg viewBox="0 0 120 124" aria-hidden="true">' +
+    '<path d="' + SH + '" fill="url(#akm' + t + ')"/><path d="' + SH2 + '" fill="url(#akc)"/><path d="' + SH2 + '" fill="none" stroke="url(#akr' + t + ')" stroke-width="1.2" stroke-opacity=".7"/>' +
+    '<path d="M24 25.5L60 14L96 25.5V40C80 34 40 34 24 40Z" fill="url(#akg)" opacity=".35"/>' +
+    '<rect x="30" y="84" width="60" height="13" rx="3" fill="url(#akm' + t + ')"/>' + (sm ? '' : '<text x="60" y="93.6" text-anchor="middle" font-family="Pretendard,Arial" font-weight="900" font-size="7.5" letter-spacing="1.6" fill="#141A2E">' + TWORD[t] + '</text>') +
+    '<g transform="translate(' + (sm ? 38.4 : 41.4) + ',' + (sm ? 31 : 36.4) + ') scale(' + (sm ? 1.8 : 1.55) + ')" fill="none" stroke="url(#aki' + t + ')" color="' + AMET[t][3] + '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + AIC[ic] + '</g>' +
+    (t === 'P' && on ? star(22, 26, 7) + star(100, 32, 5) + '<g clip-path="url(#akclip)"><rect x="-60" y="0" width="50" height="124" fill="url(#aksh)" transform="skewX(-18)"><animate attributeName="x" values="-60;160;160" dur="3s" repeatCount="indefinite"/></rect></g>' : '') +
+    '</svg></span>';
+}
 function achCelebrate(list) {
   if (list.length > 3) return sheet('<div class="apop-h">🏆 업적 ' + list.length + '개 달성!</div><div class="agrid">' + list.map((a) => '<div class="ait">' + medal(a, 1) + '<b>' + esc(a[4]) + '</b><small>' + TIER[a[2]][0] + '</small></div>').join('') + '</div><div class="srow"><button class="pri" id="ax">좋아요</button></div>', (el) => (el.querySelector('#ax').onclick = () => (el.hidden = true)));
   let i = 0;
