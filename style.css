@@ -290,3 +290,6 @@ th.sortable.on,th.sortable.on i{color:var(--navy)}
 .pullg{width:100%;margin-top:8px;min-height:40px;border:1.5px dashed #93C5FD;background:#EFF6FF;color:var(--navy);border-radius:10px;font-weight:800;font-size:13px;cursor:pointer}
 .game.off{background:#F3F4F6;border-color:#E5E7EB;opacity:.85}
 .pp{font-size:12px;font-weight:800;color:#B45309;background:#FFF7E6;border-radius:999px;padding:3px 10px}
+.pinbox{font-size:28px;letter-spacing:14px;text-align:center;font-weight:800}
+.shake{animation:shake .35s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}

@@ -75,14 +75,19 @@ function deny(u, msg) {
 }
 function pinGate(hash) {
   $('#app').innerHTML = '<div class="center"><div class="logo" style="font-size:26px">' + esc(S.club.name) + '</div><div class="muted">관리자 전용 페이지</div>' +
-    '<label class="f" style="width:240px">관리자 비밀번호<input id="pin" type="password" inputmode="numeric" autocomplete="off"></label>' +
-    '<button class="btn pri" id="go" style="min-height:46px;width:240px">들어가기</button><a class="muted" href="./?c=' + CID + '">회원 화면으로 돌아가기</a></div>';
+    '<label class="f" style="width:240px">관리자 비밀번호<input id="pin" class="pinbox" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off"></label>' +
+    '<div class="muted">숫자 4자리를 입력하면 바로 들어가요</div><a class="muted" href="./?c=' + CID + '">회원 화면으로 돌아가기</a></div>';
   const inp = $('#pin'); inp.focus();
-  const go = async () => {
-    if ((await pinHash(inp.value.trim())) === (hash || PIN_DEFAULT)) { S.unlocked = true; try { sessionStorage.setItem('afutsal_pin_' + CID, '1'); } catch (e) {} loadAll(); }
-    else { toast('비밀번호가 달라요'); inp.value = ''; inp.focus(); }
+  let wrongT = null;
+  const ok = async () => (await pinHash(inp.value.trim())) === (hash || PIN_DEFAULT);
+  const enter = () => { S.unlocked = true; try { sessionStorage.setItem('afutsal_pin_' + CID, '1'); } catch (e) {} loadAll(); };
+  const wrong = () => { toast('비밀번호가 달라요'); inp.value = ''; inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake'); inp.focus(); };
+  // 4자리가 되면 자동 확인 · 틀리면 잠깐 뒤 지우고 첫 자리부터 (더 긴 비밀번호는 계속 입력 후 Enter)
+  inp.oninput = async () => {
+    inp.value = inp.value.replace(/\D/g, ''); clearTimeout(wrongT);
+    if (inp.value.length === 4) { if (await ok()) return enter(); wrongT = setTimeout(() => { if (inp.value.length === 4) wrong(); }, 700); }
   };
-  $('#go').onclick = go; inp.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  inp.onkeydown = async (e) => { if (e.key === 'Enter' && inp.value) { clearTimeout(wrongT); if (await ok()) enter(); else wrong(); } };
 }
 
 async function loadAll() {
@@ -880,7 +885,7 @@ function openSettingsReal() {
   const grp = (title, keys) => '<div class="sgrp"><div class="g-lbl2">' + title + '</div><div class="row2">' + CFG.filter(([k]) => keys.indexOf(k) >= 0).map(([k, l, ty]) => '<label class="f">' + l + '<input data-c="' + k + '" type="' + ty + '" value="' + esc(S.cfg[k] == null ? '' : S.cfg[k]) + '"></label>').join('') + '</div></div>';
   modal('<h2>설정</h2><div class="muted">팀 만든 구글 계정 + 관리자 비밀번호로만 열려요. 회원 화면에는 나오지 않아요.</div>' +
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
-    '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" autocomplete="new-password"></label></div>' +
+    '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
     '<div class="muted" style="margin-top:8px">A-KICK v0.15.2</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = closeModal;
@@ -888,7 +893,7 @@ function openSettingsReal() {
     m.querySelector('#lo').onclick = () => { closeModal(); try { sessionStorage.clear(); } catch (e) {} signOut(auth); };
     m.querySelector('#sv').onclick = async () => {
       m.querySelectorAll('[data-c]').forEach((i) => (S.cfg[i.dataset.c] = i.type === 'number' ? +i.value : i.value.trim()));
-      const np = m.querySelector('#newpin').value.trim(); if (np) S.cfg.pinHash = await pinHash(np);
+      const np = m.querySelector('#newpin').value.trim(); if (np) { if (!/^\d{4}$/.test(np)) return toast('비밀번호는 숫자 4자리로 해주세요'); S.cfg.pinHash = await pinHash(np); }
       await putCfg(); closeModal(); toast('저장했어요'); render();
     };
   });
