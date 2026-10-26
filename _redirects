@@ -1,2 +1,3 @@
-/m      /         301
-/admin  /admin.html  200
+# A-KICK 주소 이전: 예전 주소(a-futsal.netlify.app)로 오면 새 주소로 (?c=팀번호 그대로)
+/admin.html   https://apharmga.github.io/a-kick/admin.html   301!
+/*            https://apharmga.github.io/a-kick/:splat        301!
