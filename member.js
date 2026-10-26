@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, doc, getDoc, setDoc, deleteDoc, writeBatch, onSnapshot, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, deleteUser } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, collection, doc, getDoc, setDoc, deleteDoc, writeBatch, onSnapshot, query, where, getDocs, addDoc, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 /* 카카오톡 안 브라우저에서는 구글 로그인이 막혀 있어서 바깥 브라우저(크롬·사파리)로 엽니다 */
 const UA = navigator.userAgent || '';
@@ -22,6 +22,32 @@ const fb = initializeApp({
   appId: '1:873470138264:web:121893883d55576c577ded'
 });
 const auth = getAuth(fb), db = getFirestore(fb);
+
+/* 오류 기록: 화면에서 난 오류를 운영자가 볼 수 있게 저장 (한 번 열 때 최대 5건, 같은 오류는 1번만) */
+const OPERATOR = 'apharmga@gmail.com';
+const errSeen = new Set();
+function logErr(msg, stack) {
+  try {
+    msg = String(msg || '').slice(0, 500); if (!msg || errSeen.has(msg) || errSeen.size >= 5 || !auth.currentUser) return; errSeen.add(msg);
+    addDoc(collection(db, 'errlog'), { at: Date.now(), uid: auth.currentUser.uid, cid: (typeof S !== 'undefined' && S.cid) || '', page: 'member', msg, stack: String(stack || '').slice(0, 2000), ua: UA.slice(0, 300), ver: (window.Core && window.Core.VERSION) || '' }).catch(() => {});
+  } catch (e) {}
+}
+window.addEventListener('error', (e) => logErr(e.message, e.error && e.error.stack));
+setTimeout(() => { try { const m = sessionStorage.getItem('akick_msg'); if (m) { sessionStorage.removeItem('akick_msg'); toast(m); } } catch (e) {} }, 800);
+window.addEventListener('unhandledrejection', (e) => logErr(e.reason && (e.reason.message || e.reason), e.reason && e.reason.stack));
+
+/* 홈 화면에 추가 (앱처럼 쓰기) */
+const STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const IS_IOS = /iPhone|iPad|iPod/i.test(UA);
+let installEv = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEv = e; if (S.tab === 'home' && S.pub) render(); });
+function installCard() {
+  let off = false; try { off = localStorage.getItem('akick_noinstall') === '1'; } catch (e) {}
+  if (STANDALONE || off || INAPP || (!installEv && !IS_IOS)) return '';
+  return '<section class="card inst"><b>📲 홈 화면에 추가하면 앱처럼 열려요</b>' +
+    (installEv ? '<button class="bigbtn" id="inst">홈 화면에 추가</button>' : '<p class="muted">사파리 아래쪽 <b>공유 버튼(⬆)</b> → <b>홈 화면에 추가</b>를 눌러주세요.</p>') +
+    '<button class="link" id="noinst">다시 보지 않기</button></section>';
+}
 const S = { pub: null, me: null, votes: {}, tab: 'home', uid: '', cid: '', club: null, owner: false, subs: [], voteSub: null, voteGid: '' };
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -104,6 +130,51 @@ function askJoin(name) {
 
 /* 팀 삭제 (만든 사람만) · 목록에서 빼기 (회원) */
 async function saveMyClubs() { await setDoc(doc(db, 'me', S.uid), { clubs: S.myClubs, last: '' }).catch(() => {}); }
+/* ---------------- 탈퇴 · 계정 삭제 ---------------- */
+async function wipeMine(cid) {                       // 한 팀 안의 내 흔적 지우기 (이름이 들어간 장부 기록은 관리자 소유라 남음)
+  const C = (c) => collection(db, 'clubs', cid, c), del = (q) => getDocs(q).then((r) => Promise.all(r.docs.map((d) => deleteDoc(d.ref).catch(() => {})))).catch(() => {});
+  const marks = await getDocs(query(C('anonmark'), where('uid', '==', S.uid))).catch(() => null);
+  if (marks) for (const m of marks.docs) { await deleteDoc(doc(db, 'clubs', cid, 'anonvotes', m.data().pid + '__' + m.data().key)).catch(() => {}); }
+  await Promise.all([del(query(C('votes'), where('uid', '==', S.uid))), del(query(C('pollvotes'), where('uid', '==', S.uid))),
+    del(query(C('goals'), where('by', '==', S.uid))), del(query(C('suggest'), where('uid', '==', S.uid)))]);
+  if (marks) await Promise.all(marks.docs.map((m) => deleteDoc(m.ref).catch(() => {})));
+  const u = await getDoc(doc(db, 'clubs', cid, 'users', S.uid)).catch(() => null);
+  if (u && u.exists()) await deleteDoc(doc(db, 'clubs', cid, 'claims', u.data().mid)).catch(() => {});
+  await deleteDoc(doc(db, 'clubs', cid, 'users', S.uid)).catch(() => {});
+  await deleteDoc(doc(db, 'clubs', cid, 'requests', S.uid)).catch(() => {});
+}
+function openLeave() {
+  sheet('<h2>탈퇴</h2><p class="muted">투표·골 기록·건의 등 내가 남긴 기록이 지워져요. 회비 장부의 입금 기록은 팀 회계라서 남아요.</p>' +
+    '<button class="bigbtn" id="lv1">이 팀에서만 나가기</button>' +
+    '<button class="sugbtn" id="lv2" style="margin-top:8px">A-KICK 계정 완전히 삭제 (모든 팀)</button>' +
+    '<div class="srow"><button id="lvx">취소</button></div>', (el) => {
+    el.querySelector('#lvx').onclick = () => (el.hidden = true);
+    el.querySelector('#lv1').onclick = async () => {
+      if (S.owner) return toast('관리자는 팀을 나갈 수 없어요. 팀을 삭제하려면 "다른 팀 보기"에서 삭제하세요');
+      if (!confirm(clubName() + '에서 나갈까요? 다시 들어오려면 가입 신청을 새로 해야 해요.')) return;
+      el.hidden = true; view('<div class="center">정리하는 중...</div>');
+      await wipeMine(S.cid); delete (S.myClubs || {})[S.cid]; await saveMyClubs();
+      try { sessionStorage.setItem('akick_msg', '팀에서 나갔어요'); } catch (e) {} location.replace('./');
+    };
+    el.querySelector('#lv2').onclick = async () => {
+      const own = (await getDocs(query(collection(db, 'clubs'), where('owner', '==', S.uid))).catch(() => ({ docs: [] }))).docs;
+      if (own.length) return toast('관리자인 팀(' + own.map((d) => d.data().name).join(', ') + ')을 먼저 삭제해야 계정을 지울 수 있어요', 6000);
+      const t = prompt('계정을 완전히 삭제해요. 모든 팀에서 나가고 되돌릴 수 없어요.\n정말 삭제하려면 "삭제"라고 입력하세요');
+      if ((t || '').trim() !== '삭제') return;
+      el.hidden = true; view('<div class="center">삭제하는 중... (몇 초 걸려요)</div>');
+      const me = await getDoc(doc(db, 'me', S.uid)).catch(() => null);
+      const cids = Object.keys((me && me.exists() && me.data().clubs) || {}); if (S.cid && cids.indexOf(S.cid) < 0) cids.push(S.cid);
+      for (const c of cids) await wipeMine(c);
+      await deleteDoc(doc(db, 'me', S.uid)).catch(() => {});
+      try { await deleteUser(auth.currentUser); }
+      catch (e) {                                     // 오래전에 로그인했으면 한 번 더 로그인해야 지워짐
+        try { await signInWithPopup(auth, new GoogleAuthProvider()); await deleteUser(auth.currentUser); }
+        catch (e2) { toast('기록은 지웠지만 로그인 정보 삭제는 실패했어요. 다시 로그인 후 한 번 더 해주세요', 7000); return; }
+      }
+      try { sessionStorage.setItem('akick_msg', '계정을 삭제했어요. 그동안 고마웠어요'); } catch (e) {} await signOut(auth).catch(() => {}); location.replace('./');
+    };
+  });
+}
 async function leaveList(cid, name) {
   if (!confirm('"' + name + '"을 내 목록에서 뺄까요?\n팀 링크로 다시 들어오면 다시 보여요.')) return;
   delete S.myClubs[cid]; await saveMyClubs(); renderHome();
@@ -123,6 +194,14 @@ async function deleteClub(cid, name) {
   } catch (e) { toast('삭제 실패: ' + e.message); }
   renderHome();
 }
+async function showErrs() {
+  const q = await getDocs(query(collection(db, 'errlog'), orderBy('at', 'desc'), limit(50))).catch((e) => { toast('못 불러왔어요: ' + e.message); return null; });
+  if (!q) return;
+  const rows = q.docs.map((d) => d.data()), txt = rows.map((x) => new Date(x.at).toLocaleString('ko-KR') + ' [' + x.ver + '/' + x.page + '/' + x.cid + '] ' + x.msg + '\n' + (x.stack || '').split('\n').slice(0, 3).join('\n') + '\n' + x.ua).join('\n\n');
+  sheet('<h2>오류 기록 ' + rows.length + '건</h2><pre class="errs">' + esc(txt || '오류 없음 👍') + '</pre><div class="srow"><button id="ex">닫기</button><button class="pri" id="ec">전체 복사</button></div>', (el) => {
+    el.querySelector('#ex').onclick = () => (el.hidden = true); el.querySelector('#ec').onclick = () => copy(txt, '복사했어요. Claude에게 붙여넣어 주세요');
+  });
+}
 async function renderHome() {
   let owned = [];
   try { owned = (await getDocs(query(collection(db, 'clubs'), where('owner', '==', S.uid)))).docs.map((d) => [d.id, d.data().name]); } catch (e) {}
@@ -132,9 +211,10 @@ async function renderHome() {
     (ids.length ? '<section class="card"><div class="clist">' + ids.map((k) => { const own = owned.some((o) => o[0] === k);
       return '<div class="crow"><a href="./?c=' + esc(k) + '">' + esc(all[k]) + (own ? '<em>관리자</em>' : '') + '</a><button class="cdel" data-cdel="' + esc(k) + '" data-own="' + (own ? 1 : 0) + '">' + (own ? '삭제' : '빼기') + '</button></div>'; }).join('') + '</div></section>'
       : '<section class="card soft"><h2>아직 들어간 팀이 없어요</h2><p class="muted">회원이라면 관리자에게 받은 <b>팀 링크</b>로 들어오세요.</p></section>') +
-    '<section class="card"><h2>내가 관리자예요</h2><p class="muted">새 팀을 만들면 회비·참석·팀 편성을 관리할 수 있어요. 관리자 비밀번호는 처음에 0000이에요. 만든 뒤 꼭 바꿔주세요.</p>' +
+    '<section class="card"><h2>내가 관리자예요</h2><p class="muted">새 팀을 만들면 회비·참석·팀 편성을 관리할 수 있어요. 만들면 4단계 설정(운동·요일·회비·회원)이 바로 시작돼요.</p>' +
     '<div class="newc"><input id="cn" placeholder="팀 이름 (예: 대구FC)" maxlength="20"><button id="mk">팀 만들기</button></div></section>' + LEGAL + '</main>');
   $('#out').onclick = () => signOut(auth);
+  if (S.email === OPERATOR) { $('main').insertAdjacentHTML('beforeend', '<button class="link" id="ops">운영자: 오류 기록 보기</button>'); $('#ops').onclick = showErrs; }
   document.querySelectorAll('[data-cdel]').forEach((b) => (b.onclick = () => (b.dataset.own === '1' ? deleteClub(b.dataset.cdel, all[b.dataset.cdel]) : leaveList(b.dataset.cdel, all[b.dataset.cdel]))));
   $('#mk').onclick = async () => {
     const name = $('#cn').value.trim(); if (!name) return toast('팀 이름을 넣어주세요');
@@ -227,6 +307,9 @@ function render() {
 function bindCommon() {
   const h = $('#home'); if (h) h.onclick = () => { S.subs.forEach((f) => f()); S.subs = []; S.cid = ''; history.replaceState(null, '', './'); renderHome(); };
   const o = $('#out'); if (o) o.onclick = () => signOut(auth);
+  const lv = $('#leave'); if (lv) lv.onclick = openLeave;
+  const it = $('#inst'); if (it) it.onclick = async () => { installEv.prompt(); await installEv.userChoice.catch(() => {}); installEv = null; render(); };
+  const ni = $('#noinst'); if (ni) ni.onclick = () => { try { localStorage.setItem('akick_noinstall', '1'); } catch (e) {} render(); };
   document.querySelectorAll('[data-gohome]').forEach((b) => (b.onclick = () => { S.tab = 'home'; S.wk = 0; render(); window.scrollTo(0, 0); }));
 }
 function accNo() { const a = (S.pub.dues && S.pub.dues.account) || ''; const n = (a.match(/[\d-]{6,}/) || [''])[0]; return n || a; }
@@ -341,7 +424,7 @@ function homeHTML() {
   const tile = (go, lbl, val, sub, cls) => '<button class="tile ' + (cls || '') + '" data-go="' + go + '"><span>' + lbl + '</span><b>' + val + '</b><small>' + sub + '</small></button>';
   const recent = txs.slice(-3).reverse();
   return '<header class="hero home">' + heroTop() + '<h1>안녕하세요, ' + esc(S.me.name) + ' 님 👋</h1><p>' + esc(clubName()) + '에 오신 걸 환영해요</p></header>' +
-    '<main class="pad lift">' + gcard + pollsCard() +
+    '<main class="pad lift">' + gcard + pollsCard() + installCard() +
     '<div class="tiles">' +
     tile('dues', mon(d.ym) + ' 회비', !due ? '대상 아님' : paid ? '납부 완료' : '미납', won(d.fee) + '원 · 납부 ' + d.paid.length + '/' + (d.paid.length + d.unpaid.length) + '명', !due ? '' : paid ? 'ok' : 'bad') +
     tile('bank', '통장 잔액', won(bal) + '원', '입출금 전부 공개') +
@@ -351,7 +434,7 @@ function homeHTML() {
       '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b></span></div>').join('') + '</div></section>' : '') +
     '<button class="sugbtn" id="sug">💬 관리자에게 건의하기</button>' +
     (S.owner ? '<a class="bigbtn" href="admin.html?c=' + esc(S.cid) + '">관리자 페이지</a>' : '') +
-    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button></div></main>';
+    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button></div></main>';
 }
 function duesHTML() {
   const d = S.pub.dues, paid = d.paid.indexOf(S.me.name) >= 0, due = paid || d.unpaid.indexOf(S.me.name) >= 0;
@@ -431,7 +514,7 @@ function openPoll(pid) {
         b.set(CD('anonvotes', p.id + '__' + k), { pid: p.id, picks: v.picks, add: v.add, at: v.at }); await b.commit(); S.ah[p.id] = k;
       }
       else await setDoc(CD('pollvotes', p.id + '__' + S.me.mid), v); toast(notice ? '확인했어요' : '투표했어요 🗳'); $('#sheet').hidden = true; }
-    catch (e) { toast('저장 실패: ' + e.message); }
+    catch (e) { toast('저장 실패: ' + e.message); logErr('저장 실패: ' + e.message, e.stack); }
   };
   draw();
 }
@@ -514,7 +597,7 @@ function openGoal(gid) {
       if (sc === as) return toast('골과 도움이 같은 사람이에요');
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       try { await setDoc(CD('goals', id), { gid, scorer: sc, assist: as, by: S.uid, byName: S.me.name, at: Date.now() }); el.hidden = true; toast('⚽ ' + sc + ' 골 기록!'); }
-      catch (e) { toast('저장 실패: ' + e.message); }
+      catch (e) { toast('저장 실패: ' + e.message); logErr('저장 실패: ' + e.message, e.stack); }
     };
   });
 }

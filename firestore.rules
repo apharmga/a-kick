@@ -8,6 +8,17 @@ service cloud.firestore {
       allow read, write: if signedIn() && request.auth.uid == uid;
     }
 
+    // 오류 기록: 로그인한 사람은 남기기만, 보기·지우기는 운영자만
+    match /errlog/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['at', 'uid', 'cid', 'page', 'msg', 'stack', 'ua', 'ver'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.msg is string && request.resource.data.msg.size() <= 500
+        && request.resource.data.stack is string && request.resource.data.stack.size() <= 2000
+        && request.resource.data.ua is string && request.resource.data.ua.size() <= 300;
+      allow read, delete: if signedIn() && request.auth.token.email == 'apharmga@gmail.com' && request.auth.token.email_verified == true;
+    }
+
     match /clubs/{cid} {
       function club() { return get(/databases/$(database)/documents/clubs/$(cid)).data; }
       function isOwner() { return signedIn() && club().owner == request.auth.uid; }
@@ -33,18 +44,19 @@ service cloud.firestore {
       }
       // 가입 신청: 본인 것만 쓰고 읽기 (승인·거절은 관리자)
       match /requests/{uid} {
-        allow read: if signedIn() && request.auth.uid == uid;
+        allow read, delete: if signedIn() && request.auth.uid == uid;
         allow create, update: if signedIn() && request.auth.uid == uid
           && request.resource.data.keys().hasOnly(['name', 'email', 'at'])
           && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 20
           && request.resource.data.email == request.auth.token.email;
       }
       // 이름-계정 연결과 회원 승인은 관리자만 (위 isOwner 규칙). 본인 것만 읽기
+      // (탈퇴: 본인 연결은 본인이 지울 수 있음)
       match /claims/{mid} {
-        allow read: if signedIn() && resource.data.uid == request.auth.uid;
+        allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
       }
       match /users/{uid} {
-        allow read: if signedIn() && request.auth.uid == uid;
+        allow read, delete: if signedIn() && request.auth.uid == uid;
       }
       // 골·도움 기록: 회원 누구나 넣기, 지우기는 넣은 사람(관리자는 전부)
       match /goals/{id} {
@@ -71,11 +83,12 @@ service cloud.firestore {
           && request.resource.data.picks is list && request.resource.data.picks.size() <= 10
           && request.resource.data.add is string && request.resource.data.add.size() <= 20
           && id == request.resource.data.pid + '__' + request.resource.data.mid;
+        allow delete: if signedIn() && resource.data.uid == request.auth.uid;
       }
       // 건의함: 회원은 보내기만, 읽기는 관리자(본인 것은 본인도)
       // 익명 투표: 열쇠(anonmark)는 본인만 보고, 투표(anonvotes)엔 이름·계정이 없음. 1인 1표
       match /anonmark/{id} {
-        allow read: if signedIn() && resource.data.uid == request.auth.uid;
+        allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
         allow create: if isMember()
           && request.resource.data.keys().hasOnly(['pid', 'uid', 'key'])
           && request.resource.data.uid == request.auth.uid
@@ -89,9 +102,10 @@ service cloud.firestore {
           && request.resource.data.picks is list && request.resource.data.picks.size() <= 10
           && request.resource.data.add is string && request.resource.data.add.size() <= 20
           && id == request.resource.data.pid + '__' + getAfter(/databases/$(database)/documents/clubs/$(cid)/anonmark/$(request.resource.data.pid + '__' + request.auth.uid)).data.key;
+        allow delete: if signedIn() && id == resource.data.pid + '__' + get(/databases/$(database)/documents/clubs/$(cid)/anonmark/$(resource.data.pid + '__' + request.auth.uid)).data.key;
       }
       match /suggest/{id} {
-        allow read: if signedIn() && resource.data.uid == request.auth.uid;
+        allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
         allow create: if isMember()
           && request.resource.data.keys().hasOnly(['text', 'name', 'anon', 'uid', 'at'])
           && request.resource.data.uid == request.auth.uid
@@ -105,6 +119,7 @@ service cloud.firestore {
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.mid == myMid()
           && id == request.resource.data.gid + '__' + request.resource.data.mid;
+        allow delete: if signedIn() && resource.data.uid == request.auth.uid;
       }
     }
   }

@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, doc, getDocs, getDoc, setDoc, deleteDoc, writeBatch, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, collection, doc, getDocs, getDoc, setDoc, deleteDoc, writeBatch, onSnapshot, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBZps4AWzRrf07yzSuIgydRO_Dn2qGrx9E',
@@ -12,6 +12,16 @@ const firebaseConfig = {
 };
 const C = window.Core, I = window.Importer;
 const fb = initializeApp(firebaseConfig), auth = getAuth(fb), db = getFirestore(fb);
+/* 오류 기록 (운영자 확인용) */
+const errSeen = new Set();
+function logErr(msg, stack) {
+  try {
+    msg = String(msg || '').slice(0, 500); if (!msg || errSeen.has(msg) || errSeen.size >= 5 || !auth.currentUser) return; errSeen.add(msg);
+    addDoc(collection(db, 'errlog'), { at: Date.now(), uid: auth.currentUser.uid, cid: new URLSearchParams(location.search).get('c') || '', page: 'admin', msg, stack: String(stack || '').slice(0, 2000), ua: navigator.userAgent.slice(0, 300), ver: C.VERSION }).catch(() => {});
+  } catch (e) {}
+}
+window.addEventListener('error', (e) => logErr(e.message, e.error && e.error.stack));
+window.addEventListener('unhandledrejection', (e) => logErr(e.reason && (e.reason.message || e.reason), e.reason && e.reason.stack));
 const CID = new URLSearchParams(location.search).get('c') || '';
 const D = (...p) => doc(db, 'clubs', CID, ...p);
 const CL = (n) => collection(db, 'clubs', CID, n);
@@ -41,7 +51,7 @@ async function copy(text) {
 const putTx = (t) => { schedulePublish(); return setDoc(D('tx', t.id), clean(t)).catch(fail); };
 const gameOut = (g) => { const o = clean(g); if (o.teams) o.teams = o.teams.map((t) => t.join('|')); return o; };
 const gameIn = (g) => { if (g.teams && typeof g.teams[0] === 'string') g.teams = g.teams.map((t) => t.split('|').filter(Boolean)); return g; };
-const fail = (e) => { toast('저장 실패: ' + e.message, 6000); throw e; };
+const fail = (e) => { toast('저장 실패: ' + e.message, 6000); logErr('저장 실패: ' + e.message, e.stack); throw e; };
 const putGame = (g) => { schedulePublish(); return setDoc(D('games', g.id), gameOut(g)).catch(fail); };
 const putMember = (m) => { schedulePublish(); return setDoc(D('members', m.id), clean(m)).catch(fail); };
 const putCfg = () => { schedulePublish(); return setDoc(D('config', 'main'), clean(S.cfg)); };
@@ -998,7 +1008,7 @@ function openSettingsReal() {
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
     themeHTML() +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
-    '<div class="muted" style="margin-top:8px">A-KICK v0.27</div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK ' + C.VERSION + '</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
     bindTheme(m);
