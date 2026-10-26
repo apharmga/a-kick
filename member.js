@@ -434,7 +434,7 @@ function homeHTML() {
       '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b></span></div>').join('') + '</div></section>' : '') +
     '<button class="sugbtn" id="sug">💬 관리자에게 건의하기</button>' +
     (S.owner ? '<a class="bigbtn" href="admin.html?c=' + esc(S.cid) + '">관리자 페이지</a>' : '') +
-    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button></div></main>';
+    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button></div><div class="links"><a class="link" href="privacy.html">개인정보처리방침</a><a class="link" href="terms.html">이용약관</a></div></main>';
 }
 function duesHTML() {
   const d = S.pub.dues, paid = d.paid.indexOf(S.me.name) >= 0, due = paid || d.unpaid.indexOf(S.me.name) >= 0;
