@@ -293,3 +293,35 @@ th.sortable.on,th.sortable.on i{color:var(--navy)}
 .pinbox{font-size:28px;letter-spacing:14px;text-align:center;font-weight:800}
 .shake{animation:shake .35s}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+/* v0.16 처음 시작 마법사 (폰 우선) */
+.wiz{max-width:480px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:12px;min-height:100vh;box-sizing:border-box}
+.wtop{display:flex;justify-content:space-between;align-items:center}
+.wtop b{font-size:18px;color:var(--navy)}.wtop span{font-size:13px;color:var(--sub);font-weight:700}
+.wbar{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+.wbar i{height:6px;border-radius:3px;background:#DCE4F5}.wbar i.on{background:var(--navy)}
+.wiz h2{font-size:22px;margin:6px 0 2px}
+.wl{font-size:13px;font-weight:700;color:var(--sub);margin-top:8px}
+.wbig{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.wsport{display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;min-height:130px;border:2px solid var(--line);border-radius:18px;background:#fff;cursor:pointer;font:inherit}
+.wsport b{font-size:22px}.wsport span{font-size:13px;color:var(--sub)}
+.wsport.on{border-color:var(--navy);background:#EEF3FF;box-shadow:4px 4px 0 #60A5FA}
+.wchips{display:flex;flex-wrap:wrap;gap:8px}
+.wchip{min-height:44px;min-width:52px;padding:0 14px;border:1.5px solid #C3CCE3;border-radius:12px;background:#fff;font:inherit;font-weight:700;cursor:pointer}
+.wchip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.win{width:100%;box-sizing:border-box;min-height:50px;border:1.5px solid #C3CCE3;border-radius:12px;padding:12px;font:inherit;font-size:16px;background:#fff}
+textarea.win{resize:vertical}
+.wnav{display:flex;gap:8px;margin-top:auto;padding-top:16px}
+.wback{flex:1;min-height:54px;border:1px solid var(--line);border-radius:14px;background:#fff;font:inherit;font-weight:800;font-size:16px;cursor:pointer}
+.wnext{flex:2;min-height:54px;border:0;border-radius:14px;background:var(--navy);color:#fff;font:inherit;font-weight:800;font-size:17px;box-shadow:4px 4px 0 #60A5FA;cursor:pointer}
+.wold{margin-top:8px;font-size:13px;color:var(--sub)}.wold summary{cursor:pointer;padding:6px 0}
+/* 폰에서 관리자 상단 메뉴 정리 */
+@media (max-width:700px){
+  .bar-in{gap:8px;padding:10px 12px}
+  .bar-in .tabs{order:5;width:100%;display:flex;overflow-x:auto;gap:4px;scrollbar-width:none}
+  .bar-in .tabs::-webkit-scrollbar{display:none}
+  .bar-in .tab{white-space:nowrap;flex:none}
+  .bar-in .stats{display:none}
+  .bar-in .up span{display:none}
+  .bar-in .logo{margin-right:auto}
+  .wrap{padding-left:12px;padding-right:12px}
+}

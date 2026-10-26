@@ -119,17 +119,67 @@ async function loadAll() {
 }
 
 /* ---------------- 처음 설정: 구글시트 가져오기 ---------------- */
+/* ---------------- 처음 시작: 폰에서 4단계로 끝내는 팀 설정 ---------------- */
 function renderSetup() {
-  $('#app').innerHTML = '<div class="center"><div class="logo" style="font-size:28px">' + esc(S.club.name) + ' 시작하기</div><div class="muted">처음 한 번만 고르면 돼요</div>' +
-    '<div class="setup3"><button class="scard" id="s1"><b>빈 상태로 시작</b><span>회원·경기를 여기서 직접 등록해요</span></button>' +
-    '<label class="scard"><b>구글시트 엑셀 가져오기</b><span>예전 풋살모임 구글시트를 .xlsx로 받은 파일</span><input type="file" accept=".xlsx" id="f" hidden></label>' +
-    '<button class="scard" id="s3" hidden><b>예전 A-FUTSAL 데이터 옮기기</b><span>도남풋살에서 쓰던 회원·거래·실력 점수 그대로</span></button></div></div>';
-  $('#f').onchange = (e) => e.target.files[0] && readOld(e.target.files[0]);
-  $('#s1').onclick = async () => {
-    S.cfg = { fee: 30000, guestFee: 10000, oneOff: 120000, rentPerGame: 0, cap: 12, time: '16:00', before: 7, after: 1, nextMonthDay: 25, dueDay: 30, reserve: 0, openChat: '', place: '', account: '' };
-    await setDoc(D('config', 'main'), S.cfg); toast('시작했어요 · 톱니바퀴에서 회비·계좌를 먼저 넣어주세요', 6000); loadAll();
+  const W = S.wiz = S.wiz || { step: 1, sport: '', dow: 0, time: '16:00', place: '', fee: 30000, guestFee: 10000, account: '', me: '', names: '' };
+  const DOW = '일월화수목금토';
+  const chip = (attr, val, on, label) => '<button class="wchip' + (on ? ' on' : '') + '" ' + attr + '="' + val + '">' + label + '</button>';
+  const steps = ['종목', '경기', '회비', '회원'];
+  let body = '';
+  if (W.step === 1) body = '<h2>어떤 운동을 하나요?</h2><div class="wbig">' +
+    '<button class="wsport' + (W.sport === 'futsal' ? ' on' : '') + '" data-sport="futsal"><b>⚽ 풋살</b><span>한 팀 5~6명</span></button>' +
+    '<button class="wsport' + (W.sport === 'soccer' ? ' on' : '') + '" data-sport="soccer"><b>🥅 축구</b><span>한 팀 11명</span></button></div>';
+  if (W.step === 2) body = '<h2>보통 언제 경기하나요?</h2><div class="wl">요일</div><div class="wchips">' + [...DOW].map((d, i) => chip('data-dow', i, W.dow === i, d)).join('') + '</div>' +
+    '<div class="wl">시간</div><input class="win" id="wt" type="time" value="' + esc(W.time) + '">' +
+    '<div class="wl">구장 (선택)</div><input class="win" id="wp" placeholder="예: OO풋살장" value="' + esc(W.place) + '">';
+  if (W.step === 3) body = '<h2>회비는 얼마인가요?</h2><div class="wl">월회비 (정회원)</div><div class="wchips">' + [0, 20000, 30000, 40000, 50000].map((v) => chip('data-fee', v, W.fee === v, v ? won(v) + '원' : '없음')).join('') + '</div>' +
+    '<div class="wl">게스트 참가비 (1회)</div><div class="wchips">' + [0, 5000, 10000, 15000, 20000].map((v) => chip('data-gfee', v, W.guestFee === v, v ? won(v) + '원' : '없음')).join('') + '</div>' +
+    '<div class="wl">모임통장 계좌 (선택 · 회원 화면에 복사 버튼으로 떠요)</div><input class="win" id="wa" placeholder="예: 카카오뱅크 3333-00-0000000" value="' + esc(W.account) + '">';
+  if (W.step === 4) body = '<h2>회원을 넣어주세요</h2><div class="wl">내 이름 (관리자도 회원으로 참여)</div><input class="win" id="wme" placeholder="예: 홍길동" value="' + esc(W.me) + '">' +
+    '<div class="wl">다른 회원 이름 (한 줄에 한 명 · 나중에 추가해도 돼요)</div><textarea class="win" id="wn" rows="6" placeholder="김철수&#10;이영희&#10;박민수">' + esc(W.names) + '</textarea>' +
+    '<div class="muted">회원은 나중에 링크로 가입 신청 → 승인으로 들어와요. 여기 이름을 넣어두면 승인할 때 자동으로 연결돼요.</div>';
+  $('#app').innerHTML = '<div class="wiz"><div class="wtop"><b>' + esc(S.club.name) + '</b><span>팀 설정 ' + W.step + ' / 4</span></div>' +
+    '<div class="wbar">' + steps.map((t, i) => '<i class="' + (i < W.step ? 'on' : '') + '"></i>').join('') + '</div>' + body +
+    '<div class="wnav">' + (W.step > 1 ? '<button class="wback" id="wprev">이전</button>' : '') + '<button class="wnext" id="wnext">' + (W.step < 4 ? '다음' : '시작하기 🎉') + '</button></div>' +
+    (W.step === 1 ? '<details class="wold"><summary>PC에서 엑셀로 가져오기 · 기타</summary><div class="setup3"><button class="scard" id="s1"><b>빈 상태로 시작</b><span>설정 없이 바로 시작</span></button>' +
+      '<label class="scard"><b>구글시트 엑셀 가져오기</b><span>A-KICK 전용 구글시트 양식만 가능</span><input type="file" accept=".xlsx" id="f" hidden></label>' +
+      '<button class="scard" id="s3" hidden><b>예전 A-FUTSAL 데이터 옮기기</b><span>도남풋살에서 쓰던 데이터 그대로</span></button></div></details>' : '') + '</div>';
+  const save = () => { const g = (id) => { const e = $(id); return e ? e.value.trim() : null; };
+    if (W.step === 2) { W.time = g('#wt') || W.time; W.place = g('#wp'); } if (W.step === 3) W.account = g('#wa'); if (W.step === 4) { W.me = g('#wme'); W.names = $('#wn').value; } };
+  document.querySelectorAll('[data-sport]').forEach((b) => (b.onclick = () => { W.sport = b.dataset.sport; renderSetup(); }));
+  document.querySelectorAll('[data-dow]').forEach((b) => (b.onclick = () => { save(); W.dow = +b.dataset.dow; renderSetup(); }));
+  document.querySelectorAll('[data-fee]').forEach((b) => (b.onclick = () => { save(); W.fee = +b.dataset.fee; renderSetup(); }));
+  document.querySelectorAll('[data-gfee]').forEach((b) => (b.onclick = () => { save(); W.guestFee = +b.dataset.gfee; renderSetup(); }));
+  const pv = $('#wprev'); if (pv) pv.onclick = () => { save(); W.step--; renderSetup(); };
+  $('#wnext').onclick = async () => {
+    save();
+    if (W.step === 1 && !W.sport) return toast('풋살인지 축구인지 골라주세요');
+    if (W.step === 4 && !W.me) return toast('내 이름을 넣어주세요');
+    if (W.step < 4) { W.step++; return renderSetup(); }
+    $('#wnext').disabled = true; $('#wnext').textContent = '만드는 중...';
+    await finishSetup(W);
   };
-  getDoc(doc(db, 'config', 'main')).then((d) => { if (d.exists()) { $('#s3').hidden = false; $('#s3').onclick = moveLegacy; } }).catch(() => {});
+  const f = $('#f'); if (f) f.onchange = (e) => e.target.files[0] && readOld(e.target.files[0]);
+  const s1 = $('#s1'); if (s1) s1.onclick = async () => { S.cfg = baseCfg(); await setDoc(D('config', 'main'), S.cfg); toast('시작했어요 · 톱니바퀴에서 회비·계좌를 먼저 넣어주세요', 6000); loadAll(); };
+  if (W.step === 1) getDoc(doc(db, 'config', 'main')).then((d) => { if (d.exists() && $('#s3')) { $('#s3').hidden = false; $('#s3').onclick = moveLegacy; } }).catch(() => {});
+}
+function baseCfg() { return { fee: 30000, guestFee: 10000, oneOff: 120000, rentPerGame: 0, cap: 12, time: '16:00', before: 7, after: 1, nextMonthDay: 25, dueDay: 30, reserve: 0, openChat: '', place: '', account: '', perSide: 5, maxSide: 6, dow: 0 }; }
+async function finishSetup(W) {
+  const soccer = W.sport === 'soccer';
+  S.cfg = Object.assign(baseCfg(), { fee: W.fee, guestFee: W.guestFee, account: W.account, place: W.place, time: W.time, dow: W.dow,
+    perSide: soccer ? 11 : 5, maxSide: soccer ? 11 : 6, cap: soccer ? 22 : 12, sport: W.sport });
+  const names = [W.me].concat(W.names.split(/[\n,]/).map((x) => x.trim()).filter(Boolean)).filter((x, i, a) => a.indexOf(x) === i).slice(0, 80);
+  const list = [['config', 'main', S.cfg]];
+  names.forEach((n, i) => list.push(['members', 'M' + String(i + 1).padStart(3, '0'), { id: 'M' + String(i + 1).padStart(3, '0'), name: n, join: today(), quit: '', state: '활동', fee: 0, payers: [n] }]));
+  // 첫 경기: 오늘 이후 가장 가까운 정기 요일
+  const d = new Date(today() + 'T00:00:00'); d.setDate(d.getDate() + ((W.dow - d.getDay() + 7) % 7));
+  const gd = C.ymd(d);
+  list.push(['games', 'G' + gd.replace(/-/g, ''), { id: 'G' + gd.replace(/-/g, ''), date: gd, time: W.time, type: '일회성', fee: 0, cap: S.cfg.cap, attend: [], deadline: '' }]);
+  // 관리자 본인 이름 연결
+  list.push(['claims', 'M001', { uid: S.uid, email: (auth.currentUser && auth.currentUser.email) || '', name: W.me, at: Date.now() }]);
+  list.push(['users', S.uid, { mid: 'M001', name: W.me, at: Date.now() }]);
+  try { await batchPut(list); } catch (e) { toast('저장 실패: ' + e.message, 6000); return renderSetup(); }
+  S.wiz = null; toast('팀 준비 완료! 이번 주 경기도 만들어 뒀어요 ⚽', 6000); loadAll();
 }
 async function moveLegacy() {
   $('#s3').disabled = true; $('#s3').querySelector('b').textContent = '옮기는 중... (10초쯤)';
@@ -357,6 +407,7 @@ function bindWeek() {
 const perSide = () => S.cfg.perSide || 5, maxSide = () => Math.max(perSide(), S.cfg.maxSide || perSide() + 1), minN = () => perSide() * 2;
 function sideTxt(total) { if (total < minN()) return (minN() - total) + '명 더 필요'; const k = Math.min(Math.floor(total / 2), maxSide()); return k + '대' + k + ' 가능'; }
 function newGameAsk(date) {
+  if (S.cfg.dow != null) { const d = new Date(C.addDays(date, -6) + 'T00:00:00'); d.setDate(d.getDate() + ((S.cfg.dow - d.getDay() + 7) % 7)); date = C.ymd(d); }
   modal('<h2>경기 만들기</h2><div class="row"><label class="f">날짜<input id="nd" type="date" value="' + esc(date) + '"></label><label class="f">시간<input id="nt" type="time" value="' + esc(S.cfg.time || '16:00') + '"></label></div>' +
     '<div class="muted">요일·시간 상관없이 만들 수 있어요. 기본 시간은 설정에서 바꿔요.</div><div class="mfoot"><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">만들기</button></div>', (m) => {
     m.querySelector('#cx').onclick = closeModal;
@@ -886,7 +937,7 @@ function openSettingsReal() {
   modal('<h2>설정</h2><div class="muted">팀 만든 구글 계정 + 관리자 비밀번호로만 열려요. 회원 화면에는 나오지 않아요.</div>' +
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
-    '<div class="muted" style="margin-top:8px">A-KICK v0.15.2</div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK v0.16</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = closeModal;
     m.querySelector('#bk').onclick = backup;
