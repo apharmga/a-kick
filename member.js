@@ -37,6 +37,8 @@ setTimeout(() => { try { const m = sessionStorage.getItem('akick_msg'); if (m) {
 window.addEventListener('unhandledrejection', (e) => logErr(e.reason && (e.reason.message || e.reason), e.reason && e.reason.stack));
 
 /* 홈 화면에 추가 (앱처럼 쓰기) */
+try { const rq = new URLSearchParams(location.search).get('ref'); if (rq) localStorage.setItem('akick_ref', rq.toUpperCase().slice(0, 12)); } catch (e) {}
+const refSaved = () => { try { return localStorage.getItem('akick_ref') || ''; } catch (e) { return ''; } };
 const STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 const IS_IOS = /iPhone|iPad|iPod/i.test(UA);
 let installEv = null;
@@ -80,6 +82,7 @@ function renderLogin() {
 /* ---------------- 2. 어느 팀인지 ---------------- */
 async function start() {
   view('<div class="center">불러오는 중...</div>');
+  achLoad();
   const meRef = doc(db, 'me', S.uid);
   let me = {}; try { const d = await getDoc(meRef); me = d.exists() ? d.data() : {}; } catch (e) {}
   S.myClubs = me.clubs || {}; S.seenAll = me.seen || {};
@@ -201,7 +204,7 @@ function closeVideo(fromPop) {
 window.addEventListener('popstate', () => { if ($('#vov')) closeVideo(true); });
 async function openVideo(id) {
   const v = (S.videos || []).find((x) => x.id === id); if (!v) return toast('영상을 찾지 못했어요');
-  closeVideo(true); markSeen(id);
+  closeVideo(true); markSeen(id); achAdd('vw', id, 500);
   history.pushState({ vov: 1 }, '');
   VV.id = id;
   const ov = document.createElement('div'); ov.id = 'vov'; ov.className = 'vov';
@@ -273,7 +276,7 @@ async function pushToken() {
   } catch (e) { logErr('푸시 토큰 실패: ' + e.message, e.stack); return ''; }
 }
 async function savePush(on) {
-  const token = on ? await pushToken() : '';
+  const token = on ? await pushToken() : ''; if (on) achFlag('push');
   await setDoc(doc(db, 'clubs', S.cid, 'push', S.uid), { on: !!on, token, mid: S.me.mid, at: Date.now() }).catch((e) => logErr('알림 설정 저장 실패: ' + e.message));
 }
 function openNotify() {
@@ -317,7 +320,7 @@ function openProfile() {
       if (n && (n < 1 || n > 99)) return toast('등번호는 1~99로 넣어주세요');
       const dup = n && Object.entries(S.profs || {}).find(([mid, x]) => mid !== S.me.mid && x.num === n);
       if (dup) { const who = (S.pub.members || []).find((m) => m.id === dup[0]); if (!confirm((who ? who.name + ' 님이' : '다른 회원이') + ' 이미 ' + n + '번이에요. 그래도 쓸까요?')) return; }
-      try { await setDoc(doc(db, 'clubs', S.cid, 'profiles', S.me.mid), { num: n, pos, uid: S.uid, at: Date.now() }); el.hidden = true; toast('저장했어요'); }
+      try { await setDoc(doc(db, 'clubs', S.cid, 'profiles', S.me.mid), Object.assign({ num: n, pos, uid: S.uid, at: Date.now() }, p.ach ? { ach: p.ach, plat: p.plat || 0 } : {})); el.hidden = true; toast('저장했어요'); }
       catch (e) { toast('저장 실패: ' + e.message); logErr('프로필 저장 실패: ' + e.message, e.stack); }
     };
   });
@@ -360,7 +363,8 @@ function openLeave() {
       const me = await getDoc(doc(db, 'me', S.uid)).catch(() => null);
       const cids = Object.keys((me && me.exists() && me.data().clubs) || {}); if (S.cid && cids.indexOf(S.cid) < 0) cids.push(S.cid);
       for (const c of cids) await wipeMine(c);
-      await deleteDoc(doc(db, 'me', S.uid)).catch(() => {});
+      await deleteDoc(doc(db, 'me', S.uid)).catch(() => {}); await deleteDoc(doc(db, 'ach', S.uid)).catch(() => {});
+      const rf = await getDocs(query(collection(db, 'refs'), where('uid', '==', S.uid))).catch(() => null); if (rf) for (const d of rf.docs) await deleteDoc(d.ref).catch(() => {});
       try { await deleteUser(auth.currentUser); }
       catch (e) {                                     // 오래전에 로그인했으면 한 번 더 로그인해야 지워짐
         try { await signInWithPopup(auth, new GoogleAuthProvider()); await deleteUser(auth.currentUser); }
@@ -407,15 +411,23 @@ async function renderHome() {
       return '<div class="crow"><a href="./?c=' + esc(k) + '">' + esc(all[k]) + (own ? '<em>관리자</em>' : '') + '</a><button class="cdel" data-cdel="' + esc(k) + '" data-own="' + (own ? 1 : 0) + '">' + (own ? '삭제' : '빼기') + '</button></div>'; }).join('') + '</div></section>'
       : '<section class="card soft"><h2>아직 들어간 팀이 없어요</h2><p class="muted">회원이라면 관리자에게 받은 <b>팀 링크</b>로 들어오세요.</p></section>') +
     '<section class="card"><h2>내가 관리자예요</h2><p class="muted">새 팀을 만들면 회비·참석·팀 편성을 관리할 수 있어요. 만들면 4단계 설정(운동·요일·회비·회원)이 바로 시작돼요.</p>' +
-    '<div class="newc"><input id="cn" placeholder="팀 이름 (예: 대구FC)" maxlength="20"><button id="mk">팀 만들기</button></div></section>' + LEGAL + '</main>');
+    '<div class="newc"><input id="cn" placeholder="팀 이름 (예: 대구FC)" maxlength="20"><button id="mk">팀 만들기</button></div>' +
+    '<label class="rcl">추천 코드 <small>(선택 · 받은 링크로 들어왔으면 자동으로 채워져요)</small><input id="rc" maxlength="12" placeholder="예: K7P2QX" value="' + esc(refSaved()) + '"></label></section>' + LEGAL + '</main>');
   $('#out').onclick = () => signOut(auth);
   if (S.email === OPERATOR) { $('main').insertAdjacentHTML('beforeend', '<button class="link" id="ops">운영자: 오류 기록 보기</button>'); $('#ops').onclick = showErrs; }
   document.querySelectorAll('[data-cdel]').forEach((b) => (b.onclick = () => (b.dataset.own === '1' ? deleteClub(b.dataset.cdel, all[b.dataset.cdel]) : leaveList(b.dataset.cdel, all[b.dataset.cdel]))));
   $('#mk').onclick = async () => {
     const name = $('#cn').value.trim(); if (!name) return toast('팀 이름을 넣어주세요');
     const cid = Math.random().toString(36).slice(2, 6) + Date.now().toString(36).slice(-4);
+    const data = { name, owner: S.uid, created: new Date().toISOString() }, rc = $('#rc').value.trim().toUpperCase();
+    if (rc) {
+      const r = await getDoc(doc(db, 'refs', rc)).catch(() => null);
+      if (!r || !r.exists()) return toast('없는 추천 코드예요. 비우거나 다시 확인해 주세요');
+      if (r.data().uid === S.uid) return toast('내 추천 코드는 내 팀에 쓸 수 없어요');
+      data.refBy = rc;
+    }
     try {
-      await setDoc(doc(db, 'clubs', cid), { name, owner: S.uid, created: new Date().toISOString() });
+      await setDoc(doc(db, 'clubs', cid), data); try { localStorage.removeItem('akick_ref'); } catch (e) {}
       S.myClubs[cid] = name; await setDoc(doc(db, 'me', S.uid), { clubs: S.myClubs, last: cid }, { merge: true });
       location.href = 'admin.html?c=' + cid;
     } catch (e) { toast('만들기 실패: ' + e.message); }
@@ -503,6 +515,9 @@ function render() {
   const pe = $('#pedit'); if (pe) pe.onclick = openProfile;
   document.querySelectorAll('[data-vid]').forEach((b) => (b.onclick = () => openVideo(b.dataset.vid)));
   const sg = $('#sug'); if (sg) sg.onclick = openSuggest;
+  const aa = $('#achall'); if (aa) aa.onclick = openAch;
+  if (S.tab === 'bank') achFlag('bank');
+  achSoon();
   autoPopup();
   const sy = $('#sym'); if (sy) sy.onchange = (e) => { S.sym = e.target.value; render(); };
   const pw = $('#pw'); if (pw) pw.onclick = () => { S.wk = (S.wk || 0) - 1; render(); };
@@ -514,7 +529,7 @@ function bindCommon() {
   const o = $('#out'); if (o) o.onclick = () => signOut(auth);
   const lv = $('#leave'); if (lv) lv.onclick = openLeave;
   const nf = $('#ntf'); if (nf) nf.onclick = openNotify;
-  const it = $('#inst'); if (it) it.onclick = async () => { installEv.prompt(); await installEv.userChoice.catch(() => {}); installEv = null; render(); };
+  const it = $('#inst'); if (it) it.onclick = async () => { installEv.prompt(); const ch = await installEv.userChoice.catch(() => null); if (ch && ch.outcome === 'accepted') achFlag('inst'); installEv = null; render(); };
   const ni = $('#noinst'); if (ni) ni.onclick = () => { try { localStorage.setItem('akick_noinstall', '1'); } catch (e) {} render(); };
   document.querySelectorAll('[data-gohome]').forEach((b) => (b.onclick = () => { S.tab = 'home'; S.wk = 0; render(); window.scrollTo(0, 0); }));
 }
@@ -539,7 +554,7 @@ function renderPick(members) {
 async function vote(v) {
   const g = game(); if (!g || locked(g)) return toast('투표가 마감됐어요. 관리자에게 말씀해 주세요.');
   const data = { gid: g.id, mid: S.me.mid, name: S.me.name, v, uid: S.uid, at: Date.now() };
-  S.votes[S.me.name] = data; render();
+  S.votes[S.me.name] = data; achAdd('vg', g.id, 500); if (Date.now() <= dlTs(g) - 864e5) achAdd('early', g.id, 500); render();
   try { await setDoc(CD('votes', g.id + '__' + S.me.mid), data); toast(v === '참석' ? '참석으로 표시했어요 ⚽' : '불참으로 표시했어요'); }
   catch (e) { toast('저장 실패: 다시 눌러주세요'); }
 }
@@ -630,7 +645,7 @@ function homeHTML() {
   const tile = (go, lbl, val, sub, cls) => '<button class="tile ' + (cls || '') + '" data-go="' + go + '"><span>' + lbl + '</span><b>' + val + '</b><small>' + sub + '</small></button>';
   const recent = txs.slice(-3).reverse();
   return '<header class="hero home">' + heroTop() + '<h1>안녕하세요, ' + esc(S.me.name) + ' 님 👋</h1><p>' + esc(clubName()) + '에 오신 걸 환영해요</p></header>' +
-    '<main class="pad lift">' + gcard + pollsCard() + vidsHome() + installCard() +
+    '<main class="pad lift">' + gcard + pollsCard() + vidsHome() + achCard() + installCard() +
     '<div class="tiles">' +
     tile('dues', mon(d.ym) + ' 회비', !due ? '대상 아님' : paid ? '납부 완료' : '미납', won(d.fee) + '원 · 납부 ' + d.paid.length + '/' + (d.paid.length + d.unpaid.length) + '명', !due ? '' : paid ? 'ok' : 'bad') +
     tile('bank', '통장 잔액', won(bal) + '원', '입출금 전부 공개') +
@@ -741,7 +756,7 @@ function openSuggest() {
     el.querySelector('#sok').onclick = async () => {
       const t = el.querySelector('#st').value.trim(); if (!t) return toast('내용을 써주세요');
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      try { await setDoc(CD('suggest', id), { text: t, name: S.me.name, anon: el.querySelector('#sa').checked, uid: S.uid, at: Date.now() }); el.hidden = true; toast('보냈어요. 고마워요 🙏'); }
+      try { await setDoc(CD('suggest', id), { text: t, name: S.me.name, anon: el.querySelector('#sa').checked, uid: S.uid, at: Date.now() }); el.hidden = true; toast('보냈어요. 고마워요 🙏'); if (A) { A.sug = (A.sug || 0) + 1; achSave(); } }
       catch (e) { toast('보내기 실패: ' + e.message); }
     };
   });
@@ -807,4 +822,137 @@ function openGoal(gid) {
       catch (e) { toast('저장 실패: ' + e.message); logErr('저장 실패: ' + e.message, e.stack); }
     };
   });
+}
+
+/* ---------------- 업적 (배지) ----------------
+   플레이스테이션 트로피(브론즈·실버·골드·플래티넘) + 나이키 연속 기록 + 당근 활동 배지를 섞음.
+   한 번 받은 업적은 사라지지 않음. 기록은 내 계정(ach/{uid})에만 저장 → 팀이 여러 개여도 하나로 모임 */
+const TIER = { B: ['브론즈', '흔함'], S: ['실버', '드묾'], G: ['골드', '희귀'], P: ['플래티넘', '전설'] };
+const ACAT = ['접속', '참석 투표', '경기', '경기기록', '회비', '투표·건의', '하이라이트', '앱 활용', '특별'];
+// [id, 분류, 등급, 아이콘, 이름, 조건, 값 이름, 목표, 숨김]
+const ACH = [
+  ['d1', '접속', 'B', '👟', '첫 킥오프', 'A-KICK 처음 열기', 'days', 1], ['s3', '접속', 'B', '🔥', '작심삼일 돌파', '3일 연속 접속', 'best', 3],
+  ['s7', '접속', 'B', '📆', '일주일 개근', '7일 연속 접속', 'best', 7], ['s14', '접속', 'S', '🗓️', '2주 개근', '14일 연속 접속', 'best', 14],
+  ['s30', '접속', 'G', '🌙', '한 달 개근', '30일 연속 접속', 'best', 30], ['s100', '접속', 'G', '💯', '100일 개근', '100일 연속 접속', 'best', 100],
+  ['s365', '접속', 'P', '👑', '1년 개근', '365일 연속 접속', 'best', 365], ['d10', '접속', 'B', '🏠', '단골', '접속한 날 10일', 'days', 10],
+  ['d50', '접속', 'S', '🏡', '터줏대감', '접속한 날 50일', 'days', 50], ['d150', '접속', 'G', '🏰', 'A-KICK 주민', '접속한 날 150일', 'days', 150],
+  ['d300', '접속', 'G', '🗿', '살아있는 전설', '접속한 날 300일', 'days', 300],
+  ['v1', '참석 투표', 'B', '✋', '첫 응답', '참석·불참 처음 누르기', 'vg', 1], ['v10', '참석 투표', 'B', '🙋', '응답 10경기', '10경기 참석 투표', 'vg', 10],
+  ['v30', '참석 투표', 'S', '📣', '응답 30경기', '30경기 참석 투표', 'vg', 30], ['v100', '참석 투표', 'G', '🎖️', '응답 100경기', '100경기 참석 투표', 'vg', 100],
+  ['early5', '참석 투표', 'S', '⏰', '미리미리', '마감 하루 전까지 투표 5번', 'early', 5], ['gday', '참석 투표', 'B', '🌅', '경기날 출근', '경기 당일 앱 열기', 'gd', 1],
+  ['a1', '경기', 'B', '⚽', '데뷔전', '첫 경기 참석', 'came', 1], ['a10', '경기', 'S', '🥾', '10경기', '10경기 참석', 'came', 10],
+  ['a30', '경기', 'S', '🏃', '30경기', '30경기 참석', 'came', 30], ['a50', '경기', 'G', '🦵', '50경기', '50경기 참석', 'came', 50],
+  ['a100', '경기', 'G', '🏟️', '100경기', '100경기 참석', 'came', 100], ['row5', '경기', 'S', '🔗', '연속 출전', '5경기 연속 참석', 'row', 5],
+  ['row15', '경기', 'G', '⛓️', '철인', '15경기 연속 참석', 'row', 15],
+  ['g1', '경기기록', 'B', '🥅', '첫 골', '첫 골 넣기', 'g', 1], ['as1', '경기기록', 'B', '🤝', '첫 도움', '첫 도움 하기', 'a', 1],
+  ['hat', '경기기록', 'S', '🎩', '해트트릭', '한 경기 3골', 'hat', 1, 1], ['ap10', '경기기록', 'S', '🎯', '공격포인트 10', '골+도움 10개', 'ap', 10],
+  ['ap30', '경기기록', 'G', '💥', '공격포인트 30', '골+도움 30개', 'ap', 30], ['rec10', '경기기록', 'S', '✍️', '기록 담당', '골 기록 직접 넣기 10건', 'rec', 10],
+  ['rec50', '경기기록', 'G', '📚', '기록 반장', '골 기록 직접 넣기 50건', 'rec', 50],
+  ['p1', '회비', 'B', '💵', '첫 회비', '회비 납부 확인', 'pm', 1], ['p3', '회비', 'S', '💳', '3개월 연속 납부', '3개월 연속 회비 납부', 'pmRow', 3],
+  ['p12', '회비', 'G', '🏦', '1년 완납', '12개월 연속 회비 납부', 'pmRow', 12], ['pe3', '회비', 'S', '⚡', '칼납', '마감일 전에 납부 3번', 'pe', 3],
+  ['pv1', '투표·건의', 'B', '🗳️', '첫 투표', '투표·공지 처음 참여', 'pv', 1], ['pv20', '투표·건의', 'S', '📊', '여론 주도', '투표·공지 20개 참여', 'pv', 20],
+  ['sug', '투표·건의', 'B', '💬', '한마디', '관리자에게 건의 보내기', 'sug', 1],
+  ['vw1', '하이라이트', 'B', '🎬', '첫 시청', '하이라이트 처음 보기', 'vw', 1], ['vw20', '하이라이트', 'S', '🍿', '명장면 수집가', '하이라이트 20편 보기', 'vw', 20],
+  ['c1', '하이라이트', 'B', '💭', '첫 댓글', '하이라이트에 댓글 쓰기', 'cm', 1], ['ct', '하이라이트', 'B', '⏱️', '타임라인', '시간(1:23)을 넣은 댓글 쓰기', 'ct', 1],
+  ['c30', '하이라이트', 'S', '🗣️', '해설위원', '댓글 30개', 'cm', 30],
+  ['inst', '앱 활용', 'B', '📲', '홈 화면 추가', '앱을 홈 화면에 설치', 'inst', 1], ['push', '앱 활용', 'B', '🔔', '알림 켜기', '알림 받기 켜기', 'push', 1],
+  ['num', '앱 활용', 'B', '🔟', '등번호 등록', '내 선수 정보에 등번호 넣기', 'num', 1], ['bank', '앱 활용', 'B', '🔍', '꼼꼼한 회원', '통장 탭에서 장부 보기', 'bank', 1],
+  ['ny', '특별', 'S', '🎍', '새해 첫 킥', '1월 1일에 접속', 'ny', 1, 1], ['yr1', '특별', 'G', '🎂', '1주년', '팀 가입 1년', 'yr', 365],
+  ['plat', '특별', 'P', '💎', 'A-KICK 플래티넘', '다른 업적 49개 모두 달성', 'got', 49]
+];
+let A = null, achSaveT = null, achT = null;
+const achRef = () => doc(db, 'ach', S.uid);
+function achSave() { clearTimeout(achSaveT); achSaveT = setTimeout(() => setDoc(achRef(), A).catch((e) => logErr('업적 저장 실패: ' + e.message)), 800); }
+function achAdd(k, v, cap) { if (!A) return; const a = (A[k] = A[k] || []); if (a.indexOf(v) < 0) { a.push(v); if (a.length > (cap || 400)) a.shift(); achSave(); } }
+function achFlag(k) { if (!A) return; A.f = A.f || {}; if (!A.f[k]) { A.f[k] = 1; achSave(); } }
+async function achLoad() {
+  if (A) return achTick();
+  try { const d = await getDoc(achRef()); A = d.exists() ? d.data() : {}; } catch (e) { A = {}; }
+  A.got = A.got || {}; A.f = A.f || {}; achTick();
+}
+/** 하루 한 번: 접속일·연속 접속 */
+function achTick() {
+  if (!A) return;
+  const now = new Date(), t = ymd(now), y = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  if (STANDALONE) achFlag('inst');
+  if (A.last === t) return;
+  A.streak = A.last === y ? (A.streak || 0) + 1 : 1; A.best = Math.max(A.best || 0, A.streak); A.days = (A.days || 0) + 1; A.last = t;
+  if (t.substr(5) === '01-01') A.f.ny = 1;
+  achSave();
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && A) { achTick(); achSoon(); } });
+function maxRun(list) { let b = 0, c = 0; list.forEach((x) => { c = x ? c + 1 : 0; b = Math.max(b, c); }); return b; }
+function achCtx() {
+  const P = played(), nm = S.me.name, gs = S.goals || [], st = myStat() || { g: 0, a: 0, ap: 0 };
+  const byG = {}; gs.filter((x) => x.scorer === nm).forEach((x) => (byG[x.gid] = (byG[x.gid] || 0) + 1));
+  const pm = (A.pm || []).slice().sort(); let pmRow = 0, pc = 0; pm.forEach((m, i) => { pc = i && window.Core.addYM(pm[i - 1], 1) === m ? pc + 1 : 1; pmRow = Math.max(pmRow, pc); });
+  const mine = (S.vcAll || []).filter((c) => c.uid === S.uid), r = (S.pub.records || {})[nm] || { came: 0 };
+  return { days: A.days || 0, best: A.best || 0, vg: (A.vg || []).length, early: (A.early || []).length, gd: (A.gd || []).length,
+    came: Math.max(r.came || 0, P.filter((g) => (g.players || []).indexOf(nm) >= 0).length), row: maxRun(P.map((g) => (g.players || []).indexOf(nm) >= 0)),
+    g: st.g, a: st.a, ap: st.g + st.a, hat: Object.values(byG).some((n) => n >= 3) ? 1 : 0, rec: gs.filter((x) => x.by === S.uid).length,
+    pm: pm.length, pmRow, pe: (A.pe || []).length,
+    pv: (S.pvotes || []).filter((v) => v.mid === S.me.mid).length + Object.values(S.ah || {}).filter(Boolean).length, sug: A.sug || 0,
+    vw: (A.vw || []).length, cm: mine.length, ct: mine.some((c) => /(^|[^\d:])\d{1,2}:[0-5]\d/.test(c.text || '')) ? 1 : 0,
+    inst: A.f.inst || 0, push: A.f.push || 0, num: ((S.profs || {})[S.me.mid] || {}).num ? 1 : 0, bank: A.f.bank || 0,
+    ny: A.f.ny || 0, yr: S.me.at ? Math.floor((Date.now() - S.me.at) / 864e5) : 0, got: ACH.filter((x) => x[0] !== 'plat' && A.got[x[0]]).length };
+}
+function achSoon() { clearTimeout(achT); achT = setTimeout(achCheck, 1200); }
+function achCheck() {
+  if (!A || !S.pub || !S.me || !S.cid || !(S.pub.members || []).some((m) => m.id === S.me.mid)) return;
+  const d = S.pub.dues, t = ymd(new Date());
+  if (d && d.paid.indexOf(S.me.name) >= 0) { achAdd('pm', d.ym, 60); const due = window.Core.addYM(d.ym, -1) + '-' + String(d.dueDay || 30).padStart(2, '0'); if (t <= due) achAdd('pe', d.ym, 60); }
+  if ((S.pub.games || []).concat(S.pub.played || []).some((g) => g.date === t)) achAdd('gd', t, 400);
+  const fresh = [];
+  for (let k = 0; k < 2; k++) {                                         // 두 번 돌려야 플래티넘까지 한 번에 잡힘
+    const x = achCtx();
+    ACH.forEach((a) => { if (!A.got[a[0]] && x[a[6]] >= a[7]) { A.got[a[0]] = Date.now(); fresh.push(a); } });
+  }
+  if (!fresh.length) return achSyncProf();
+  achSave(); achSyncProf(); achCelebrate(fresh);
+  if (S.tab === 'home') render();
+}
+/** 팀원에게 보일 업적 수 (선수 정보 문서에 같이 저장) */
+function achSyncProf() {
+  if (!S.profs) return;
+  const n = Object.keys(A.got).length, p = S.profs[S.me.mid] || {}, plat = A.got.plat ? 1 : 0;
+  if (p.ach === n && (p.plat || 0) === plat) return;
+  setDoc(doc(db, 'clubs', S.cid, 'profiles', S.me.mid), { num: p.num || 0, pos: p.pos || [], uid: S.uid, at: Date.now(), ach: n, plat }).catch(() => {});
+}
+const medal = (a, on, big) => '<span class="md ' + a[2] + (on ? '' : ' off') + (big ? ' big' : '') + '">' + (on || !a[8] ? a[3] : '❓') + '</span>';
+function achCelebrate(list) {
+  if (list.length > 3) return sheet('<div class="apop-h">🏆 업적 ' + list.length + '개 달성!</div><div class="agrid">' + list.map((a) => '<div class="ait">' + medal(a, 1) + '<b>' + esc(a[4]) + '</b><small>' + TIER[a[2]][0] + '</small></div>').join('') + '</div><div class="srow"><button class="pri" id="ax">좋아요</button></div>', (el) => (el.querySelector('#ax').onclick = () => (el.hidden = true)));
+  let i = 0;
+  const one = () => {
+    const a = list[i++]; if (!a) return;
+    const el = document.createElement('div'); el.className = 'apop'; el.innerHTML = '<div class="apbox">' + medal(a, 1, 1) + '<small>업적 달성</small><b>' + esc(a[4]) + '</b><em class="t' + a[2] + '">' + TIER[a[2]].join(' · ') + '</em><span>' + esc(a[5]) + '</span></div>';
+    document.body.appendChild(el); const bye = () => { if (!el.parentNode) return; el.remove(); one(); };
+    el.onclick = bye; setTimeout(bye, 3200);
+  };
+  one();
+}
+function achNext(x) {
+  return ACH.filter((a) => !A.got[a[0]] && !a[8] && a[0] !== 'plat').map((a) => [a, Math.min(x[a[6]], a[7]) / a[7]]).sort((p, q) => q[1] - p[1])[0];
+}
+function achCard() {
+  if (!A) return '';
+  const x = achCtx(), got = ACH.filter((a) => A.got[a[0]]), nx = achNext(x), cnt = (t) => got.filter((a) => a[2] === t).length;
+  const last = got.slice().sort((p, q) => A.got[q[0]] - A.got[p[0]]).slice(0, 5);
+  return '<section class="card achc"><div class="h2row"><h2>🏆 업적 <small class="muted">' + got.length + '/' + ACH.length + '</small></h2><button class="more inl" id="achall">전체 ›</button></div>' +
+    '<div class="arow">' + (last.length ? last.map((a) => medal(a, 1)).join('') : '<span class="muted">아직 없어요. 매일 들어오기만 해도 하나씩 열려요</span>') + '</div>' +
+    (nx ? '<div class="anext"><span>다음 목표 ' + nx[0][3] + ' <b>' + esc(nx[0][4]) + '</b></span><em>' + Math.min(x[nx[0][6]], nx[0][7]) + '/' + nx[0][7] + '</em><i><u style="width:' + Math.round(nx[1] * 100) + '%"></u></i></div>' : '') +
+    '<div class="atiers"><span class="tB">브론즈 ' + cnt('B') + '</span><span class="tS">실버 ' + cnt('S') + '</span><span class="tG">골드 ' + cnt('G') + '</span><span class="tP">플래티넘 ' + cnt('P') + '</span>' + ((A.streak || 0) > 1 ? '<span class="tF">🔥 ' + A.streak + '일 연속</span>' : '') + '</div></section>';
+}
+function openAch() {
+  const x = achCtx(), got = ACH.filter((a) => A.got[a[0]]).length;
+  const rank = Object.entries(S.profs || {}).filter(([, p]) => p.ach).map(([mid, p]) => [((S.pub.members || []).find((m) => m.id === mid) || {}).name, p.ach, p.plat]).filter((r) => r[0]).sort((p, q) => q[1] - p[1]).slice(0, 5);
+  sheet('<h2>🏆 업적 ' + got + '/' + ACH.length + '</h2>' +
+    '<div class="aleg"><span class="tB">브론즈 · 흔함</span><span class="tS">실버 · 드묾</span><span class="tG">골드 · 희귀</span><span class="tP">플래티넘 · 전설</span></div>' +
+    '<div class="muted" style="font-size:12px">등급이 높을수록 오래 꾸준히 써야 열려요. 플래티넘은 1년 이상 걸려요.</div>' +
+    (rank.length ? '<div class="arank"><b>팀 업적 순위</b>' + rank.map((r, i) => '<span>' + (i + 1) + '. ' + esc(r[0]) + (r[2] ? ' 💎' : '') + ' <em>' + r[1] + '개</em></span>').join('') + '</div>' : '') +
+    ACAT.map((c) => '<div class="acat">' + c + '</div><div class="alist">' + ACH.filter((a) => a[1] === c).map((a) => {
+      const on = !!A.got[a[0]], hid = a[8] && !on, cur = Math.min(x[a[6]] || 0, a[7]);
+      return '<div class="ali' + (on ? ' on' : '') + '">' + medal(a, on) + '<div><b>' + (hid ? '숨겨진 업적' : esc(a[4])) + '<em class="t' + a[2] + '">' + TIER[a[2]][0] + '</em></b><small>' + (hid ? '달성하면 공개돼요' : esc(a[5])) + '</small>' +
+        (on ? '<small class="adt">' + ymd(new Date(A.got[a[0]])).replace(/-/g, '.') + ' 달성</small>' : hid || a[7] === 1 ? '' : '<i><u style="width:' + Math.round(cur / a[7] * 100) + '%"></u></i><small>' + cur + '/' + a[7] + '</small>') + '</div></div>';
+    }).join('') + '</div>').join('') +
+    '<div class="srow"><button class="pri" id="ax">닫기</button></div>', (el) => (el.querySelector('#ax').onclick = () => (el.hidden = true)));
 }

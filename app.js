@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, doc, getDocs, getDoc, setDoc, deleteDoc, writeBatch, onSnapshot, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, collection, doc, getDocs, getDoc, setDoc, deleteDoc, writeBatch, onSnapshot, addDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBZps4AWzRrf07yzSuIgydRO_Dn2qGrx9E',
@@ -631,7 +631,13 @@ function pubData() {
   return { updatedAt: new Date().toISOString(), club: S.club.name, perSide: perSide(), maxSide: maxSide(), txs, played, statFrom: statFrom(), place: S.cfg.place || '', members: act.map((m) => ({ id: m.id, name: m.name })), games, records, ledger,
            dues: { ym, fee: S.cfg.fee, dueDay: S.cfg.dueDay || 30, account: S.cfg.account || '', paid: list.filter((m) => paid[m.name]).map((m) => m.name), unpaid: list.filter((m) => !paid[m.name]).map((m) => m.name) } };
 }
-async function publish() { await setDoc(D('pub', 'state'), pubData()); }
+async function publish() {
+  await setDoc(D('pub', 'state'), pubData());
+  // 추천 '활성 팀' 판정용 요약 (연결된 회원 수 · 치른 경기 수) → 추천한 관리자가 볼 수 있음
+  if (!S.claimsLoaded) return;
+  const st = { m: Object.keys(S.claims || {}).length, g: S.games.filter((g) => g.date <= today() && !g.postponed).length };
+  if (JSON.stringify(st) !== JSON.stringify(S.club.stat || null)) { S.club.stat = st; await setDoc(doc(db, 'clubs', CID), { stat: st }, { merge: true }).catch(() => {}); }
+}
 
 /* ---- 빠른 처리 ---- */
 async function quick(id, q) {
@@ -1193,12 +1199,12 @@ function openSettingsReal() {
   const grp = (title, keys) => '<div class="sgrp"><div class="g-lbl2">' + title + '</div><div class="row2">' + CFG.filter(([k]) => keys.indexOf(k) >= 0).map(([k, l, ty]) => '<label class="f">' + l + '<input data-c="' + k + '" type="' + ty + '" value="' + esc(S.cfg[k] == null ? '' : S.cfg[k]) + '"></label>').join('') + '</div></div>';
   modal('<h2>설정</h2><div class="muted">팀 만든 구글 계정 + 관리자 비밀번호로만 열려요. 회원 화면에는 나오지 않아요.</div>' +
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
-    themeHTML() +
+    themeHTML() + '<div class="sgrp" id="refbox"><div class="g-lbl2">추천</div><div class="muted">불러오는 중...</div></div>' +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
     '<div class="muted" style="margin-top:8px">A-KICK ' + C.VERSION + ' · <a href="privacy.html" target="_blank">개인정보처리방침</a> · <a href="terms.html" target="_blank">이용약관</a></div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
-    bindTheme(m);
+    bindTheme(m); loadRef(m);
     m.querySelector('#bk').onclick = backup;
     m.querySelector('#lo').onclick = () => { closeModal(); try { sessionStorage.clear(); } catch (e) {} signOut(auth); };
     m.querySelector('#sv').onclick = async () => {
@@ -1209,6 +1215,64 @@ function openSettingsReal() {
       await putCfg(); closeModal(); toast('저장했어요'); render();
     };
   });
+}
+
+/* ---- 추천 제도 ----
+   총무가 다른 팀 총무를 데려오면: 그 팀이 '활성 팀'(구글 계정 연결 회원 5명 + 경기 2번)이 될 때
+   추천한 쪽 Pro 3개월, 추천받은 팀 Pro 1개월 적립 (유료화되는 날 적용). 구장 코드는 운영자가 만듦 */
+const REF_ROOT = new URL('./', location.href).href;
+const OPERATOR = 'apharmga@gmail.com';
+const RM = 5, RG = 2, R_GIVE = 3, R_GET = 1;
+const refActive = (c) => !!c.stat && c.stat.m >= RM && c.stat.g >= RG;
+const refBadges = [[1, '🤝', '첫 영입'], [3, '🔭', '스카우터'], [10, '🕴️', '에이전트']];
+function genCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; return [...crypto.getRandomValues(new Uint8Array(6))].map((x) => A[x % A.length]).join(''); }
+async function teamsBy(code) { return (await getDocs(query(collection(db, 'clubs'), where('refBy', '==', code))).catch(() => ({ docs: [] }))).docs.map((d) => d.data()); }
+async function loadRef(m) {
+  const box = m.querySelector('#refbox'); if (!box) return;
+  try {
+    const mineQ = (await getDocs(query(collection(db, 'refs'), where('uid', '==', S.uid)))).docs;
+    let code = (mineQ.find((d) => !d.data().venue) || {}).id;
+    for (let i = 0; !code && i < 5; i++) { const c = genCode(); if (!(await getDoc(doc(db, 'refs', c))).exists()) { await setDoc(doc(db, 'refs', c), { uid: S.uid, at: Date.now() }); code = c; } }
+    const teams = await teamsBy(code), act = teams.filter(refActive).length, link = REF_ROOT + '?ref=' + code;
+    let me = '';
+    if (S.club.refBy) {
+      const ok = refActive(S.club), st = S.club.stat || { m: 0, g: 0 };
+      me = '<div class="refme">추천 코드 <b>' + esc(S.club.refBy) + '</b>로 시작한 팀이에요 · ' + (ok ? '✅ 활성 팀 · <b>Pro ' + R_GET + '개월 적립</b>' : '⏳ 활성 팀이 되면 Pro ' + R_GET + '개월 적립 (회원 연결 ' + Math.min(st.m, RM) + '/' + RM + ' · 경기 ' + Math.min(st.g, RG) + '/' + RG + ')') + '</div>';
+    } else if (Date.now() - Date.parse(S.club.created || 0) < 30 * 864e5) {
+      me = '<div class="refin"><input id="rfin" maxlength="12" placeholder="받은 추천 코드 (팀 만든 뒤 30일까지)"><button class="btn" id="rfok">등록</button></div>';
+    }
+    box.innerHTML = '<div class="g-lbl2">추천 · 다른 팀 총무에게 A-KICK 알려주기</div>' +
+      '<div class="refcode"><span>내 추천 코드</span><b>' + code + '</b><button class="btn pri" id="rfcp">추천 문구 복사</button></div>' +
+      '<div class="refsum"><span>가입한 팀 <b>' + teams.length + '</b></span><span>활성 팀 <b>' + act + '</b></span><span>적립 <b>Pro ' + act * R_GIVE + '개월</b></span></div>' +
+      '<div class="refbd">' + refBadges.map(([n, ic, t]) => '<span class="' + (act >= n ? 'on' : '') + '"><i>' + ic + '</i>' + t + '<small>활성 ' + n + '팀</small></span>').join('') + '</div>' +
+      (teams.length ? '<div class="reflist">' + teams.map((c) => '<div><b>' + esc(c.name) + '</b><span>' + (refActive(c) ? '✅ 활성' : '⏳ 회원 ' + Math.min((c.stat || {}).m || 0, RM) + '/' + RM + ' · 경기 ' + Math.min((c.stat || {}).g || 0, RG) + '/' + RG) + '</span></div>').join('') + '</div>' : '') +
+      '<div class="muted">추천받은 팀이 <b>활성 팀</b>(앱에 연결된 회원 ' + RM + '명 + 경기 ' + RG + '번)이 되면 나는 Pro ' + R_GIVE + '개월, 그 팀은 Pro ' + R_GET + '개월이 적립돼요. 지금은 무료라 유료 기능이 생기는 날 자동 적용돼요.</div>' + me +
+      (S.uid && auth.currentUser && auth.currentUser.email === OPERATOR ? '<div id="venuebox"></div>' : '');
+    box.querySelector('#rfcp').onclick = () => copy('⚽ 총무 일 줄여주는 앱 A-KICK 써보세요!\n모임통장 엑셀만 올리면 회비·게스트비 정리 끝, 참석 투표·팀 편성도 돼요.\n이 링크로 팀을 만들면 Pro 무료 이용권을 드려요 (유료화 때 적용)\n👉 ' + link);
+    const ok = box.querySelector('#rfok');
+    if (ok) ok.onclick = async () => {
+      const rc = box.querySelector('#rfin').value.trim().toUpperCase(); if (!rc) return;
+      const r = await getDoc(doc(db, 'refs', rc)).catch(() => null);
+      if (!r || !r.exists()) return toast('없는 추천 코드예요');
+      if (r.data().uid === S.uid) return toast('내 추천 코드는 내 팀에 쓸 수 없어요');
+      try { await setDoc(doc(db, 'clubs', CID), { refBy: rc }, { merge: true }); S.club.refBy = rc; toast('추천 코드를 등록했어요'); loadRef(m); } catch (e) { fail(e); }
+    };
+    if (box.querySelector('#venuebox')) loadVenues(box.querySelector('#venuebox'), mineQ.filter((d) => d.data().venue));
+  } catch (e) { box.innerHTML = '<div class="g-lbl2">추천</div><div class="muted">불러오지 못했어요: ' + esc(e.message) + '</div>'; logErr('추천 불러오기 실패: ' + e.message, e.stack); }
+}
+/** 운영자만: 구장 추천 코드 (구장이 정기대관 팀에게 A-KICK을 권하면 구장에도 적립) */
+async function loadVenues(el, vs) {
+  const rows = await Promise.all(vs.map(async (d) => { const t = await teamsBy(d.id); return [d.id, d.data().venue, t.length, t.filter(refActive).length]; }));
+  el.innerHTML = '<div class="g-lbl2" style="margin-top:12px">운영자 · 구장 코드</div>' +
+    (rows.length ? '<div class="reflist">' + rows.map((r) => '<div><b>' + esc(r[1]) + ' · ' + r[0] + '</b><span>가입 ' + r[2] + ' · 활성 ' + r[3] + ' · 구장판 ' + r[3] * R_GIVE + '개월</span><button class="btn xs" data-vcp="' + r[0] + '">링크</button></div>').join('') + '</div>' : '<div class="muted">아직 구장 코드가 없어요</div>') +
+    '<div class="refin"><input id="vcode" maxlength="12" placeholder="코드 (예: DONAM)"><input id="vname" maxlength="20" placeholder="구장 이름"><button class="btn" id="vmk">만들기</button></div>';
+  el.querySelectorAll('[data-vcp]').forEach((b) => (b.onclick = () => copy(REF_ROOT + '?ref=' + b.dataset.vcp)));
+  el.querySelector('#vmk').onclick = async () => {
+    const c = el.querySelector('#vcode').value.trim().toUpperCase(), n = el.querySelector('#vname').value.trim();
+    if (!/^[A-Z0-9]{4,12}$/.test(c)) return toast('코드는 영문·숫자 4~12자로 해주세요'); if (!n) return toast('구장 이름을 넣어주세요');
+    if ((await getDoc(doc(db, 'refs', c))).exists()) return toast('이미 있는 코드예요');
+    try { await setDoc(doc(db, 'refs', c), { uid: S.uid, at: Date.now(), venue: n }); toast('구장 코드를 만들었어요'); loadVenues(el, vs.concat([{ id: c, data: () => ({ venue: n }) }])); } catch (e) { fail(e); }
+  };
 }
 
 /* ---- 화면 아무 데나 끌어다 놓기 ---- */

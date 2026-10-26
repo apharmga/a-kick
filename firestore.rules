@@ -2,6 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    function isOp() { return signedIn() && request.auth.token.email == 'apharmga@gmail.com' && request.auth.token.email_verified == true; }
+    // 추천 코드: 있는 코드여야 하고, 내 코드로 내 팀을 추천할 수 없음
+    function validRef(code) {
+      return code is string && exists(/databases/$(database)/documents/refs/$(code))
+        && get(/databases/$(database)/documents/refs/$(code)).data.uid != request.auth.uid;
+    }
 
     // 내 팀 목록 (본인만)
     match /me/{uid} {
@@ -9,6 +15,23 @@ service cloud.firestore {
     }
 
     // 오류 기록: 로그인한 사람은 남기기만, 보기·지우기는 운영자만
+    // 업적: 내 기록은 나만
+    match /ach/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // 추천 코드: 누구나 확인 가능, 만들기는 본인 것만. 구장 코드(venue)는 운영자만
+    match /refs/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && code.matches('^[A-Z0-9]{4,12}$')
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.at is int
+        && (request.resource.data.keys().hasOnly(['uid', 'at'])
+          || (isOp() && request.resource.data.keys().hasOnly(['uid', 'at', 'venue'])
+            && request.resource.data.venue is string && request.resource.data.venue.size() <= 20));
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
     match /errlog/{id} {
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['at', 'uid', 'cid', 'page', 'msg', 'stack', 'ua', 'ver'])
@@ -28,9 +51,13 @@ service cloud.firestore {
       // 팀 이름·주인: 링크 받은 사람이면 읽기, 만든 사람만 수정
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.owner == request.auth.uid
-        && request.resource.data.keys().hasOnly(['name', 'owner', 'created']);
+        && request.resource.data.keys().hasOnly(['name', 'owner', 'created', 'refBy'])
+        && (!('refBy' in request.resource.data) || validRef(request.resource.data.refBy));
+      // 추천 코드는 비어 있을 때 한 번만 넣을 수 있고, 넣은 뒤엔 못 바꿈
       allow update: if signedIn() && resource.data.owner == request.auth.uid
-        && request.resource.data.owner == request.auth.uid;
+        && request.resource.data.owner == request.auth.uid
+        && (request.resource.data.get('refBy', '') == resource.data.get('refBy', '')
+          || (resource.data.get('refBy', '') == '' && validRef(request.resource.data.refBy)));
       allow delete: if signedIn() && resource.data.owner == request.auth.uid;
 
       // 팀 안의 모든 데이터(거래·실력 점수·설정): 만든 사람(관리자)만
@@ -126,7 +153,7 @@ service cloud.firestore {
       match /profiles/{mid} {
         allow read: if isMember();
         allow write: if isMember() && mid == myMid()
-          && (request.resource == null || (request.resource.data.keys().hasOnly(['num', 'pos', 'uid', 'at'])
+          && (request.resource == null || (request.resource.data.keys().hasOnly(['num', 'pos', 'uid', 'at', 'ach', 'plat'])
             && request.resource.data.uid == request.auth.uid
             && request.resource.data.num is int && request.resource.data.num >= 0 && request.resource.data.num <= 99
             && request.resource.data.pos is list && request.resource.data.pos.size() <= 2));
