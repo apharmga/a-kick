@@ -17,7 +17,7 @@ const D = (...p) => doc(db, 'clubs', CID, ...p);
 const CL = (n) => collection(db, 'clubs', CID, n);
 
 const S = { cfg: null, members: [], games: [], txs: [], skills: {}, votes: {}, view: 'week', week: monday(C.ymd(new Date())) };
-const MEMBER_URL = location.origin + '/?c=' + CID;
+const MEMBER_URL = new URL('./?c=' + CID, location.href).href;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const won = (n) => C.comma(n);
@@ -58,8 +58,8 @@ async function batchPut(list) {
 const PIN_DEFAULT = 'd491e185da5e647a77d68eeaf393cd35';   // 0000
 async function pinHash(pin) { return C.md5('a-futsal:' + pin); }
 onAuthStateChanged(auth, async (u) => {
-  if (!u) { location.href = '/' + (CID ? '?c=' + CID : ''); return; }
-  if (!CID) { location.href = '/'; return; }
+  if (!u) { location.href = './' + (CID ? '?c=' + CID : ''); return; }
+  if (!CID) { location.href = './'; return; }
   try {
     const club = await getDoc(doc(db, 'clubs', CID));
     if (!club.exists() || club.data().owner !== u.uid) return deny(u);
@@ -71,12 +71,12 @@ onAuthStateChanged(auth, async (u) => {
   } catch (e) { deny(u, e.message); }
 });
 function deny(u, msg) {
-  $('#app').innerHTML = '<div class="center"><b>이 팀의 관리자가 아니에요</b><div class="muted">' + esc(u.email || '') + (msg ? '<br>' + esc(msg) : '') + '</div><a class="btn pri" href="/' + (CID ? '?c=' + CID : '') + '">회원 화면으로</a></div>';
+  $('#app').innerHTML = '<div class="center"><b>이 팀의 관리자가 아니에요</b><div class="muted">' + esc(u.email || '') + (msg ? '<br>' + esc(msg) : '') + '</div><a class="btn pri" href="./' + (CID ? '?c=' + CID : '') + '">회원 화면으로</a></div>';
 }
 function pinGate(hash) {
   $('#app').innerHTML = '<div class="center"><div class="logo" style="font-size:26px">' + esc(S.club.name) + '</div><div class="muted">관리자 전용 페이지</div>' +
     '<label class="f" style="width:240px">관리자 비밀번호<input id="pin" type="password" inputmode="numeric" autocomplete="off"></label>' +
-    '<button class="btn pri" id="go" style="min-height:46px;width:240px">들어가기</button><a class="muted" href="/?c=' + CID + '">회원 화면으로 돌아가기</a></div>';
+    '<button class="btn pri" id="go" style="min-height:46px;width:240px">들어가기</button><a class="muted" href="./?c=' + CID + '">회원 화면으로 돌아가기</a></div>';
   const inp = $('#pin'); inp.focus();
   const go = async () => {
     if ((await pinHash(inp.value.trim())) === (hash || PIN_DEFAULT)) { S.unlocked = true; try { sessionStorage.setItem('afutsal_pin_' + CID, '1'); } catch (e) {} loadAll(); }
@@ -202,10 +202,10 @@ const IC = {
 function render() {
   const v = S.view, ym = payYM(), list = C.membersFor(S.members, ym), paid = C.duesPaid(S.txs, ym);
   const tab = (k, l) => '<button class="tab' + (v === k ? ' on' : '') + '" data-v="' + k + '">' + l + '</button>';
-  const nav = '<header class="bar"><div class="bar-in"><a class="logo" href="/?c=' + CID + '" title="홈으로">' + esc(S.club.name) + '<small>관리자</small></a><nav class="tabs" aria-label="메뉴">' + tab('week', '이번 주') + tab('members', '회원 · 회비' + ((S.reqs || []).length ? ' <em class="badge">' + S.reqs.length + '</em>' : '')) + tab('ledger', '장부') + tab('stats', '스탯 · 이벤트') + tab('polls', '투표 · 건의' + (newSugs() ? ' <em class="badge">' + newSugs() + '</em>' : '')) + '</nav>' +
+  const nav = '<header class="bar"><div class="bar-in"><a class="logo" href="./?c=' + CID + '" title="홈으로">' + esc(S.club.name) + '<small>관리자</small></a><nav class="tabs" aria-label="메뉴">' + tab('week', '이번 주') + tab('members', '회원 · 회비' + ((S.reqs || []).length ? ' <em class="badge">' + S.reqs.length + '</em>' : '')) + tab('ledger', '장부') + tab('stats', '스탯 · 이벤트') + tab('polls', '투표 · 건의' + (newSugs() ? ' <em class="badge">' + newSugs() + '</em>' : '')) + '</nav>' +
     '<div class="stats"><div class="stat"><span>통장 잔액</span><b>' + won(C.balance(S.txs)) + '<em>원</em></b></div><div class="stat"><span>' + mon(ym) + ' 회비</span><b>' + list.filter((m) => paid[m.name]).length + '<em> / ' + list.length + '명</em></b></div></div>' +
     '<label class="btn pri up">' + IC.up + '<span>거래내역 엑셀 넣기</span><input type="file" accept=".xlsx,.xls" id="up" hidden></label>' +
-    '<a class="btn" href="/?c=' + CID + '">' + IC.home + ' 홈</a><button class="iconbtn" id="gear" aria-label="설정">' + IC.gear + '</button></div></header>';
+    '<a class="btn" href="./?c=' + CID + '">' + IC.home + ' 홈</a><button class="iconbtn" id="gear" aria-label="설정">' + IC.gear + '</button></div></header>';
   const body = v === 'week' ? weekHTML() : v === 'members' ? membersHTML() : v === 'team' ? teamHTML() : v === 'stats' ? statsHTML() : v === 'polls' ? pollsHTML() : ledgerHTML();
   $('#app').innerHTML = nav + '<main class="wrap">' + body + '</main>';
   document.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { S.view = b.dataset.v; render(); }));

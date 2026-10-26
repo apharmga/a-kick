@@ -63,7 +63,7 @@ async function start() {
     const c = await getDoc(doc(db, 'clubs', cid));
     if (!c.exists()) { toast('없어진 팀이에요'); delete S.myClubs[cid]; await saveMyClubs(); return renderHome(); }
     S.cid = cid; S.club = c.data(); S.owner = S.club.owner === S.uid;
-    if (!urlC) history.replaceState(null, '', '/?c=' + cid);
+    if (!urlC) history.replaceState(null, '', './?c=' + cid);
     S.myClubs[cid] = S.club.name;
     setDoc(meRef, { clubs: S.myClubs, last: cid }, { merge: true }).catch(() => {});
     document.title = S.club.name;
@@ -129,7 +129,7 @@ async function renderHome() {
   const ids = Object.keys(all);
   view('<header class="hero"><div class="hrow"><b>A-KICK</b><button class="who lk" id="out">로그아웃</button></div><h1>내 팀</h1><p>' + esc(S.email) + '</p></header><main class="pad lift">' +
     (ids.length ? '<section class="card"><div class="clist">' + ids.map((k) => { const own = owned.some((o) => o[0] === k);
-      return '<div class="crow"><a href="/?c=' + esc(k) + '">' + esc(all[k]) + (own ? '<em>관리자</em>' : '') + '</a><button class="cdel" data-cdel="' + esc(k) + '" data-own="' + (own ? 1 : 0) + '">' + (own ? '삭제' : '빼기') + '</button></div>'; }).join('') + '</div></section>'
+      return '<div class="crow"><a href="./?c=' + esc(k) + '">' + esc(all[k]) + (own ? '<em>관리자</em>' : '') + '</a><button class="cdel" data-cdel="' + esc(k) + '" data-own="' + (own ? 1 : 0) + '">' + (own ? '삭제' : '빼기') + '</button></div>'; }).join('') + '</div></section>'
       : '<section class="card soft"><h2>아직 들어간 팀이 없어요</h2><p class="muted">회원이라면 관리자에게 받은 <b>팀 링크</b>로 들어오세요.</p></section>') +
     '<section class="card"><h2>내가 관리자예요</h2><p class="muted">새 팀을 만들면 회비·참석·팀 편성을 관리할 수 있어요. 관리자 비밀번호는 처음에 0000이에요. 만든 뒤 꼭 바꿔주세요.</p>' +
     '<div class="newc"><input id="cn" placeholder="팀 이름 (예: 수성FC)" maxlength="20"><button id="mk">팀 만들기</button></div></section></main>');
@@ -141,7 +141,7 @@ async function renderHome() {
     try {
       await setDoc(doc(db, 'clubs', cid), { name, owner: S.uid, created: new Date().toISOString() });
       S.myClubs[cid] = name; await setDoc(doc(db, 'me', S.uid), { clubs: S.myClubs, last: cid }, { merge: true });
-      location.href = '/admin.html?c=' + cid;
+      location.href = 'admin.html?c=' + cid;
     } catch (e) { toast('만들기 실패: ' + e.message); }
   };
 }
@@ -187,14 +187,14 @@ function locked(g) {
   return now > dl;
 }
 const clubName = () => (S.pub && S.pub.club) || (S.club && S.club.name) || '';
-const adminBtn = () => (S.owner ? '<a class="adm" href="/admin.html?c=' + esc(S.cid) + '">관리자</a>' : '');
+const adminBtn = () => (S.owner ? '<a class="adm" href="admin.html?c=' + esc(S.cid) + '">관리자</a>' : '');
 const HOME = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>';
 const heroTop = () => '<div class="hrow"><button class="cname" data-gohome>' + HOME + '<b>' + esc(clubName()) + '</b></button><span class="who">' + (S.me ? esc(S.me.name) + ' 님' : '') + adminBtn() + '</span></div>';
 
 /* ---------------- 3. 화면 ---------------- */
 function render() {
   if (!S.pub) return void view('<header class="hero">' + heroTop() + '<h1>아직 준비 중이에요</h1><p>' + (S.owner ? '관리자 페이지에서 회원을 등록하면 여기에 떠요.' : '관리자가 준비하면 여기에 떠요.') + '</p></header><main class="pad lift">' +
-    (S.owner ? '<a class="bigbtn" href="/admin.html?c=' + esc(S.cid) + '">관리자 페이지 열기</a>' : '') + '<button class="link" id="home">다른 팀 보기</button> <button class="link" id="out">로그아웃</button></main>'), bindCommon();
+    (S.owner ? '<a class="bigbtn" href="admin.html?c=' + esc(S.cid) + '">관리자 페이지 열기</a>' : '') + '<button class="link" id="home">다른 팀 보기</button> <button class="link" id="out">로그아웃</button></main>'), bindCommon();
   const members = S.pub.members || [];
   if (S.me && !S.owner && !members.some((m) => m.id === S.me.mid)) return void view('<header class="hero">' + heroTop() + '<h1>승인됐어요! 🎉</h1><p>명단을 불러오는 중이에요. 잠시 후 자동으로 열려요.</p></header><main class="pad lift"></main>');
   if (!S.me || !members.some((m) => m.id === S.me.mid)) return renderPick(members);
@@ -223,7 +223,7 @@ function render() {
   bindCommon();
 }
 function bindCommon() {
-  const h = $('#home'); if (h) h.onclick = () => { S.subs.forEach((f) => f()); S.subs = []; S.cid = ''; history.replaceState(null, '', '/'); renderHome(); };
+  const h = $('#home'); if (h) h.onclick = () => { S.subs.forEach((f) => f()); S.subs = []; S.cid = ''; history.replaceState(null, '', './'); renderHome(); };
   const o = $('#out'); if (o) o.onclick = () => signOut(auth);
   document.querySelectorAll('[data-gohome]').forEach((b) => (b.onclick = () => { S.tab = 'home'; S.wk = 0; render(); window.scrollTo(0, 0); }));
 }
@@ -348,7 +348,7 @@ function homeHTML() {
     (recent.length ? '<section class="card"><div class="h2row"><h2>최근 입출금</h2><button class="more inl" data-go="bank">전체 ›</button></div><div class="blist">' + recent.map((t) =>
       '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b></span></div>').join('') + '</div></section>' : '') +
     '<button class="sugbtn" id="sug">💬 관리자에게 건의하기</button>' +
-    (S.owner ? '<a class="bigbtn" href="/admin.html?c=' + esc(S.cid) + '">관리자 페이지</a>' : '') +
+    (S.owner ? '<a class="bigbtn" href="admin.html?c=' + esc(S.cid) + '">관리자 페이지</a>' : '') +
     '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button></div></main>';
 }
 function duesHTML() {
