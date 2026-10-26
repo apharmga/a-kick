@@ -356,8 +356,8 @@ body.noscroll{overflow:hidden}
 .rcl{display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:13px;font-weight:700}.rcl small{font-weight:500;color:var(--sub)}
 .rcl input{height:42px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font-size:15px;text-transform:uppercase}
 /* ---- 레벨 ---- */
-.lvp{display:inline-flex;padding:1.5px;border-radius:999px;vertical-align:middle;margin-right:5px;box-shadow:0 1px 2px rgba(11,16,32,.25);flex:none}
-.lvp i{font-style:normal;background:linear-gradient(#26304F,#0E1222);color:#fff;border-radius:999px;padding:1px 7px;font:400 10px/1.5 Bungee,sans-serif;letter-spacing:.3px}
+.lvp{display:inline-flex;padding:2px;border-radius:999px;vertical-align:middle;margin-right:5px;box-shadow:0 1px 2px rgba(11,16,32,.25);flex:none}
+.lvp>kk-i{display:block;font-style:normal;background:linear-gradient(#26304F,#0E1222);color:#fff;border-radius:999px;padding:1px 7px;font:400 10px/1.5 Bungee,sans-serif;letter-spacing:.3px}
 .lvc .lvhead{display:flex;gap:10px;align-items:center}.lvc .lvem{flex:none;margin:-6px -4px -6px -8px}
 .lvnm{flex:1;min-width:0}.lvnm b{display:block;font-size:17px}.lvnm small{color:var(--sub);font-size:12px}
 .lvb{font-style:normal;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--tint);color:var(--navy);vertical-align:2px}
@@ -387,5 +387,8 @@ body.noscroll{overflow:hidden}
 /* ---- 날씨 ---- */
 .wx{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;background:var(--bg);border-radius:12px;padding:8px 12px;margin:8px 0;font-size:13px}
 .wx .wi{font-size:20px}.wx b{font-size:17px}.wx em{font-style:normal;font-weight:800;color:var(--navy);width:100%;font-size:12.5px}.wx small{margin-left:auto;color:var(--sub);font-size:11px}
-.wx.rain{background:#EFF6FF}.wx.rain em{color:#1D4ED8}.wx.soft{color:var(--sub)}
+.wx.ok em{color:#15803D}.wx.warn{background:#FFFBEB}.wx.warn em{color:#B45309}.wx.bad{background:#FEF2F2}.wx.bad em{color:#B91C1C}.wx.soft{color:var(--sub)}
 .wx b.mm{font-size:13px}
+.lvb{border:0;cursor:pointer}
+.lvg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 6px;margin:10px 0}.lvg div{display:flex;flex-direction:column;align-items:center;gap:1px}.lvg b{font-size:13px}.lvg small{font-size:11px;color:var(--sub);margin-bottom:3px}
+.pn .lvp{transform:scale(.85);margin-right:2px}.who .lvp{margin-right:4px}

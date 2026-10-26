@@ -172,7 +172,7 @@ service cloud.firestore {
       match /wx/{gid} {
         allow read: if isMember();
         allow write: if isMember()
-          && request.resource.data.keys().hasOnly(['gid', 'date', 'time', 't', 'pop', 'pr', 'code', 'wind', 'at'])
+          && request.resource.data.keys().hasOnly(['gid', 'date', 'time', 't', 'pop', 'pr', 'mx', 'st', 'code', 'wind', 'at'])
           && request.resource.data.gid == gid && request.resource.data.at is int;
       }
       match /suggest/{id} {

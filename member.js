@@ -253,7 +253,7 @@ async function openVideo(id) {
     Object.keys(kids).forEach((p) => { if (!ids.has(p)) roots.push({ id: p, gone: 1, at: kids[p][0].at }); });   // 원댓글이 지워져도 답글은 남김
     roots.sort((a, b) => a.at - b.at);
     const one = (c, root) => c.gone ? '<div class="vcm gone">삭제된 댓글이에요</div>' :
-      '<div class="vcm' + (root !== c.id ? ' sub' : '') + '"><div class="vch"><b>' + esc(c.name) + '</b><small>' + new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small>' +
+      '<div class="vcm' + (root !== c.id ? ' sub' : '') + '"><div class="vch"><b>' + lvPill(lvOfMid(c.mid)) + esc(c.name) + '</b><small>' + new Date(c.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small>' +
       (c.uid === S.uid || S.owner ? '<button class="vdel" data-cdel="' + esc(c.id) + '" aria-label="삭제">✕</button>' : '') + '</div><div class="vct">' + tsText(c.text) + '</div>' +
       '<button class="vrb" data-rep="' + esc(c.id) + '" data-root="' + esc(root) + '" data-name="' + esc(c.name) + '">답글</button></div>';
     box.innerHTML = roots.length ? roots.map((r) => '<div class="vth2">' + one(r, r.id) + ((kids[r.id] || []).length ? '<div class="vkids">' + kids[r.id].map((k) => one(k, r.id)).join('') + '</div>' : '') + '</div>').join('') : '<div class="muted">첫 댓글을 남겨보세요 ⚽</div>';
@@ -485,7 +485,7 @@ function locked(g) {
 const clubName = () => (S.pub && S.pub.club) || (S.club && S.club.name) || '';
 const adminBtn = () => (S.owner ? '<a class="adm" href="admin.html?c=' + esc(S.cid) + '">관리자</a>' : '');
 const HOME = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>';
-const heroTop = () => '<div class="hrow"><button class="cname" data-gohome>' + HOME + '<b>' + esc(clubName()) + '</b></button><span class="who">' + (S.me ? esc(S.me.name) + ' 님' : '') + adminBtn() + '</span></div>';
+const heroTop = () => '<div class="hrow"><button class="cname" data-gohome>' + HOME + '<b>' + esc(clubName()) + '</b></button><span class="who">' + (S.me ? lvPill(lvOfMid(S.me.mid)) + esc(S.me.name) + ' 님' : '') + adminBtn() + '</span></div>';
 
 /* ---------------- 3. 화면 ---------------- */
 function render() {
@@ -517,6 +517,7 @@ function render() {
   const sg = $('#sug'); if (sg) sg.onclick = openSuggest;
   const aa = $('#achall'); if (aa) aa.onclick = openAch;
   const lva = $('#lvall'); if (lva) lva.onclick = openLevel;
+  const lvg = $('#lvguide'); if (lvg) lvg.onclick = openLvGuide;
   const rg = $('#rpsgo'); if (rg) rg.onclick = openRps;
   rpsWatch(); wxWatch(game());
   if (S.tab === 'bank') achFlag('bank');
@@ -575,7 +576,7 @@ function side(team, bottom, cls, seed) {
   const ord = window.Core.order(team, seed), f = FORM[Math.min(11, Math.max(3, ord.length))];
   return ord.map((n, i) => {
     const p = f[i] || [46, 15 + i * 10], top = bottom ? 100 - p[0] : p[0];
-    return '<div class="ptok" style="left:' + p[1] + '%;top:' + top + '%"><span class="dot ' + cls + (n === S.me.name ? ' me' : '') + '">' + ((profOf(n) || {}).num || '') + '</span><span class="pn">' + esc(n) + (i === 0 ? ' <i>GK</i>' : '') + '</span></div>';
+    return '<div class="ptok" style="left:' + p[1] + '%;top:' + top + '%"><span class="dot ' + cls + (n === S.me.name ? ' me' : '') + '">' + ((profOf(n) || {}).num || '') + '</span><span class="pn">' + lvPill(lvOfName(n)) + esc(n) + (i === 0 ? ' <i>GK</i>' : '') + '</span></div>';
   }).join('');
 }
 function weekDays() {
@@ -720,7 +721,7 @@ function openPoll(pid) {
       (p.deadline ? '<div class="muted">' + md(p.deadline.substr(0, 10)) + '(' + day(p.deadline.substr(0, 10)) + ') ' + p.deadline.substr(11, 5) + ' 마감</div>' : '') +
       (notice ? '' : '<div class="muted">' + (p.multi ? '여러 개 고를 수 있어요' : '하나만 골라주세요') + (p.anon ? ' · 누가 뭘 골랐는지 아무에게도 안 보여요' : '') + '</div><div class="popts">' + opts.map((o) =>
         '<button class="popt' + (picks.has(o.id) ? ' on' : '') + '" data-o="' + esc(o.id) + '"' + (open ? '' : ' disabled') + '><span>' + esc(o.text) + '</span>' + (show ? '<b>' + o.who.length + '</b><i style="width:' + (o.who.length / mx * 100) + '%"></i>' : '') + '</button>' +
-        (show && o.who.length && !p.anon ? '<small class="pwho">' + esc(o.who.join(', ')) + '</small>' : '')).join('') + '</div>' +
+        (show && o.who.length && !p.anon ? '<small class="pwho">' + o.who.map((n) => lvPill(lvOfName(n)) + esc(n)).join(', ') + '</small>' : '')).join('') + '</div>' +
         (open && p.allowAdd ? '<div class="padd"><input id="pnew" maxlength="20" placeholder="다른 의견 직접 쓰기"><button id="padd">추가</button></div>' : '')) +
       '<div class="srow">' + '<button id="px">' + (open && !mine ? '나중에' : '닫기') + '</button>' + (open ? '<button id="pok" class="pri">' + (notice ? '확인했어요' : mine ? '다시 저장' : '투표하기') + '</button>' : '') + '</div>', (el) => {
       el.querySelector('#px').onclick = () => { el.hidden = true; try { sessionStorage.setItem('pp_' + p.id, '1'); } catch (e) {} };
@@ -773,7 +774,7 @@ function gameRec(g) {
   const gs = (S.goals || []).filter((x) => x.gid === g.id), T = (g.teams || []).map((x) => x.split('|')).filter((x) => x[0]);
   const sc = window.Core.score({ id: g.id, teams: T }, S.goals || []);
   return '<div class="grec"><div class="grh"><b>' + md(g.date) + ' (' + day(g.date) + ')</b>' + (T.length >= 2 ? '<span class="score"><em class="a">A</em> ' + sc[0] + ' : ' + sc[1] + ' <em class="b">B</em></span>' : '<span class="muted">' + g.players.length + '명</span>') + '</div>' +
-    (gs.length ? gs.map((x) => '<div class="gli"><span>⚽ <b>' + esc(x.scorer) + '</b>' + (x.assist ? ' <small>도움 ' + esc(x.assist) + '</small>' : '') + '</span>' + (x.by === S.uid || S.owner ? '<button class="x" data-gdel="' + esc(x.id) + '" aria-label="삭제">✕</button>' : '') + '</div>').join('') : '<div class="muted" style="padding:6px 0">아직 기록이 없어요</div>') +
+    (gs.length ? gs.map((x) => '<div class="gli"><span>⚽ <b>' + lvPill(lvOfName(x.scorer)) + esc(x.scorer) + '</b>' + (x.assist ? ' <small>도움 ' + lvPill(lvOfName(x.assist)) + esc(x.assist) + '</small>' : '') + '</span>' + (x.by === S.uid || S.owner ? '<button class="x" data-gdel="' + esc(x.id) + '" aria-label="삭제">✕</button>' : '') + '</div>').join('') : '<div class="muted" style="padding:6px 0">아직 기록이 없어요</div>') +
     '<button class="addg" data-gadd="' + esc(g.id) + '">+ 골 기록 넣기</button></div>';
 }
 function recHTML() {
@@ -789,7 +790,7 @@ function recHTML() {
     '<section class="card"><div class="h2row"><h2>골·도움 순위</h2><select id="sym"><option value="">전체 기간</option>' + yms.map((y) => '<option value="' + y + '"' + (y === S.sym ? ' selected' : '') + '>' + y.substr(0, 4) + '년 ' + mon(y) + '</option>').join('') + '</select></div>' +
     '<div class="muted" style="margin-top:4px">제목을 누르면 기본 → 내림차순 → 오름차순</div>' +
     '<table class="stab"><thead><tr>' + th('name', '이름') + th('gp', '경기') + th('g', '골') + th('a', '도움') + th('ap', '공격P') + '</tr></thead><tbody>' +
-    sortRows(rows, 'st').map((x) => '<tr class="' + (x.name === S.me.name ? 'me' : '') + '"><td>' + esc(x.name) + '</td><td>' + x.gp + '</td><td>' + x.g + '</td><td>' + x.a + '</td><td><b>' + x.ap + '</b></td></tr>').join('') + '</tbody></table></section>' +
+    sortRows(rows, 'st').map((x) => '<tr class="' + (x.name === S.me.name ? 'me' : '') + '"><td>' + lvPill(lvOfName(x.name)) + esc(x.name) + '</td><td>' + x.gp + '</td><td>' + x.g + '</td><td>' + x.a + '</td><td><b>' + x.ap + '</b></td></tr>').join('') + '</tbody></table></section>' +
     vidsRec() + '<section class="card"><h2>경기별 기록</h2>' + (played().length ? played().slice(-12).reverse().map(gameRec).join('') : '<p class="muted">' + (S.pub.statFrom ? md(S.pub.statFrom) + ' 경기 당일부터 여기에 [+ 골 기록 넣기] 버튼이 생겨요.' : '아직 치른 경기가 없어요') + '</p>') + '</section></main>';
 }
 /* 정렬: 제목 누를 때마다 기본 → 내림차순 → 오름차순 */
@@ -1034,7 +1035,7 @@ function openAch() {
   sheet('<h2>🏆 업적 ' + got + '/' + ACH.length + '</h2>' +
     '<div class="aleg"><span class="tB">브론즈 · 흔함</span><span class="tS">실버 · 드묾</span><span class="tG">골드 · 희귀</span><span class="tP">플래티넘 · 전설</span></div>' +
     '<div class="muted" style="font-size:12px">등급이 높을수록 오래 꾸준히 써야 열려요. 플래티넘은 1년 이상 걸려요.</div>' +
-    (rank.length ? '<div class="arank"><b>팀 업적 순위</b>' + rank.map((r, i) => '<span>' + (i + 1) + '. ' + esc(r[0]) + (r[2] ? ' 💎' : '') + ' <em>' + r[1] + '개</em></span>').join('') + '</div>' : '') +
+    (rank.length ? '<div class="arank"><b>팀 업적 순위</b>' + rank.map((r, i) => '<span>' + (i + 1) + '. ' + lvPill(lvOfName(r[0])) + esc(r[0]) + (r[2] ? ' 💎' : '') + ' <em>' + r[1] + '개</em></span>').join('') + '</div>' : '') +
     ACAT.map((c) => '<div class="acat">' + c + '</div><div class="alist">' + ACH.filter((a) => a[1] === c).map((a) => {
       const on = !!A.got[a[0]], hid = a[8] && !on, cur = Math.min(x[a[6]] || 0, a[7]);
       return '<div class="ali' + (on ? ' on' : '') + '">' + medal(a, on) + '<div><b>' + (hid ? '숨겨진 업적' : esc(a[4])) + '<em class="t' + a[2] + '">' + TIER[a[2]][0] + '</em></b><small>' + (hid ? '달성하면 공개돼요' : esc(a[5])) + '</small>' +
@@ -1054,7 +1055,7 @@ const LVSTOP = (k) => k === 'P' ? '<stop offset="0" stop-color="#F7FAFF"/><stop 
 const LVBG = (k) => k === 'P' ? 'linear-gradient(135deg,#F7FAFF,#C9D8FF 30%,#F1DCFF 55%,#C6F1EA 80%,#8F88D8)' : k === 'X' ? 'linear-gradient(120deg,#FFF1B5,#FFB36B,#F07BFF,#76B8FF,#7CF5D2)'
   : 'linear-gradient(135deg,' + LVMET[k][0] + ',' + LVMET[k][1] + ' 50%,' + LVMET[k][2] + ')';
 /** 작은 자리용 알약 (테두리 색으로 구간 구분) */
-function lvPill(lv) { if (!lv) return ''; const b = window.Core.lvBand(lv); return '<span class="lvp" style="background:' + LVBG(b.key) + '"><i>' + (lv >= 50 ? 'GOAT' : 'LV.' + lv) + '</i></span>'; }
+function lvPill(lv) { if (!lv) return ''; const b = window.Core.lvBand(lv); return '<kk-lv class="lvp" style="background:' + LVBG(b.key) + '"><kk-i>' + (lv >= 50 ? 'GOAT' : 'LV.' + lv) + '</kk-i></kk-lv>'; }   // 전용 태그: 주변 span·i 스타일이 묻지 않게
 let lvUid = 0;
 /** 큰 자리용 엠블럼: 깎인 보석 + 구간이 오를수록 길어지는 월계수 (GOAT는 원 + 별) */
 function lvEmblem(lv, size) {
@@ -1104,10 +1105,17 @@ function lvOfName(n) { const m = (S.pub.members || []).find((x) => x.name === n)
 function lvCard() {
   if (!A) return '';
   const L = window.Core.lvOf(myXp()), b = window.Core.lvBand(L.lv), rk = lvRank(), my = rk.findIndex((r) => r.mid === S.me.mid);
-  return '<section class="card lvc"><div class="lvhead">' + lvEmblem(L.lv, 76) + '<div class="lvnm"><b>' + esc(S.me.name) + ' <em class="lvb">' + b.name + '</em></b>' +
+  return '<section class="card lvc"><div class="lvhead">' + lvEmblem(L.lv, 76) + '<div class="lvnm"><b>' + esc(S.me.name) + ' <button class="lvb" id="lvguide">' + b.name + ' ⓘ</button></b>' +
     '<small>' + (L.lv >= 50 ? '최고 레벨 GOAT 🐐' : 'LV.' + (L.lv + 1) + '까지 ' + (L.need - L.cur) + ' EXP') + (my >= 0 && rk.length > 1 ? ' · 팀 ' + (my + 1) + '위' : '') + '</small></div><button class="more inl" id="lvall">내역 ›</button></div>' +
     '<div class="lvbar"><u style="width:' + (L.lv >= 50 ? 100 : Math.round(L.cur / L.need * 100)) + '%"></u></div><div class="lvxp"><span>LV.' + L.lv + '</span><span><b>' + L.xp.toLocaleString() + '</b> EXP</span><span>' + (L.lv >= 50 ? 'GOAT' : 'LV.' + (L.lv + 1)) + '</span></div>' +
     '<button class="rpsbtn" id="rpsgo"><span>✊✌️🖐️</span><b>오늘의 가위바위보</b><em>' + Math.max(0, 5 - ((S.rpsToday || {}).n || 0)) + '판 남음</em></button></section>';
+}
+/** 레벨 구간 안내 (참고용) */
+function lvGuideHTML() {
+  return '<div class="lvg">' + [[1, '1~9'], [10, '10~19'], [20, '20~29'], [30, '30~39'], [40, '40~49'], [50, '50']].map(([l, r]) => '<div>' + lvEmblem(l, 54) + '<b>' + window.Core.lvBand(l).name + '</b><small>LV ' + r + '</small>' + lvPill(l) + '</div>').join('') + '</div>';
+}
+function openLvGuide() {
+  sheet('<h2>레벨 구간</h2><div class="muted">꾸준히 1년 쓰면 GOAT(50). 구간이 오를 때마다 월계수가 자라고 색이 바뀌어요.</div>' + lvGuideHTML() + '<div class="srow"><button class="pri" id="lgx">닫기</button></div>', (el) => (el.querySelector('#lgx').onclick = () => (el.hidden = true)));
 }
 function lvRank() {
   return Object.entries(S.profs || {}).filter(([, p]) => p.xp).map(([mid, p]) => ({ mid, name: ((S.pub.members || []).find((m) => m.id === mid) || {}).name, xp: p.xp, lv: p.lv || 1 })).filter((r) => r.name).sort((a, b) => b.xp - a.xp);
@@ -1117,7 +1125,7 @@ function openLevel() {
   sheet('<div class="lvtop">' + lvEmblem(L.lv, 96) + '<div><h2>LV.' + L.lv + ' ' + window.Core.lvBand(L.lv).name + '</h2><div class="muted">총 ' + L.xp.toLocaleString() + ' EXP · 꾸준히 1년이면 GOAT(50)</div></div></div>' +
     '<div class="acat">내 EXP 내역</div><table class="xpt">' + parts.filter((p) => p[2]).map((p) => '<tr><td>' + p[0] + '</td><td class="muted">' + p[1] + '</td><td class="' + (p[2] < 0 ? 'n' : 'p') + '">' + (p[2] > 0 ? '+' : '') + p[2].toLocaleString() + '</td></tr>').join('') + '</table>' +
     (rk.length ? '<div class="acat">팀 레벨 순위</div><div class="lvrk">' + rk.map((r, i) => '<div class="' + (r.mid === S.me.mid ? 'me' : '') + '"><span>' + (i + 1) + '</span>' + lvPill(r.lv) + '<b>' + esc(r.name) + '</b><em>' + r.xp.toLocaleString() + '</em></div>').join('') + '</div>' : '') +
-    '<div class="acat">EXP 얻는 법</div><div class="muted" style="font-size:12.5px;line-height:1.7">하루 접속 +5 · 참석 투표 +10 · 경기 참석 +30 · 골 +10 · 도움 +7 · 하이라이트 댓글 +3 (하루 10개까지) · 투표·공지 참여 +5 · 회비 기한 내 납부 +20 · 업적 브론즈 +20 · 실버 +50 · 골드 +150 · 플래티넘 +500</div>' +
+    '<div class="acat">레벨 구간</div>' + lvGuideHTML() + '<div class="acat">EXP 얻는 법</div><div class="muted" style="font-size:12.5px;line-height:1.7">하루 접속 +5 · 참석 투표 +10 · 경기 참석 +30 · 골 +10 · 도움 +7 · 하이라이트 댓글 +3 (하루 10개까지) · 투표·공지 참여 +5 · 회비 기한 내 납부 +20 · 업적 브론즈 +20 · 실버 +50 · 골드 +150 · 플래티넘 +500</div>' +
     '<div class="srow"><button class="pri" id="lx">닫기</button></div>', (el) => (el.querySelector('#lx').onclick = () => (el.hidden = true)));
 }
 /** 레벨 변화 확인 → 팀원에게 보일 값 저장 · 올랐으면 축하 */
@@ -1150,7 +1158,7 @@ async function openRps() {
   const day = todayKey();
   const top = (await getDocs(query(collection(db, 'clubs', S.cid, 'rps'), where('date', '==', day))).catch(() => ({ docs: [] }))).docs.map((d) => d.data());
   const me = S.rpsToday || { n: 0, w: 0, l: 0, net: 0 }, left = 5 - (me.n || 0), have = myXp();
-  const row = (x, i, neg) => '<div><span>' + (i + 1) + '위</span><b>' + esc(x.name) + '</b><em class="' + (neg ? 'n' : 'p') + '">' + (x.net > 0 ? '+' : '') + x.net + '</em></div>';
+  const row = (x, i, neg) => '<div><span>' + (i + 1) + '위</span><b>' + lvPill(lvOfMid(x.mid)) + esc(x.name) + '</b><em class="' + (neg ? 'n' : 'p') + '">' + (x.net > 0 ? '+' : '') + x.net + '</em></div>';
   const win = top.filter((x) => x.net > 0).sort((a, b) => b.net - a.net).slice(0, 10), lose = top.filter((x) => x.net < 0).sort((a, b) => a.net - b.net).slice(0, 10);
   sheet('<h2>✊✌️🖐️ 가위바위보</h2><div class="rstat"><div><span>보유 EXP</span><b>' + have.toLocaleString() + '</b></div><div><span>남은 판</span><b>' + left + '/5</b></div>' +
     '<div><span>오늘 승률</span><b>' + (me.w + me.l ? Math.round(me.w / (me.w + me.l) * 100) + '%' : '-') + '</b></div><div><span>오늘 결과</span><b class="' + (me.net < 0 ? 'n' : 'p') + '">' + (me.net > 0 ? '+' : '') + (me.net || 0) + '</b></div></div>' +
@@ -1205,7 +1213,7 @@ async function wxRefresh(g) {
 function wxLine(g) {
   const w = S.wx; if (!g) return '';
   if (!w || w.date !== g.date) return (Date.parse(g.date) - Date.now()) / 864e5 > 15 ? '<div class="wx soft">🌤️ 날씨는 경기 15일 전부터 나와요</div>' : '';
-  const [ic, lb] = window.Core.wxLabel(w.code), rain = w.pop >= 50 || w.pr >= 1;
-  return '<div class="wx' + (rain ? ' rain' : '') + '"><span class="wi">' + ic + '</span><b>' + w.t + '°</b><span>' + lb + '</span><span>강수확률 ' + w.pop + '%</span><span>강수량 <b class="mm">' + (w.pr || 0) + 'mm</b></span>' +
-    (rain ? '<em>우산 챙기세요 · 우천 공지 확인</em>' : w.t <= 3 ? '<em>추워요 · 따뜻하게</em>' : w.t >= 30 ? '<em>더워요 · 물 챙기세요</em>' : '') + '<small>경기 ' + (g.time || '').substr(0, 5) + '부터 2시간 · ' + new Date(w.at).getHours() + '시 업데이트</small></div>';
+  const [ic, lb] = window.Core.wxLabel(w.code), mx = w.mx != null ? w.mx : w.pr, pv = window.Core.playable(mx, w.st || w.code >= 95);
+  return '<div class="wx ' + pv.lv + '"><span class="wi">' + ic + '</span><b>' + w.t + '°</b><span>' + lb + '</span><span>강수확률 ' + w.pop + '%</span><span>강수량 <b class="mm">' + (mx > 0 ? mx + 'mm/시간' : '비 없음') + '</b></span>' +
+    '<em>' + pv.text + '</em><small>경기 ' + (g.time || '').substr(0, 5) + '부터 2시간 · ' + new Date(w.at).getHours() + '시 업데이트</small></div>';
 }

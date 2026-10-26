@@ -170,6 +170,15 @@
     51: ['🌦️', '이슬비'], 53: ['🌦️', '이슬비'], 55: ['🌦️', '이슬비'], 56: ['🌧️', '어는 비'], 57: ['🌧️', '어는 비'], 61: ['🌧️', '비'], 63: ['🌧️', '비'], 65: ['🌧️', '강한 비'],
     66: ['🌧️', '어는 비'], 67: ['🌧️', '어는 비'], 71: ['🌨️', '눈'], 73: ['🌨️', '눈'], 75: ['❄️', '많은 눈'], 77: ['🌨️', '싸락눈'], 80: ['🌦️', '소나기'], 81: ['🌧️', '소나기'], 82: ['⛈️', '강한 소나기'],
     85: ['🌨️', '눈 소나기'], 86: ['❄️', '눈 소나기'], 95: ['⛈️', '뇌우'], 96: ['⛈️', '뇌우'], 99: ['⛈️', '뇌우'] };
+  /** 시간당 강수량 → 풋살 가능 여부 (인조잔디 기준) */
+  function playable(mm, storm) {
+    if (storm) return { lv: 'bad', text: '⛈️ 풋살 어려움 (천둥·번개)' };
+    if (mm >= 7) return { lv: 'bad', text: '🔴 풋살 어려움 (강한 비)' };
+    if (mm >= 3) return { lv: 'warn', text: '🟡 진행 판단 필요 (비 꽤 옴)' };
+    if (mm >= 1) return { lv: 'ok', text: '🟢 풋살 가능 · 미끄럼 주의' };
+    if (mm > 0) return { lv: 'ok', text: '🟢 풋살 가능 · 약한 비' };
+    return { lv: 'ok', text: '🟢 풋살 가능 · 비 없음' };
+  }
   function wxLabel(code) { return WX[code] || ['🌡️', '날씨']; }
   /** 경기 날짜·시간의 날씨 (16일 이내만 예보가 있음) */
   function fetchWx(lat, lon, date, time) {
@@ -177,8 +186,10 @@
     return fetch(u).then(function (r) { if (!r.ok) throw new Error('날씨 조회 실패 ' + r.status); return r.json(); }).then(function (j) {
       var h = j.hourly, k = h.time.indexOf(date + 'T' + String(time || '16:00').substr(0, 2) + ':00'); if (k < 0) k = 16;
       var k2 = Math.min(k + 1, h.time.length - 1);
+      // 경기 시간(2시간) 동안 시간당 강수량 중 가장 많은 값으로 판단 (예전 구글시트 기준과 같음)
+      var mx = Math.max(h.precipitation[k] || 0, h.precipitation[k2] || 0), st = h.weather_code[k] >= 95 || h.weather_code[k2] >= 95;
       return { t: Math.round(h.temperature_2m[k]), pop: Math.max(h.precipitation_probability[k] || 0, h.precipitation_probability[k2] || 0),
-               pr: Math.round(((h.precipitation[k] || 0) + (h.precipitation[k2] || 0)) * 10) / 10, code: h.weather_code[k], wind: Math.round(h.wind_speed_10m[k] * 10) / 10 };
+               pr: Math.round(((h.precipitation[k] || 0) + (h.precipitation[k2] || 0)) * 10) / 10, mx: Math.round(mx * 10) / 10, st: st, code: h.weather_code[k], wind: Math.round(h.wind_speed_10m[k] * 10) / 10 };
     });
   }
 
@@ -545,8 +556,8 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.43';
-  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
+  var VERSION = 'v0.44';
+  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
     balance: balance, book: book, nearestGame: nearestGame, nextGameAfter: nextGameAfter, gamesInMonth: gamesInMonth,
