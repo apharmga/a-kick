@@ -1206,6 +1206,6 @@ function wxLine(g) {
   const w = S.wx; if (!g) return '';
   if (!w || w.date !== g.date) return (Date.parse(g.date) - Date.now()) / 864e5 > 15 ? '<div class="wx soft">🌤️ 날씨는 경기 15일 전부터 나와요</div>' : '';
   const [ic, lb] = window.Core.wxLabel(w.code), rain = w.pop >= 50 || w.pr >= 1;
-  return '<div class="wx' + (rain ? ' rain' : '') + '"><span class="wi">' + ic + '</span><b>' + w.t + '°</b><span>' + lb + '</span><span>강수 ' + w.pop + '%</span><span>바람 ' + w.wind + 'm/s</span>' +
-    (rain ? '<em>우산 챙기세요 · 우천 공지 확인</em>' : w.t <= 3 ? '<em>추워요 · 따뜻하게</em>' : w.t >= 30 ? '<em>더워요 · 물 챙기세요</em>' : '') + '<small>' + new Date(w.at).getHours() + '시 기준</small></div>';
+  return '<div class="wx' + (rain ? ' rain' : '') + '"><span class="wi">' + ic + '</span><b>' + w.t + '°</b><span>' + lb + '</span><span>강수확률 ' + w.pop + '%</span><span>강수량 <b class="mm">' + (w.pr || 0) + 'mm</b></span>' +
+    (rain ? '<em>우산 챙기세요 · 우천 공지 확인</em>' : w.t <= 3 ? '<em>추워요 · 따뜻하게</em>' : w.t >= 30 ? '<em>더워요 · 물 챙기세요</em>' : '') + '<small>경기 ' + (g.time || '').substr(0, 5) + '부터 2시간 · ' + new Date(w.at).getHours() + '시 업데이트</small></div>';
 }

@@ -388,3 +388,4 @@ body.noscroll{overflow:hidden}
 .wx{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;background:var(--bg);border-radius:12px;padding:8px 12px;margin:8px 0;font-size:13px}
 .wx .wi{font-size:20px}.wx b{font-size:17px}.wx em{font-style:normal;font-weight:800;color:var(--navy);width:100%;font-size:12.5px}.wx small{margin-left:auto;color:var(--sub);font-size:11px}
 .wx.rain{background:#EFF6FF}.wx.rain em{color:#1D4ED8}.wx.soft{color:var(--sub)}
+.wx b.mm{font-size:13px}
