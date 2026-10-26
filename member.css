@@ -411,3 +411,9 @@ body.noscroll{overflow:hidden}
 .rres .last{color:#D97706}
 .rbet{white-space:nowrap}
 .wx .w2 b{font-size:13.5px}
+/* 날씨: 넓은 화면에선 판정을 오른쪽 칸으로, 좁으면 아래로 (빈 공간 없이) */
+.wx{display:flex!important;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.wx .wi{font-size:44px;flex:none}
+.wx .wmain{flex:1 1 150px;min-width:0}
+.wx em{flex:1 1 170px;margin:0;align-self:stretch;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px 12px;font-size:14px;font-weight:800;border-radius:12px}
+.wx small{flex:1 1 100%;margin:0}
