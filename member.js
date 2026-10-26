@@ -29,6 +29,7 @@ const won = (n) => String(Math.round(Math.abs(n || 0))).replace(/\B(?=(\d{3})+(?
 const md = (d) => (+d.substr(5, 2)) + '/' + (+d.substr(8, 2));
 const day = (d) => '일월화수목금토'[new Date(d + 'T00:00:00').getDay()];
 const mon = (ym) => (+ym.substr(5, 2)) + '월';
+const LEGAL = '<small class="legal">시작하면 <a href="terms.html">이용약관</a>과 <a href="privacy.html">개인정보처리방침</a>에 동의하게 돼요</small>';
 const CD = (...p) => doc(db, 'clubs', S.cid, ...p);
 const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 let tT = null;
@@ -44,7 +45,7 @@ function renderLogin() {
     (INAPP ? '<div class="warn"><b>카카오톡·밴드 안에서는 구글 로그인이 막혀 있어요.</b><br>아래 버튼을 누르면 ' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 바로 열려요.' +
       '<button id="ext" class="extbtn">' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 열기</button><button id="cpl" class="lnk">안 열리면 링크 복사</button></div>'
       : '<button class="gbtn" id="in"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>구글로 시작하기</button>' +
-        '<small>처음이면 로그인 → 이름 쓰고 가입 신청 → 관리자 승인 후 입장</small>') + '</div>');
+        '<small>처음이면 로그인 → 이름 쓰고 가입 신청 → 관리자 승인 후 입장</small>') + LEGAL + '</div>');
   const i = $('#in'); if (i) i.onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => toast(e.code === 'auth/popup-closed-by-user' ? '로그인을 취소했어요' : '로그인 실패: ' + e.message));
   const x = $('#ext'); if (x) x.onclick = openOutside;
   const c = $('#cpl'); if (c) c.onclick = () => copy(location.href, '링크를 복사했어요. 사파리·크롬 주소창에 붙여넣으세요');
@@ -91,7 +92,7 @@ async function renderRequest() {
 }
 function askJoin(name) {
   view('<header class="hero"><div class="hrow"><b>' + esc(S.club.name) + '</b><span class="who">' + esc(S.email) + '</span></div><h1>가입 신청</h1><p>관리자가 확인하고 승인하면 들어갈 수 있어요.</p></header>' +
-    '<main class="pad lift"><section class="card"><h2>내 이름</h2><p class="muted">모임에서 쓰는 실명으로 써주세요.</p><div class="newc"><input id="jn" maxlength="20" placeholder="예: 홍길동" value="' + esc(name) + '"><button id="jok">신청하기</button></div></section>' +
+    '<main class="pad lift"><section class="card"><h2>내 이름</h2><p class="muted">모임에서 쓰는 실명으로 써주세요.</p><div class="newc"><input id="jn" maxlength="20" placeholder="예: 홍길동" value="' + esc(name) + '"><button id="jok">신청하기</button></div>' + LEGAL + '</section>' +
     '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button></div></main>');
   $('#jok').onclick = async () => {
     const n = $('#jn').value.trim(); if (!n) return toast('이름을 써주세요');
@@ -132,7 +133,7 @@ async function renderHome() {
       return '<div class="crow"><a href="./?c=' + esc(k) + '">' + esc(all[k]) + (own ? '<em>관리자</em>' : '') + '</a><button class="cdel" data-cdel="' + esc(k) + '" data-own="' + (own ? 1 : 0) + '">' + (own ? '삭제' : '빼기') + '</button></div>'; }).join('') + '</div></section>'
       : '<section class="card soft"><h2>아직 들어간 팀이 없어요</h2><p class="muted">회원이라면 관리자에게 받은 <b>팀 링크</b>로 들어오세요.</p></section>') +
     '<section class="card"><h2>내가 관리자예요</h2><p class="muted">새 팀을 만들면 회비·참석·팀 편성을 관리할 수 있어요. 관리자 비밀번호는 처음에 0000이에요. 만든 뒤 꼭 바꿔주세요.</p>' +
-    '<div class="newc"><input id="cn" placeholder="팀 이름 (예: 대구FC)" maxlength="20"><button id="mk">팀 만들기</button></div></section></main>');
+    '<div class="newc"><input id="cn" placeholder="팀 이름 (예: 대구FC)" maxlength="20"><button id="mk">팀 만들기</button></div></section>' + LEGAL + '</main>');
   $('#out').onclick = () => signOut(auth);
   document.querySelectorAll('[data-cdel]').forEach((b) => (b.onclick = () => (b.dataset.own === '1' ? deleteClub(b.dataset.cdel, all[b.dataset.cdel]) : leaveList(b.dataset.cdel, all[b.dataset.cdel]))));
   $('#mk').onclick = async () => {

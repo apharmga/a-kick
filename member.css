@@ -267,3 +267,4 @@ body{background:var(--bg);background-image:var(--bg-grad);background-attachment:
 /* v0.23 상단 카드: 아래 흰 박스와 같은 폭·둥근 모서리 */
 .hero{margin:12px 16px 0;border-radius:20px;padding:18px 20px 20px;box-shadow:0 6px 20px -12px rgba(15,23,42,.35)}
 .lift{margin-top:0}
+.legal{display:block;text-align:center;color:var(--sub);font-size:12px;margin-top:10px}.legal a{color:inherit}
