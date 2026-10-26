@@ -84,6 +84,23 @@ service cloud.firestore {
           && id == request.resource.data.pid + '__' + request.resource.data.mid;
       }
       // 건의함: 회원은 보내기만, 읽기는 관리자(본인 것은 본인도)
+      // 익명 투표: 열쇠(anonmark)는 본인만 보고, 투표(anonvotes)엔 이름·계정이 없음. 1인 1표
+      match /anonmark/{id} {
+        allow read: if signedIn() && resource.data.uid == request.auth.uid;
+        allow create: if isMember()
+          && request.resource.data.keys().hasOnly(['pid', 'uid', 'key'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.key is string && request.resource.data.key.size() == 32
+          && id == request.resource.data.pid + '__' + request.auth.uid;
+      }
+      match /anonvotes/{id} {
+        allow read: if isMember();
+        allow create, update: if isMember()
+          && request.resource.data.keys().hasOnly(['pid', 'picks', 'add', 'at'])
+          && request.resource.data.picks is list && request.resource.data.picks.size() <= 10
+          && request.resource.data.add is string && request.resource.data.add.size() <= 20
+          && id == request.resource.data.pid + '__' + getAfter(/databases/$(database)/documents/clubs/$(cid)/anonmark/$(request.resource.data.pid + '__' + request.auth.uid)).data.key;
+      }
       match /suggest/{id} {
         allow read: if signedIn() && resource.data.uid == request.auth.uid;
         allow create: if isMember()

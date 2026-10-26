@@ -113,7 +113,7 @@ async function deleteClub(cid, name) {
   if (t.trim() !== name) return toast('팀 이름이 달라서 삭제하지 않았어요');
   view('<div class="center">삭제하는 중... (몇 초 걸려요)</div>');
   try {
-    for (const c of ['members', 'games', 'tx', 'config', 'private', 'pub', 'votes', 'goals', 'polls', 'pollvotes', 'suggest', 'requests', 'claims', 'users']) {
+    for (const c of ['members', 'games', 'tx', 'config', 'private', 'pub', 'votes', 'goals', 'polls', 'pollvotes', 'anonvotes', 'anonmark', 'suggest', 'requests', 'claims', 'users']) {
       const q = await getDocs(collection(db, 'clubs', cid, c));
       for (let i = 0; i < q.docs.length; i += 400) { const b = writeBatch(db); q.docs.slice(i, i + 400).forEach((d) => b.delete(d.ref)); await b.commit(); }
     }
@@ -149,9 +149,10 @@ async function renderHome() {
 function game() { return S.pub && S.pub.games && S.pub.games[0]; }
 function watchVotes() {
   if (S.me && !S.pollSub) {
-    S.polls = []; S.pvotes = [];
-    S.pollSub = [onSnapshot(collection(db, 'clubs', S.cid, 'polls'), (q) => { S.polls = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); S.pollsLoaded = true; render(); }, () => {}),
-      onSnapshot(collection(db, 'clubs', S.cid, 'pollvotes'), (q) => { S.pvotes = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); S.pvLoaded = true; render(); }, () => {})];
+    S.polls = []; S.pvotes = []; S.avotes = []; S.ah = {};
+    S.pollSub = [onSnapshot(collection(db, 'clubs', S.cid, 'polls'), (q) => { S.polls = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); Promise.all(S.polls.filter((x) => x.anon).map((x) => anonKey(x.id))).then(() => { S.pollsLoaded = true; render(); }); }, () => {}),
+      onSnapshot(collection(db, 'clubs', S.cid, 'pollvotes'), (q) => { S.pvotes = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); S.pvLoaded = true; render(); }, () => {}),
+      onSnapshot(collection(db, 'clubs', S.cid, 'anonvotes'), (q) => { S.avotes = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render(); }, () => {})];
   }
   if (S.me && !S.goalSub) S.goalSub = onSnapshot(collection(db, 'clubs', S.cid, 'goals'), (q) => { S.goals = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); render(); }, () => {});
   const g = game(); if (!g || !S.me || S.voteGid === g.id) return;
@@ -378,11 +379,18 @@ const played = () => {
 
 /* ---------------- 투표 · 공지 · 건의 ---------------- */
 const pollOpen = (p) => !p.closed && (!p.deadline || Date.now() < Date.parse(p.deadline));
-const myPV = (p) => (S.pvotes || []).find((v) => v.pid === p.id && v.mid === S.me.mid);
+// 익명 투표: 투표마다 무작위 열쇠를 만들어 '나만 볼 수 있는 곳'(anonmark)에 보관 → 투표 문서엔 이름·계정 없음
+async function anonKey(pid) {
+  if (S.ah[pid]) return S.ah[pid];
+  const m = await getDoc(CD('anonmark', pid + '__' + S.uid)).catch(() => null);
+  if (m && m.exists()) S.ah[pid] = m.data().key;
+  return S.ah[pid] || '';
+}
+const myPV = (p) => p.anon ? (S.avotes || []).find((v) => S.ah[p.id] && v.id === p.id + '__' + S.ah[p.id]) : (S.pvotes || []).find((v) => v.pid === p.id && v.mid === S.me.mid);
 function pollOpts(p) {
-  const vs = (S.pvotes || []).filter((v) => v.pid === p.id), adds = [...new Set(vs.map((v) => v.add).filter(Boolean))];
+  const vs = (p.anon ? S.avotes || [] : S.pvotes || []).filter((v) => v.pid === p.id), adds = [...new Set(vs.map((v) => v.add).filter(Boolean))];
   return (p.options || []).concat(adds.filter((a) => !(p.options || []).some((o) => o.text === a)).map((a) => ({ id: 'u:' + a, text: a, user: 1 })))
-    .map((o) => Object.assign({}, o, { who: vs.filter((v) => (v.picks || []).indexOf(o.id) >= 0).map((v) => v.name) }));
+    .map((o) => Object.assign({}, o, { who: vs.filter((v) => (v.picks || []).indexOf(o.id) >= 0).map((v) => (p.anon ? '' : v.name)) }));
 }
 function pollsCard() {
   const ps = (S.polls || []).slice().sort((a, b) => (pollOpen(b) - pollOpen(a)) || (a.created < b.created ? 1 : -1)).slice(0, 5);
@@ -399,11 +407,11 @@ function openPoll(pid) {
   let picks = new Set(mine ? mine.picks || [] : []);
   const draw = () => {
     const opts = pollOpts(p), mx = Math.max(1, ...opts.map((o) => o.who.length)), show = !!mine || !open;
-    sheet('<div class="ptag">' + (notice ? '📢 공지' : '🗳 투표') + (open ? '' : ' · 마감됨') + '</div><h2>' + esc(p.title) + '</h2>' + (p.desc ? '<div class="pdesc">' + esc(p.desc) + '</div>' : '') +
+    sheet('<div class="ptag">' + (notice ? '📢 공지' : '🗳 투표') + (p.anon ? ' · 🔒 익명' : '') + (open ? '' : ' · 마감됨') + '</div><h2>' + esc(p.title) + '</h2>' + (p.desc ? '<div class="pdesc">' + esc(p.desc) + '</div>' : '') +
       (p.deadline ? '<div class="muted">' + md(p.deadline.substr(0, 10)) + '(' + day(p.deadline.substr(0, 10)) + ') ' + p.deadline.substr(11, 5) + ' 마감</div>' : '') +
-      (notice ? '' : '<div class="muted">' + (p.multi ? '여러 개 고를 수 있어요' : '하나만 골라주세요') + '</div><div class="popts">' + opts.map((o) =>
+      (notice ? '' : '<div class="muted">' + (p.multi ? '여러 개 고를 수 있어요' : '하나만 골라주세요') + (p.anon ? ' · 누가 뭘 골랐는지 아무에게도 안 보여요' : '') + '</div><div class="popts">' + opts.map((o) =>
         '<button class="popt' + (picks.has(o.id) ? ' on' : '') + '" data-o="' + esc(o.id) + '"' + (open ? '' : ' disabled') + '><span>' + esc(o.text) + '</span>' + (show ? '<b>' + o.who.length + '</b><i style="width:' + (o.who.length / mx * 100) + '%"></i>' : '') + '</button>' +
-        (show && o.who.length ? '<small class="pwho">' + esc(o.who.join(', ')) + '</small>' : '')).join('') + '</div>' +
+        (show && o.who.length && !p.anon ? '<small class="pwho">' + esc(o.who.join(', ')) + '</small>' : '')).join('') + '</div>' +
         (open && p.allowAdd ? '<div class="padd"><input id="pnew" maxlength="20" placeholder="다른 의견 직접 쓰기"><button id="padd">추가</button></div>' : '')) +
       '<div class="srow">' + '<button id="px">' + (open && !mine ? '나중에' : '닫기') + '</button>' + (open ? '<button id="pok" class="pri">' + (notice ? '확인했어요' : mine ? '다시 저장' : '투표하기') + '</button>' : '') + '</div>', (el) => {
       el.querySelector('#px').onclick = () => { el.hidden = true; try { sessionStorage.setItem('pp_' + p.id, '1'); } catch (e) {} };
@@ -415,7 +423,13 @@ function openPoll(pid) {
   const save = async () => {
     if (!notice && !picks.size) return toast('하나 이상 골라주세요');
     const v = { pid: p.id, mid: S.me.mid, name: S.me.name, picks: [...picks].slice(0, 10), add: p._add || (mine && mine.add) || '', uid: S.uid, at: Date.now() };
-    try { await setDoc(CD('pollvotes', p.id + '__' + S.me.mid), v); toast(notice ? '확인했어요' : '투표했어요 🗳'); $('#sheet').hidden = true; }
+    try {
+      if (p.anon) {
+        let k = await anonKey(p.id); const b = writeBatch(db);
+        if (!k) { k = [...crypto.getRandomValues(new Uint8Array(16))].map((x) => x.toString(16).padStart(2, '0')).join(''); b.set(CD('anonmark', p.id + '__' + S.uid), { pid: p.id, uid: S.uid, key: k }); }
+        b.set(CD('anonvotes', p.id + '__' + k), { pid: p.id, picks: v.picks, add: v.add, at: v.at }); await b.commit(); S.ah[p.id] = k;
+      }
+      else await setDoc(CD('pollvotes', p.id + '__' + S.me.mid), v); toast(notice ? '확인했어요' : '투표했어요 🗳'); $('#sheet').hidden = true; }
     catch (e) { toast('저장 실패: ' + e.message); }
   };
   draw();

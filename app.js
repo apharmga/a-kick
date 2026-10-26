@@ -101,9 +101,9 @@ async function loadAll() {
     S.games = gs.docs.map((d) => gameIn(d.data())).sort((a, b) => (a.date < b.date ? -1 : 1));
     S.txs = ts.docs.map((d) => d.data()).sort((a, b) => (a.dt < b.dt ? -1 : 1));
     S.skills = sk.exists() ? sk.data() : {};
-    S.claims = {}; S.goals = []; S.polls = []; S.pvotes = []; S.sugs = [];
+    S.claims = {}; S.goals = []; S.polls = []; S.pvotes = []; S.avotes = []; S.sugs = [];
     const live = (col, key) => onSnapshot(CL(col), (q) => { S[key] = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); if (S.view === 'polls') render(); if (key === 'sugs' || key === 'reqs') render(); }, () => {});
-    if (!S.pollSub) S.pollSub = [live('polls', 'polls'), live('pollvotes', 'pvotes'), live('suggest', 'sugs'), live('requests', 'reqs')];
+    if (!S.pollSub) S.pollSub = [live('polls', 'polls'), live('pollvotes', 'pvotes'), live('anonvotes', 'avotes'), live('suggest', 'sugs'), live('requests', 'reqs')];
     getDocs(CL('claims')).then((q) => q.docs.forEach((d) => (S.claims[d.id] = d.data()))).catch(() => {});
     if (!S.goalSub) S.goalSub = onSnapshot(CL('goals'), (q) => { S.goals = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); if (S.view === 'stats') render(); }, () => {});
     render();
@@ -869,21 +869,22 @@ function statsHTML() {
 /* ---- 투표 · 공지 · 건의함 ---- */
 const newSugs = () => (S.sugs || []).filter((x) => !x.done).length;
 const pollOpen = (p) => !p.closed && (!p.deadline || Date.now() < Date.parse(p.deadline));
+const pvOf = (p) => (p.anon ? S.avotes || [] : S.pvotes).filter((v) => v.pid === p.id);
 function pollOpts(p) {
-  const vs = S.pvotes.filter((v) => v.pid === p.id), adds = [...new Set(vs.map((v) => v.add).filter(Boolean))];
+  const vs = pvOf(p), adds = [...new Set(vs.map((v) => v.add).filter(Boolean))];
   const opts = (p.options || []).concat(adds.filter((a) => !(p.options || []).some((o) => o.text === a)).map((a) => ({ id: 'u:' + a, text: a, user: 1 })));
-  return opts.map((o) => Object.assign({}, o, { who: vs.filter((v) => (v.picks || []).indexOf(o.id) >= 0).map((v) => v.name) })).sort((a, b) => b.who.length - a.who.length);
+  return opts.map((o) => Object.assign({}, o, { who: vs.filter((v) => (v.picks || []).indexOf(o.id) >= 0).map((v) => (p.anon ? '' : v.name)) })).sort((a, b) => b.who.length - a.who.length);
 }
 function pollsHTML() {
   const ps = S.polls.slice().sort((a, b) => (a.created < b.created ? 1 : -1)), mem = S.members.filter((m) => m.state !== '탈퇴');
   const card = (p) => {
-    const vs = S.pvotes.filter((v) => v.pid === p.id), opts = pollOpts(p), mx = Math.max(1, ...opts.map((o) => o.who.length));
-    const not = mem.filter((m) => !vs.some((v) => v.mid === m.id)).map((m) => m.name);
-    return '<div class="panel pad pcard"><div class="ph"><b>' + esc(p.title) + '</b><span class="pill ' + (pollOpen(p) ? 'ok' : '') + '">' + (pollOpen(p) ? '진행 중' : '마감') + '</span></div>' +
+    const vs = pvOf(p), opts = pollOpts(p), mx = Math.max(1, ...opts.map((o) => o.who.length));
+    const not = p.anon ? [] : mem.filter((m) => !vs.some((v) => v.mid === m.id)).map((m) => m.name);
+    return '<div class="panel pad pcard"><div class="ph"><b>' + esc(p.title) + (p.anon ? ' <small class="muted">🔒 익명</small>' : '') + '</b><span class="pill ' + (pollOpen(p) ? 'ok' : '') + '">' + (pollOpen(p) ? '진행 중' : '마감') + '</span></div>' +
       (p.desc ? '<div class="pdesc">' + esc(p.desc) + '</div>' : '') +
       '<div class="muted">' + (p.multi ? '복수 선택' : '하나만 선택') + (p.allowAdd ? ' · 회원 보기 추가 가능' : '') + ' · ' + (p.deadline ? md(p.deadline.substr(0, 10)) + ' ' + p.deadline.substr(11, 5) + ' 마감' : '마감 없음') + ' · 참여 ' + vs.length + '/' + mem.length + '명</div>' +
-      opts.map((o) => '<div class="bar2"><div class="bl"><span>' + esc(o.text) + (o.user ? ' <em class="tag gry">회원 추가</em>' : '') + '</span><b>' + o.who.length + '</b></div><div class="bt"><i style="width:' + (o.who.length / mx * 100) + '%"></i></div><small>' + esc(o.who.join(', ')) + '</small></div>').join('') +
-      (not.length ? '<div class="muted" style="margin-top:6px">아직 안 한 사람: ' + esc(not.join(', ')) + '</div>' : '') +
+      opts.map((o) => '<div class="bar2"><div class="bl"><span>' + esc(o.text) + (o.user ? ' <em class="tag gry">회원 추가</em>' : '') + '</span><b>' + o.who.length + '</b></div><div class="bt"><i style="width:' + (o.who.length / mx * 100) + '%"></i></div>' + (p.anon ? '' : '<small>' + esc(o.who.join(', ')) + '</small>') + '</div>').join('') +
+      (p.anon ? '<div class="muted" style="margin-top:6px">🔒 익명 투표라 누가 뭘 골랐는지는 관리자 화면에도 안 나와요</div>' : '') + (not.length ? '<div class="muted" style="margin-top:6px">아직 안 한 사람: ' + esc(not.join(', ')) + '</div>' : '') +
       '<div class="row" style="margin-top:10px"><button class="btn sm" data-pcopy="' + p.id + '">' + IC.copy + ' 카톡 공지 문구</button>' + (pollOpen(p) ? '<button class="btn sm" data-pclose="' + p.id + '">지금 마감</button>' : '') + '<button class="btn sm ghost" data-pdel="' + p.id + '">삭제</button></div></div>';
   };
   const sugs = (S.sugs || []).slice().sort((a, b) => b.at - a.at);
@@ -895,7 +896,7 @@ function pollsHTML() {
 function bindPolls() {
   $('#newp').onclick = newPoll;
   document.querySelectorAll('[data-pclose]').forEach((b) => (b.onclick = async () => { const p = S.polls.find((x) => x.id === b.dataset.pclose); p.closed = true; await setDoc(D('polls', p.id), clean(p)).catch(fail); render(); }));
-  document.querySelectorAll('[data-pdel]').forEach((b) => (b.onclick = async () => { if (!confirm('이 투표를 지울까요? 결과도 같이 사라져요.')) return; await deleteDoc(D('polls', b.dataset.pdel)).catch(fail); S.pvotes.filter((v) => v.pid === b.dataset.pdel).forEach((v) => deleteDoc(D('pollvotes', v.id)).catch(() => {})); }));
+  document.querySelectorAll('[data-pdel]').forEach((b) => (b.onclick = async () => { if (!confirm('이 투표를 지울까요? 결과도 같이 사라져요.')) return; await deleteDoc(D('polls', b.dataset.pdel)).catch(fail); S.pvotes.filter((v) => v.pid === b.dataset.pdel).forEach((v) => deleteDoc(D('pollvotes', v.id)).catch(() => {})); (S.avotes || []).filter((v) => v.pid === b.dataset.pdel).forEach((v) => deleteDoc(D('anonvotes', v.id)).catch(() => {})); }));
   document.querySelectorAll('[data-pcopy]').forEach((b) => (b.onclick = () => {
     const p = S.polls.find((x) => x.id === b.dataset.pcopy);
     copy('📢 ' + p.title + (p.desc ? '\n\n' + p.desc : '') + '\n\n🗳 투표하기 👉 ' + MEMBER_URL + (p.deadline ? '\n⏰ ' + md(p.deadline.substr(0, 10)) + '(' + C.dayName(p.deadline.substr(0, 10)) + ') ' + p.deadline.substr(11, 5) + ' 마감' : ''));
@@ -906,7 +907,7 @@ function newPoll() {
   modal('<h2>새 투표 · 공지</h2><label class="f">제목<input id="pt" placeholder="예: 우리 팀 이름 정하기" maxlength="60"></label>' +
     '<label class="f">설명 · 공지 내용 (선택)<textarea id="pd" rows="3" placeholder="예: 후보 중에 골라주세요. 좋은 이름 있으면 직접 추가해도 돼요!"></textarea></label>' +
     '<label class="f">보기 (한 줄에 하나 · 공지만 할 거면 비워두세요)<textarea id="po" rows="4" placeholder="OO FC&#10;킥앤런&#10;일요일의 전설"></textarea></label>' +
-    '<div class="row"><label class="chk"><input type="checkbox" id="pm"> 여러 개 고를 수 있게</label><label class="chk"><input type="checkbox" id="pa" checked> 회원이 보기 추가 가능</label></div>' +
+    '<div class="row"><label class="chk"><input type="checkbox" id="pm"> 여러 개 고를 수 있게</label><label class="chk"><input type="checkbox" id="pa" checked> 회원이 보기 추가 가능</label><label class="chk"><input type="checkbox" id="pan"> 🔒 익명 투표 (누가 뭘 골랐는지 안 보임)</label></div>' +
     '<div class="row"><label class="f">마감 날짜 (비우면 마감 없음)<input id="pdl" type="date"></label><label class="f">마감 시간' + timeSel('pdt', '22:00') + '</label></div>' +
     '<div class="muted">만들면 회원이 앱을 열 때 아직 안 한 투표가 바로 팝업으로 떠요.</div>' +
     '<div class="mfoot"><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">만들기</button></div>', (m) => {
@@ -916,7 +917,7 @@ function newPoll() {
       const lines = m.querySelector('#po').value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 20);
       const id = 'P' + Date.now().toString(36);
       const p = { title, desc: m.querySelector('#pd').value.trim(), options: lines.map((t, i) => ({ id: 'o' + (i + 1), text: t })), multi: m.querySelector('#pm').checked,
-        allowAdd: m.querySelector('#pa').checked, deadline: m.querySelector('#pdl').value ? m.querySelector('#pdl').value + 'T' + timeVal(m, 'pdt') : '', created: new Date().toISOString(), closed: false };
+        allowAdd: m.querySelector('#pa').checked, anon: m.querySelector('#pan').checked, deadline: m.querySelector('#pdl').value ? m.querySelector('#pdl').value + 'T' + timeVal(m, 'pdt') : '', created: new Date().toISOString(), closed: false };
       await setDoc(D('polls', id), p).catch(fail); closeModal(); toast('만들었어요 · 카톡 공지 문구도 복사해 보세요'); S.view = 'polls'; render();
     };
   });
@@ -961,7 +962,7 @@ function openSettingsReal() {
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
     themeHTML() +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
-    '<div class="muted" style="margin-top:8px">A-KICK v0.21</div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK v0.22</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
     bindTheme(m);
