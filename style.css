@@ -186,7 +186,7 @@ textarea{min-height:220px}
 .pl-boxL{left:-2px;top:30%;width:9%;height:40%;border-radius:0 60px 60px 0}
 .pl-boxR{right:-2px;top:30%;width:9%;height:40%;border-radius:60px 0 0 60px}
 .tok{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:transparent;padding:0;width:120px}
-.tok-c{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;box-shadow:0 3px 0 rgba(0,0,0,.25)}
+.tok-c{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;letter-spacing:-.5px;font-weight:800;box-shadow:0 3px 0 rgba(0,0,0,.25)}
 .tok.t0 .tok-c{background:#FF8A3D;color:#2B1200}
 .tok.t1 .tok-c{background:#5CB8FF;color:#00213D}
 .tok.sel .tok-c{box-shadow:0 0 0 4px #fff,0 0 0 7px #FACC15}
@@ -198,7 +198,7 @@ textarea{min-height:220px}
 .seg5 button{border:0;background:#fff;width:32px;height:32px;font-size:13px;color:var(--sub)}
 .seg5 button+button{border-left:1px solid var(--line)}
 .seg5 button.on{background:var(--navy);color:#fff;font-weight:700}
-@media (max-width:760px){.tok{width:80px}.tok-c{width:36px;height:36px;font-size:15px}.tok-n{font-size:11px}}
+@media (max-width:760px){.tok{width:80px}.tok-c{width:36px;height:36px;font-size:12.5px}.tok-n{font-size:11px}}
 
 .mchip{position:relative}
 .mchip.no{border-color:#F3C1BB;color:#B4534A;background:#FFF6F5}
@@ -234,7 +234,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .tbhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .pitch.sm{aspect-ratio:2.6/1}
 .tok.plain{width:96px}
-.tok.plain .tok-c{width:28px;height:28px}
+.tok.plain .tok-c{width:28px;height:28px;font-size:11px}
 .tok.plain .tok-n{font-size:12px}
 a.logo{text-decoration:none}
 
@@ -386,3 +386,4 @@ button.pill{cursor:pointer;border:0;font:inherit}
 .bmap tfoot td{position:sticky;bottom:0;background:#fff;padding:6px 4px}.bmap select{font-size:12px;height:30px;border:1px solid var(--line);border-radius:7px}
 .xpadj{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px;font-weight:700}.xpadj small{color:var(--sub);font-weight:500}.xpadj input{flex:1;height:38px;border:1px solid var(--line);border-radius:9px;padding:0 10px}
 .wxr{display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--sub)}
+.lnkb{border:0;background:none;padding:0;color:var(--navy);font:inherit;text-decoration:underline;cursor:pointer}

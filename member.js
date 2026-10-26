@@ -414,7 +414,7 @@ async function renderHome() {
     '<div class="newc"><input id="cn" placeholder="팀 이름 (예: 대구FC)" maxlength="20"><button id="mk">팀 만들기</button></div>' +
     '<label class="rcl">추천 코드 <small>(선택 · 받은 링크로 들어왔으면 자동으로 채워져요)</small><input id="rc" maxlength="12" placeholder="예: K7P2QX" value="' + esc(refSaved()) + '"></label></section>' + LEGAL + '</main>');
   $('#out').onclick = () => signOut(auth);
-  if (S.email === OPERATOR) { $('main').insertAdjacentHTML('beforeend', '<button class="link" id="ops">운영자: 오류 기록 보기</button>'); $('#ops').onclick = showErrs; }
+  if (S.email === OPERATOR) { $('main').insertAdjacentHTML('beforeend', '<button class="link" id="ops">운영자: 오류 기록 보기</button><button class="link" id="opf">운영자: 개발자 건의 보기</button>'); $('#ops').onclick = showErrs; $('#opf').onclick = showFeedback; }
   document.querySelectorAll('[data-cdel]').forEach((b) => (b.onclick = () => (b.dataset.own === '1' ? deleteClub(b.dataset.cdel, all[b.dataset.cdel]) : leaveList(b.dataset.cdel, all[b.dataset.cdel]))));
   $('#mk').onclick = async () => {
     const name = $('#cn').value.trim(); if (!name) return toast('팀 이름을 넣어주세요');
@@ -467,8 +467,9 @@ function attendOf(g) {
 function dlTs(g) { return g.deadline ? Date.parse(g.deadline) : Date.parse(g.date + 'T' + (g.time || '23:59')); }
 function left(ms) { const s = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(s / 86400), p = (n) => String(n).padStart(2, '0');
   return (d ? d + '일 ' : '') + p(Math.floor(s % 86400 / 3600)) + ':' + p(Math.floor(s % 3600 / 60)) + ':' + p(s % 60); }
-function cdHTML(g) {
-  const t = dlTs(g);
+function cdHTML(g) { return cdAt(dlTs(g)); }
+/** 마감 카운트다운 (참석 투표·투표·공지 공용) */
+function cdAt(t) {
   if (Date.now() >= t) return '<div class="cd done"><span>투표</span><b>마감됐어요</b></div>';
   const d = new Date(t), dd = ymd(d);
   return '<div class="cd" data-cd="' + t + '"><span>투표 마감까지<small>' + md(dd) + '(' + day(dd) + ') ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ' 마감</small></span><b>' + left(t - Date.now()) + '</b></div>';
@@ -533,6 +534,8 @@ function bindCommon() {
   const o = $('#out'); if (o) o.onclick = () => signOut(auth);
   const lv = $('#leave'); if (lv) lv.onclick = openLeave;
   const nf = $('#ntf'); if (nf) nf.onclick = openNotify;
+  const dv = $('#dev'); if (dv) dv.onclick = openDev;
+  const dn = $('#dona'); if (dn) dn.onclick = openDonate;
   const it = $('#inst'); if (it) it.onclick = async () => { installEv.prompt(); const ch = await installEv.userChoice.catch(() => null); if (ch && ch.outcome === 'accepted') achFlag('inst'); installEv = null; render(); };
   const ni = $('#noinst'); if (ni) ni.onclick = () => { try { localStorage.setItem('akick_noinstall', '1'); } catch (e) {} render(); };
   document.querySelectorAll('[data-gohome]').forEach((b) => (b.onclick = () => { S.tab = 'home'; S.wk = 0; render(); window.scrollTo(0, 0); }));
@@ -657,9 +660,9 @@ function homeHTML() {
     tile('week', '팀 편성', g && (g.teams || []).length >= 2 ? '공개됨' : '준비 중', g ? md(g.date) + ' 경기' : '-') + '</div>' +
     (recent.length ? '<section class="card"><div class="h2row"><h2>최근 입출금</h2><button class="more inl" data-go="bank">전체 ›</button></div><div class="blist">' + recent.map((t) =>
       '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what + (t.pend ? ' · 통장 확인 전' : '')) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b></span></div>').join('') + '</div></section>' : '') +
-    '<button class="sugbtn" id="sug">💬 관리자에게 건의하기</button>' +
+    '<button class="sugbtn" id="sug">💬 우리 팀 총무에게 건의하기</button>' +
     (S.owner ? '<a class="bigbtn" href="admin.html?c=' + esc(S.cid) + '">관리자 페이지</a>' : '') +
-    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button><button class="link" id="ntf">🔔 알림</button></div><div class="links"><a class="link" href="privacy.html">개인정보처리방침</a><a class="link" href="terms.html">이용약관</a></div></main>';
+    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button><button class="link" id="ntf">🔔 알림</button></div><div class="links"><button class="link" id="dev">💌 앱 개발자에게 건의</button><button class="link" id="dona">☕ A-KICK 후원</button></div><div class="links"><a class="link" href="privacy.html">개인정보처리방침</a><a class="link" href="terms.html">이용약관</a></div></main>';
 }
 function duesHTML() {
   const d = S.pub.dues, paid = d.paid.indexOf(S.me.name) >= 0, due = paid || d.unpaid.indexOf(S.me.name) >= 0;
@@ -706,7 +709,7 @@ function pollsCard() {
   if (!ps.length) return '';
   return '<section class="card"><h2>투표 · 공지</h2><div class="plist">' + ps.map((p) => {
     const mine = myPV(p), open = pollOpen(p), notice = !(p.options || []).length && !p.allowAdd;
-    return '<button class="pitem' + (open && !mine ? ' glow' : '') + '" data-poll="' + esc(p.id) + '"><span><b>' + esc(p.title) + (isNewPoll(p) ? NEWB : '') + '</b><small>' + (open ? (p.deadline ? md(p.deadline.substr(0, 10)) + ' ' + p.deadline.substr(11, 5) + ' 마감' : '진행 중') : '마감됨') + '</small></span>' +
+    return '<button class="pitem' + (open && !mine ? ' glow' : '') + '" data-poll="' + esc(p.id) + '"><span><b>' + esc(p.title) + (isNewPoll(p) ? NEWB : '') + '</b><small>' + (open ? (p.deadline ? '<span class="pcd" data-cd="' + Date.parse(p.deadline) + '">⏳ <b>' + left(Date.parse(p.deadline) - Date.now()) + '</b> 남음</span>' : '진행 중') : '마감됨') + '</small></span>' +
       '<em class="' + (mine ? 'done' : open ? 'todo' : '') + '">' + (mine ? (notice ? '확인함' : '참여함') : open ? (notice ? '새 공지' : '참여하기') : '결과 보기') + '</em></button>';
   }).join('') + '</div></section>';
 }
@@ -718,7 +721,7 @@ function openPoll(pid) {
   const draw = () => {
     const opts = pollOpts(p), mx = Math.max(1, ...opts.map((o) => o.who.length)), show = !!mine || !open;
     sheet('<div class="ptag">' + (notice ? '📢 공지' : '🗳 투표') + (p.anon ? ' · 🔒 익명' : '') + (open ? '' : ' · 마감됨') + '</div><h2>' + esc(p.title) + '</h2>' + (p.desc ? '<div class="pdesc">' + esc(p.desc) + '</div>' : '') +
-      (p.deadline ? '<div class="muted">' + md(p.deadline.substr(0, 10)) + '(' + day(p.deadline.substr(0, 10)) + ') ' + p.deadline.substr(11, 5) + ' 마감</div>' : '') +
+      (p.deadline ? (open ? cdAt(Date.parse(p.deadline)) : '<div class="muted">' + md(p.deadline.substr(0, 10)) + '(' + day(p.deadline.substr(0, 10)) + ') ' + p.deadline.substr(11, 5) + ' 마감</div>') : '') +
       (notice ? '' : '<div class="muted">' + (p.multi ? '여러 개 고를 수 있어요' : '하나만 골라주세요') + (p.anon ? ' · 누가 뭘 골랐는지 아무에게도 안 보여요' : '') + '</div><div class="popts">' + opts.map((o) =>
         '<button class="popt' + (picks.has(o.id) ? ' on' : '') + '" data-o="' + esc(o.id) + '"' + (open ? '' : ' disabled') + '><span>' + esc(o.text) + '</span>' + (show ? '<b>' + o.who.length + '</b><i style="width:' + (o.who.length / mx * 100) + '%"></i>' : '') + '</button>' +
         (show && o.who.length && !p.anon ? '<small class="pwho">' + o.who.map((n) => lvPill(lvOfName(n)) + esc(n)).join(', ') + '</small>' : '')).join('') + '</div>' +
@@ -752,7 +755,7 @@ function autoPopup() {
   if (p) setTimeout(() => openPoll(p.id), 300);
 }
 function openSuggest() {
-  sheet('<h2>💬 관리자에게 건의하기</h2><div class="muted">관리자만 볼 수 있어요. 회원 화면에는 안 나와요.</div>' +
+  sheet('<h2>💬 우리 팀 총무에게 건의하기</h2><div class="muted">우리 팀 관리자(총무)만 볼 수 있어요. 앱 자체에 대한 의견은 홈 맨 아래 [앱 개발자에게 건의]로 보내주세요.</div>' +
     '<textarea id="st" rows="5" maxlength="1000" placeholder="예: 경기 시간을 30분 당기면 어떨까요?"></textarea>' +
     '<label class="chk2"><input type="checkbox" id="sa"> 이름 빼고 보내기 (익명)</label>' +
     '<div class="srow"><button id="sx">취소</button><button id="sok" class="pri">보내기</button></div>', (el) => {
@@ -1163,9 +1166,9 @@ async function openRps() {
   sheet('<h2>✊✌️🖐️ 가위바위보</h2><div class="rstat"><div><span>보유 EXP</span><b>' + have.toLocaleString() + '</b></div><div><span>남은 판</span><b>' + left + '/5</b></div>' +
     '<div><span>오늘 승률</span><b>' + (me.w + me.l ? Math.round(me.w / (me.w + me.l) * 100) + '%' : '-') + '</b></div><div><span>오늘 결과</span><b class="' + (me.net < 0 ? 'n' : 'p') + '">' + (me.net > 0 ? '+' : '') + (me.net || 0) + '</b></div></div>' +
     '<div class="rvs"><div><small>' + esc(S.me.name) + '</small><i id="rme">❔</i></div><b class="vs">VS</b><div><small>킥봇</small><i id="rbot">❔</i></div></div><div class="rres" id="rres">' + (left > 0 ? '걸 EXP를 넣고 하나를 고르세요' : '오늘은 다 했어요. 내일 또 만나요!') + '</div>' +
-    '<label class="rbet">걸 EXP <input id="rbet" type="number" inputmode="numeric" min="1" max="100" value="' + Math.min(50, Math.max(1, have)) + '"><small>한 판 최대 100 · 비기면 그대로</small></label>' +
+    '<label class="rbet">걸 EXP <input id="rbet" type="number" inputmode="numeric" min="1" max="100" value="' + Math.min(50, Math.max(1, have)) + '"><small>최대 100 · 비기면 횟수 그대로</small></label>' +
     '<div class="rbtns">' + RPS.map(([k, e, l]) => '<button data-rps="' + k + '"' + (left > 0 && have > 0 ? '' : ' disabled') + '><i>' + e + '</i>' + l + '</button>').join('') + '</div>' +
-    '<div class="rtop"><div><h3>오늘의 다승왕</h3>' + (win.map((x, i) => row(x, i)).join('') || '<p class="muted">아직 없어요</p>') + '</div><div><h3>오늘의 불행왕</h3>' + (lose.map((x, i) => row(x, i, 1)).join('') || '<p class="muted">아직 없어요</p>') + '</div></div>' +
+    '<div class="rtop"><div><h3>🔥 오늘의 승부사</h3>' + (win.map((x, i) => row(x, i)).join('') || '<p class="muted">아직 없어요</p>') + '</div><div><h3>💧 오늘의 액땜</h3>' + (lose.map((x, i) => row(x, i, 1)).join('') || '<p class="muted">아직 없어요</p>') + '</div></div>' +
     '<div class="srow"><button id="rx">닫기</button></div>', (el) => {
     el.querySelector('.sbox').id = 'rpsov';
     el.querySelector('#rx').onclick = () => { el.hidden = true; render(); };
@@ -1182,14 +1185,22 @@ async function rpsPlay(mine, el) {
   bet = Math.min(bet, 100, have);
   rpsBusy = true; el.querySelectorAll('[data-rps]').forEach((b) => (b.disabled = true));
   const bot = RPS[crypto.getRandomValues(new Uint8Array(1))[0] % 3][0], E = (k) => RPS.find((x) => x[0] === k)[1];
-  const bi = el.querySelector('#rbot'); let t = 0; const spin = setInterval(() => (bi.textContent = RPS[t++ % 3][1]), 90);
+  const bi = el.querySelector('#rbot'), last = me.n === 4, wait = (ms) => new Promise((r) => setTimeout(r, ms));
   el.querySelector('#rme').textContent = E(mine);
-  await new Promise((r) => setTimeout(r, 900)); clearInterval(spin); bi.textContent = E(bot);
+  // 보통은 빠르게, 마지막 판은 빠칭코처럼 빠르게 돌다가 점점 느려지며 결과가 나옴
+  const steps = last ? [...Array(22)].map(() => 55).concat([80, 110, 150, 200, 260, 340, 440, 560, 720, 900]) : [...Array(10)].map(() => 90);
+  if (last) { el.querySelector('#rres').innerHTML = '<b class="last">🔥 오늘의 마지막 판!</b>'; bi.classList.add('spin'); }
+  let k = 0, cur = 0;
+  for (const ms of steps) { cur = k++ % 3; bi.textContent = RPS[cur][1]; await wait(ms); }
+  if (last && RPS[cur][0] === bot) { await wait(500); }       // 한 칸 더 넘어갈 듯 말 듯
+  bi.textContent = E(bot); bi.classList.remove('spin'); bi.classList.add('hit'); setTimeout(() => bi.classList.remove('hit'), 900);
   const res = mine === bot ? 0 : (mine === 'r' && bot === 's') || (mine === 's' && bot === 'p') || (mine === 'p' && bot === 'r') ? 1 : -1;
-  const nx = { uid: S.uid, mid: S.me.mid, name: S.me.name, date: todayKey(), n: me.n + 1, w: me.w + (res > 0 ? 1 : 0), l: me.l + (res < 0 ? 1 : 0), net: me.net + res * bet, at: Date.now() };
-  el.querySelector('#rres').innerHTML = res > 0 ? '<b class="p">이겼어요! +' + bet + ' EXP</b>' : res < 0 ? '<b class="n">졌어요 −' + bet + ' EXP</b>' : '<b>비겼어요 · EXP 그대로</b>';
-  try { await setDoc(doc(db, 'clubs', S.cid, 'rps', S.uid + '_' + nx.date), nx); S.rpsToday = nx; }
-  catch (e) { toast('저장 실패: ' + e.message); logErr('가위바위보 저장 실패: ' + e.message, e.stack); }
+  el.querySelector('#rres').innerHTML = res > 0 ? '<b class="p">이겼어요! +' + bet + ' EXP</b>' : res < 0 ? '<b class="n">졌어요 −' + bet + ' EXP</b>' : '<b>비겼어요 · 횟수·EXP 그대로</b>';
+  if (res) {
+    const nx = { uid: S.uid, mid: S.me.mid, name: S.me.name, date: todayKey(), n: me.n + 1, w: me.w + (res > 0 ? 1 : 0), l: me.l + (res < 0 ? 1 : 0), net: me.net + res * bet, at: Date.now() };
+    try { await setDoc(doc(db, 'clubs', S.cid, 'rps', S.uid + '_' + nx.date), nx); S.rpsToday = nx; }
+    catch (e) { toast('저장 실패: ' + e.message); logErr('가위바위보 저장 실패: ' + e.message, e.stack); }
+  }
   rpsBusy = false; setTimeout(() => { if (!el.hidden) openRps(); }, 1300);
 }
 
@@ -1214,6 +1225,39 @@ function wxLine(g) {
   const w = S.wx; if (!g) return '';
   if (!w || w.date !== g.date) return (Date.parse(g.date) - Date.now()) / 864e5 > 15 ? '<div class="wx soft">🌤️ 날씨는 경기 15일 전부터 나와요</div>' : '';
   const [ic, lb] = window.Core.wxLabel(w.code), mx = w.mx != null ? w.mx : w.pr, pv = window.Core.playable(mx, w.st || w.code >= 95);
-  return '<div class="wx ' + pv.lv + '"><span class="wi">' + ic + '</span><b>' + w.t + '°</b><span>' + lb + '</span><span>강수확률 ' + w.pop + '%</span><span>강수량 <b class="mm">' + (mx > 0 ? mx + 'mm/시간' : '비 없음') + '</b></span>' +
+  return '<div class="wx ' + pv.lv + '"><span class="wi">' + ic + '</span><div class="w1"><b>' + w.t + '°</b><span>' + lb + '</span></div><div class="w2"><span>강수확률 <b>' + w.pop + '%</b></span><span>강수량 <b>' + (mx > 0 ? mx + 'mm/시간' : '비 없음') + '</b></span></div>' +
     '<em>' + pv.text + '</em><small>경기 ' + (g.time || '').substr(0, 5) + '부터 2시간 · ' + new Date(w.at).getHours() + '시 업데이트</small></div>';
+}
+
+/* ---------------- 앱 개발자에게 건의 · 후원 ---------------- */
+function openDev() {
+  sheet('<h2>💌 앱 개발자에게 건의</h2><div class="muted">A-KICK 앱을 만든 사람에게 바로 가요. 불편한 점, 있었으면 하는 기능, 오류 무엇이든 좋아요. (우리 팀 운영 얘기는 총무에게)</div>' +
+    '<textarea id="dt" rows="5" maxlength="1000" placeholder="예: 경기 기록을 사진으로도 남기고 싶어요"></textarea>' +
+    '<div class="srow"><button id="dx">취소</button><button id="dok" class="pri">보내기</button></div>', (el) => {
+    el.querySelector('#dx').onclick = () => (el.hidden = true);
+    el.querySelector('#dok').onclick = async () => {
+      const t = el.querySelector('#dt').value.trim(); if (!t) return toast('내용을 써주세요');
+      try {
+        await addDoc(collection(db, 'feedback'), { text: t, uid: S.uid, email: S.email || '', cid: S.cid || '', club: (S.club && S.club.name) || '', name: (S.me && S.me.name) || '', at: Date.now(), ver: window.Core.VERSION });
+        el.hidden = true; toast('개발자에게 보냈어요. 고마워요 🙏');
+      } catch (e) { toast('보내기 실패: ' + e.message); logErr('개발자 건의 실패: ' + e.message, e.stack); }
+    };
+  });
+}
+const DONA = '카카오뱅크 3333-15-3268863 (예금주 장은총)';
+function openDonate() {
+  sheet('<h2>☕ A-KICK 후원</h2><div class="dona"><p>🙏 A-KICK이 팀 운영과 축구하는 일상에 도움이 되셨다면, 원하시는 만큼 후원으로 응원해 주셔도 됩니다.</p>' +
+    '<p>🌱 후원은 앱을 계속 다듬고 새 기능을 더하는 데 쓰입니다. 부담 갖지 않으셔도 됩니다. 😊</p><p class="muted">후원 계좌를 남겨둡니다. 마음이 닿을 때, 원하시는 만큼 후원해 주시면 감사히 받겠습니다.</p>' +
+    '<div class="acrow"><b>' + DONA + '</b><button id="dcp">복사</button></div></div><div class="srow"><button class="pri" id="dnx">닫기</button></div>', (el) => {
+    el.querySelector('#dcp').onclick = () => copy('3333153268863', '계좌번호를 복사했어요 (카카오뱅크 · 장은총)');
+    el.querySelector('#dnx').onclick = () => (el.hidden = true);
+  });
+}
+async function showFeedback() {
+  const q = await getDocs(query(collection(db, 'feedback'), orderBy('at', 'desc'), limit(100))).catch((e) => { toast('못 불러왔어요: ' + e.message); return null; });
+  if (!q) return;
+  const rows = q.docs.map((d) => d.data()), txt = rows.map((x) => new Date(x.at).toLocaleString('ko-KR') + ' [' + (x.club || '-') + ' · ' + (x.name || x.email) + ' · ' + x.ver + ']\n' + x.text).join('\n\n');
+  sheet('<h2>개발자 건의 ' + rows.length + '건</h2><pre class="errs">' + esc(txt || '아직 없어요') + '</pre><div class="srow"><button id="fx">닫기</button><button class="pri" id="fc">전체 복사</button></div>', (el) => {
+    el.querySelector('#fx').onclick = () => (el.hidden = true); el.querySelector('#fc').onclick = () => copy(txt, '복사했어요. Claude에게 붙여넣어 주세요');
+  });
 }

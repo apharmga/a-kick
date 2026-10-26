@@ -32,6 +32,15 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
+    // 앱 개발자에게 건의: 로그인한 누구나 보내고, 운영자만 읽음
+    match /feedback/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['text', 'uid', 'email', 'cid', 'club', 'name', 'at', 'ver'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000;
+      allow read, delete: if isOp();
+    }
+
     match /errlog/{id} {
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['at', 'uid', 'cid', 'page', 'msg', 'stack', 'ua', 'ver'])

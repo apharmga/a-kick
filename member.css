@@ -316,7 +316,7 @@ body.noscroll{overflow:hidden}
 .ppick button{border:1.5px solid #D5DBE7;background:#fff;border-radius:12px;min-height:56px;font:inherit;font-weight:900;font-size:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--ink)}
 .ppick button small{font-size:11px;font-weight:600;color:var(--sub)}
 .ppick button.on{border-color:var(--navy);background:var(--tint);color:var(--navy)}
-.ptok .dot{display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:900}
+.ptok .dot{display:flex;align-items:center;justify-content:center;color:#fff;font-size:9.5px;font-weight:800;letter-spacing:-.3px}
 .sbox label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700;color:var(--sub)}
 .sbox label.f input{min-height:46px;border:1px solid #D5DBE7;border-radius:12px;padding:0 12px;font:inherit;font-size:16px;color:var(--ink)}
 .sbox .wl{font-size:13px;font-weight:700;color:var(--sub)}
@@ -392,3 +392,22 @@ body.noscroll{overflow:hidden}
 .lvb{border:0;cursor:pointer}
 .lvg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 6px;margin:10px 0}.lvg div{display:flex;flex-direction:column;align-items:center;gap:1px}.lvg b{font-size:13px}.lvg small{font-size:11px;color:var(--sub);margin-bottom:3px}
 .pn .lvp{transform:scale(.85);margin-right:2px}.who .lvp{margin-right:4px}
+/* ---- 날씨 (다시 배치) ---- */
+.wx{display:grid!important;grid-template-columns:auto 1fr;gap:2px 12px;align-items:center;padding:10px 14px}
+.wx .wi{grid-row:span 2;font-size:42px;line-height:1}
+.wx .w1{display:flex;align-items:baseline;gap:8px}.wx .w1 b{font-size:24px;line-height:1.1}.wx .w1 span{font-size:14px;font-weight:700}
+.wx .w2{font-size:12.5px;color:var(--sub);display:flex;flex-wrap:wrap;gap:0 10px}.wx .w2 span{white-space:nowrap}.wx{text-align:left}.wx .w2 b{color:var(--ink)}
+.wx em{grid-column:1/-1;margin-top:6px;padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.75);font-size:13px}
+.wx small{grid-column:1/-1;margin:2px 0 0;text-align:right}
+.wx.soft{display:block!important}
+/* ---- 투표 카운트다운 · 후원 · 가위바위보 마지막 판 ---- */
+.pcd{white-space:nowrap}.pcd b{font-variant-numeric:tabular-nums;color:var(--navy)}
+.dona p{margin:8px 0;font-size:14px;line-height:1.6}.dona .acrow{display:flex;gap:8px;align-items:center;background:var(--bg);border-radius:12px;padding:10px 12px;margin-top:10px}.dona .acrow b{flex:1;font-size:13.5px}
+.dona .acrow button{border:0;border-radius:9px;padding:7px 12px;font-weight:800;background:var(--btn);color:var(--on-btn)}
+.rvs i.spin{border-color:#FACC15;box-shadow:0 0 0 3px #FDE68A,0 0 22px rgba(250,204,21,.6);animation:rshake .12s infinite}
+.rvs i.hit{animation:rpop .5s ease}
+@keyframes rshake{0%{transform:translateY(0)}50%{transform:translateY(-2px)}100%{transform:translateY(0)}}
+@keyframes rpop{0%{transform:scale(1)}40%{transform:scale(1.25)}100%{transform:scale(1)}}
+.rres .last{color:#D97706}
+.rbet{white-space:nowrap}
+.wx .w2 b{font-size:13.5px}

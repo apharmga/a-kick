@@ -549,7 +549,7 @@ function pitchSide(team, side, ti, gid, plain) {
     const x = side === 'L' ? pos[0] : 100 - pos[0];
     if (plain) return '<div class="tok t' + ti + ' plain" style="left:' + x + '%;top:' + pos[1] + '%"><span class="tok-c">' + numOf(name) + '</span><span class="tok-n">' + esc(name) + (i === 0 ? ' <i>GK</i>' : '') + '</span></div>';
     const sel = S.pick === name ? ' sel' : '';
-    return '<button class="tok t' + ti + sel + '" style="left:' + x + '%;top:' + pos[1] + '%" data-pick="' + esc(name) + '" aria-label="' + esc(name) + ' ' + scoreOf(name) + '점"><span class="tok-c">' + scoreOf(name) + '</span><span class="tok-n">' + (numOf(name) ? '<small>' + numOf(name) + '</small> ' : '') + esc(name) + (i === 0 ? ' <i>GK</i>' : '') + '</span></button>';
+    return '<button class="tok t' + ti + sel + '" style="left:' + x + '%;top:' + pos[1] + '%" data-pick="' + esc(name) + '" aria-label="' + esc(name) + '"><span class="tok-c">' + (numOf(name) || '') + '</span><span class="tok-n">' + esc(name) + (i === 0 ? ' <i>GK</i>' : '') + '</span></button>';
   }).join('');
 }
 function teamHTML() {
@@ -1237,7 +1237,7 @@ function bindLedger() {
 /* ---- 설정 ---- */
 const CFG = [['fee', '월회비', 'number'], ['guestFee', '게스트비', 'number'], ['rentPerGame', '정기대관 회당 구장비', 'number'], ['oneOff', '일회성 구장비', 'number'],
   ['cap', '기본 정원', 'number'], ['perSide', '한 팀 최소 인원 (풋살 5 · 축구 11)', 'number'], ['maxSide', '한 팀 최대 인원 (풋살 6 · 축구 11)', 'number'], ['time', '경기 시간', 'text'], ['nextMonthDay', '이 날짜부터 들어온 회비는 다음 달분', 'number'], ['dueDay', '회비 마감일', 'number'],
-  ['reserve', '곶간(비상금)', 'number'], ['statFrom', '골·도움 집계 시작일', 'date'], ['place', '구장 이름', 'text'], ['account', '모임통장 (예: 카카오뱅크 3333-00-0000000)', 'text'], ['openChat', '오픈채팅 링크', 'text']];
+  ['reserve', '비상금 (남겨둘 돈)', 'number'], ['statFrom', '골·도움 집계 시작일', 'date'], ['place', '구장 이름', 'text'], ['account', '모임통장 (예: 카카오뱅크 3333-00-0000000)', 'text'], ['openChat', '오픈채팅 링크', 'text']];
 function openSettings() { openSettingsReal(); }
 /* ---- 팀 테마 고르기 (추천 5개 + 직접 고르기) ---- */
 function themeHTML() {
@@ -1260,10 +1260,15 @@ function openSettingsReal() {
     '<div class="sgrp"><div class="g-lbl2">경기 날씨 지역 · 지금: <b id="wxcur">' + esc((S.cfg.wxLoc || {}).name || '대구 (기본)') + '</b></div><div class="refin"><input id="wxq" maxlength="40" placeholder="구장 주소 (예: 대구 북구 도남동)"><button class="btn" id="wxs">찾기</button><button class="btn" id="wxme">📍 지금 내 위치</button></div><div class="muted">구장에 있을 때 [지금 내 위치]를 누르면 가장 정확해요</div><div id="wxr" class="wxr"></div></div>' +
     themeHTML() + '<div class="sgrp" id="refbox"><div class="g-lbl2">추천</div><div class="muted">불러오는 중...</div></div>' +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
-    '<div class="muted" style="margin-top:8px">A-KICK ' + C.VERSION + ' · <a href="privacy.html" target="_blank">개인정보처리방침</a> · <a href="terms.html" target="_blank">이용약관</a></div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK ' + C.VERSION + ' · <a href="privacy.html" target="_blank">개인정보처리방침</a> · <a href="terms.html" target="_blank">이용약관</a> · <button class="lnkb" id="devfb">💌 앱 개발자에게 건의</button> · <button class="lnkb" id="dona">☕ 후원</button></div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
     bindTheme(m); loadRef(m);
+    m.querySelector('#devfb').onclick = async () => {
+      const t = prompt('A-KICK 앱 개발자에게 보낼 건의·오류·원하는 기능을 적어주세요'); if (!t || !t.trim()) return;
+      try { await addDoc(collection(db, 'feedback'), { text: t.trim().slice(0, 1000), uid: S.uid, email: (auth.currentUser && auth.currentUser.email) || '', cid: CID, club: S.club.name, name: '관리자', at: Date.now(), ver: C.VERSION }); toast('개발자에게 보냈어요. 고마워요 🙏'); } catch (e) { fail(e); }
+    };
+    m.querySelector('#dona').onclick = () => alert('🙏 A-KICK이 팀 운영에 도움이 되셨다면, 원하시는 만큼 후원으로 응원해 주셔도 됩니다.\n🌱 후원은 앱을 계속 다듬고 새 기능을 더하는 데 쓰입니다. 부담 갖지 않으셔도 됩니다. 😊\n\n카카오뱅크 3333-15-3268863 (예금주 장은총)\n\n마음이 닿을 때, 원하시는 만큼 후원해 주시면 감사히 받겠습니다.');
     // 구장 위치: 주소 검색(오픈스트리트맵) · 지금 내 위치 · 위도,경도 직접 입력
     const wxSave = async (name, lat, lon, box) => {
       S.cfg.wxLoc = { name, lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 };
