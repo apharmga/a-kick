@@ -263,3 +263,4 @@ body{background:var(--bg);background-image:var(--bg-grad);background-attachment:
 .adm{background:rgba(255,255,255,.4);color:var(--on-hdr)}
 .vote button.on,.names span.me,.newc button,.bigbtn,.acrow button,.srow .pri,.pitem em.todo,.login .gbtn,.extbtn,.warn .extbtn{background:var(--btn);border-color:transparent;color:var(--on-btn);box-shadow:0 4px 14px -6px rgba(15,23,42,.35)}
 .tile{border-top:0;box-shadow:0 1px 3px rgba(15,23,42,.06),inset 0 3px 0 0 var(--acc)}
+.hero{animation:var(--aur,none)}.hero::before{opacity:var(--glow,1)}

@@ -335,7 +335,7 @@
   // 색 역할: c[0] 메인(상단 배경) · c[1] 서브1(버튼·강조 글씨) · c[2] 서브2(포인트: 배지·카드 선)
   // c: [메인, 서브1, 서브2] · g: 오로라 그라데이션 3색(프리셋 전용)
   var THEMES = [
-    { id: 'navy', name: '기본 네이비', c: ['#1E3A8A', '#1E3A8A', '#60A5FA'], g: ['#1E3A8A', '#2C4FB0', '#3E74D6'] },
+    { id: 'navy', name: '기본 네이비', c: ['#1E3A8A', '#1E3A8A', '#60A5FA'], flat: true },
     { id: 'lavender', name: '오로라 라벤더', c: ['#E2D9FF', '#4B3A99', '#A78BFA'], g: ['#E2D9FF', '#D3CBF6', '#C6E6F4'] },
     { id: 'peach', name: '선셋 피치', c: ['#FFDCC8', '#A9472F', '#FF9F7A'], g: ['#FFDCC8', '#FFCDC3', '#FBE6B2'] },
     { id: 'lemon', name: '레몬 소다', c: ['#FAF0A2', '#2C6A4D', '#F2A93B'], g: ['#FAF0A2', '#CDEFC6', '#ACDDF1'] },
@@ -350,7 +350,7 @@
   function applyTheme(t) {
     var d = THEMES[0].c, main = (t && t.main) || d[0], s1 = (t && t.sub1) || d[1], acc = (t && t.sub2) || d[2];
     var pre = THEMES.filter(function (x) { return x.c[0].toLowerCase() === String(main).toLowerCase() && x.c[1].toLowerCase() === String(s1).toLowerCase() && x.c[2].toLowerCase() === String(acc).toLowerCase(); })[0];
-    var g = pre ? pre.g : [main, mix(main, '#FFFFFF', 0.4), mix(main, s1, 0.22)];
+    var g = pre ? (pre.g || [main, main, main]) : [main, mix(main, '#FFFFFF', 0.4), mix(main, s1, 0.22)];
     var light = (lum(g[0]) + lum(g[1]) + lum(g[2])) / 3 > 0.4;
     var ink = darkTo(s1, 0.12), onHdr = light ? ink : '#FFFFFF';
     var grad = 'linear-gradient(120deg,' + g[0] + ' 0%,' + g[1] + ' 50%,' + g[2] + ' 100%)';
@@ -360,6 +360,8 @@
       '--navy': ink, '--navy-d': mix(ink, '#000000', 0.2), '--navy-l': mix(ink, '#FFFFFF', 0.88),
       '--tint': mix(light ? g[1] : ink, '#FFFFFF', light ? 0.6 : 0.9), '--acc': acc, '--on-acc': lum(acc) > 0.4 ? '#0F172A' : '#FFFFFF',
       '--bg': mix(g[0], '#FFFFFF', 0.86), '--bg-grad': 'linear-gradient(180deg,' + mix(g[0], '#FFFFFF', 0.8) + ' 0%,' + mix(g[1], '#FFFFFF', 0.86) + ' 45%,' + mix(g[2], '#FFFFFF', 0.82) + ' 100%)' };
+    if (pre && pre.flat) { v['--grad'] = main; v['--btn'] = main; v['--on-hdr'] = '#FFFFFF'; v['--on-btn'] = '#FFFFFF'; v['--navy'] = main; v['--tint'] = '#EEF3FF'; v['--bg'] = '#EEF1F5'; v['--bg-grad'] = 'none'; v['--glow'] = '0'; v['--aur'] = 'none'; }
+    else { v['--glow'] = '1'; v['--aur'] = 'aur 14s ease-in-out infinite alternate'; }
     if (typeof document === 'undefined') return v;
     var r = document.documentElement.style; Object.keys(v).forEach(function (k2) { r.setProperty(k2, v[k2]); });
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
