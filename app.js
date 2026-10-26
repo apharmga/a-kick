@@ -561,7 +561,7 @@ function pubData() {
   const act = S.members.filter((m) => m.state !== '탈퇴');
   const games = S.games.filter((g) => g.date >= t).slice(0, 2).map((g) => {
     const a = attOf(g);
-    return { id: g.id, date: g.date, time: g.time || '', cap: g.cap || S.cfg.cap, deadline: g.deadline || '', attend: a,
+    return { id: g.id, date: g.date, postponed: !!g.postponed, time: g.time || '', cap: g.cap || S.cfg.cap, deadline: g.deadline || '', attend: a,
              guests: C.guestNames(S.txs, g.id, a), teams: g.teamsPublic && g.teams ? g.teams.map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0).join('|')) : [] };
   });
   const past = S.games.filter((g) => g.date < t && !g.postponed);
@@ -961,7 +961,7 @@ function openSettingsReal() {
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
     themeHTML() +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
-    '<div class="muted" style="margin-top:8px">A-KICK v0.20</div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK v0.21</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
     bindTheme(m);

@@ -368,7 +368,13 @@ function duesHTML() {
       '<tr><td>월말 잔액</td>' + L.map((x) => '<td>' + won(x.end) + '</td>').join('') + '</tr></table><div class="muted" style="margin-top:8px">회비는 그 달분, 게스트비·구장비는 경기한 달 기준이에요.</div></section>' : '') + '</main>';
 }
 /* ---------------- 스탯: 골·도움 ---------------- */
-const played = () => S.pub.played || [];
+// 관리자가 앱을 안 열어도, 경기 당일부터 회원이 바로 기록할 수 있게
+const played = () => {
+  const P = S.pub.played || [], ids = P.map((g) => g.id), t = window.Core.ymd(new Date()), from = S.pub.statFrom || '';
+  const extra = (S.pub.games || []).filter((g) => !g.postponed && g.date <= t && g.date >= from && ids.indexOf(g.id) < 0)
+    .map((g) => ({ id: g.id, date: g.date, players: attendOf(g).concat(g.guests || []), teams: g.teams || [] }));
+  return P.concat(extra).sort((a, b) => (a.date < b.date ? -1 : 1));
+};
 
 /* ---------------- 투표 · 공지 · 건의 ---------------- */
 const pollOpen = (p) => !p.closed && (!p.deadline || Date.now() < Date.parse(p.deadline));
@@ -461,7 +467,7 @@ function recHTML() {
     '<div class="muted" style="margin-top:4px">제목을 누르면 기본 → 내림차순 → 오름차순</div>' +
     '<table class="stab"><thead><tr>' + th('name', '이름') + th('gp', '경기') + th('g', '골') + th('a', '도움') + th('ap', '공격P') + '</tr></thead><tbody>' +
     sortRows(rows, 'st').map((x) => '<tr class="' + (x.name === S.me.name ? 'me' : '') + '"><td>' + esc(x.name) + '</td><td>' + x.gp + '</td><td>' + x.g + '</td><td>' + x.a + '</td><td><b>' + x.ap + '</b></td></tr>').join('') + '</tbody></table></section>' +
-    '<section class="card"><h2>경기별 기록</h2>' + (played().length ? played().slice(-12).reverse().map(gameRec).join('') : '<p class="muted">' + (S.pub.statFrom ? md(S.pub.statFrom) + ' 이후 경기부터 기록돼요. 경기가 끝나면 여기서 골을 넣어주세요.' : '아직 치른 경기가 없어요') + '</p>') + '</section></main>';
+    '<section class="card"><h2>경기별 기록</h2>' + (played().length ? played().slice(-12).reverse().map(gameRec).join('') : '<p class="muted">' + (S.pub.statFrom ? md(S.pub.statFrom) + ' 경기 당일부터 여기에 [+ 골 기록 넣기] 버튼이 생겨요.' : '아직 치른 경기가 없어요') + '</p>') + '</section></main>';
 }
 /* 정렬: 제목 누를 때마다 기본 → 내림차순 → 오름차순 */
 S.sort = {};
