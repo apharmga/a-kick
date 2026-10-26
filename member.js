@@ -260,6 +260,38 @@ async function openVideo(id) {
   VV.player = new YT.Player('ytp', { videoId: v.yt, width: '100%', height: '100%', playerVars: { playsinline: 1, rel: 0, modestbranding: 1 } });
 }
 
+/* ---------------- 푸시 알림 ----------------
+   지금은 '받기 설정'까지만 동작. 실제 발송은 앱 출시 때 서버(functions/index.js)를 켜면 시작됨.
+   VAPID_KEY(파이어베이스 콘솔 → 클라우드 메시징 → 웹 푸시 인증서)를 넣으면 기기 토큰도 자동으로 저장됨 */
+const VAPID_KEY = '';
+const PUSH_OK = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+async function pushToken() {
+  if (!VAPID_KEY || !PUSH_OK || Notification.permission !== 'granted') return '';
+  try {
+    const { getMessaging, getToken } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js');
+    return await getToken(getMessaging(fb), { vapidKey: VAPID_KEY, serviceWorkerRegistration: await navigator.serviceWorker.ready });
+  } catch (e) { logErr('푸시 토큰 실패: ' + e.message, e.stack); return ''; }
+}
+async function savePush(on) {
+  const token = on ? await pushToken() : '';
+  await setDoc(doc(db, 'clubs', S.cid, 'push', S.uid), { on: !!on, token, mid: S.me.mid, at: Date.now() }).catch((e) => logErr('알림 설정 저장 실패: ' + e.message));
+}
+function openNotify() {
+  const iosNoInstall = IS_IOS && !STANDALONE;
+  const st = !PUSH_OK ? (iosNoInstall ? 'ios' : 'no') : Notification.permission;
+  sheet('<h2>🔔 알림</h2>' +
+    '<p class="muted">새 투표·공지, 새 하이라이트, 내 댓글에 달린 답글을 폰 알림으로 받아요.</p>' +
+    '<div class="ntfbox">' + (st === 'granted' ? '✅ 이 폰은 알림을 받도록 설정돼 있어요.' : st === 'denied' ? '⛔ 알림이 차단돼 있어요. 폰 설정 → 브라우저(크롬·사파리) → 알림에서 이 사이트를 허용해 주세요.' :
+      st === 'ios' ? '📲 아이폰은 <b>홈 화면에 추가</b>한 아이콘으로 열어야 알림을 받을 수 있어요. 사파리 공유 버튼(⬆) → 홈 화면에 추가 후 그 아이콘으로 다시 열어주세요.' :
+      st === 'no' ? '이 브라우저는 알림을 지원하지 않아요. 크롬이나 사파리(홈 화면에 추가)로 열어주세요.' : '아래 버튼을 누르고 \'허용\'을 골라주세요.') + '</div>' +
+    '<div class="muted" style="font-size:12px">알림 발송은 정식 오픈 때부터 시작돼요. 지금 켜두면 그때부터 자동으로 받아요.</div>' +
+    '<div class="srow"><button id="nx">닫기</button>' + (st === 'default' ? '<button class="pri" id="non">알림 받기</button>' : st === 'granted' ? '<button id="noff">이 폰 알림 끄기</button>' : '') + '</div>', (el) => {
+    el.querySelector('#nx').onclick = () => (el.hidden = true);
+    const on = el.querySelector('#non'); if (on) on.onclick = async () => { const r = await Notification.requestPermission(); await savePush(r === 'granted'); el.hidden = true; toast(r === 'granted' ? '알림을 켰어요 🔔' : '알림을 허용하지 않았어요'); };
+    const off = el.querySelector('#noff'); if (off) off.onclick = async () => { await savePush(false); el.hidden = true; toast('이 폰 알림을 껐어요'); };
+  });
+}
+
 /* ---------------- 탈퇴 · 계정 삭제 ---------------- */
 async function wipeMine(cid) {                       // 한 팀 안의 내 흔적 지우기 (이름이 들어간 장부 기록은 관리자 소유라 남음)
   const C = (c) => collection(db, 'clubs', cid, c), del = (q) => getDocs(q).then((r) => Promise.all(r.docs.map((d) => deleteDoc(d.ref).catch(() => {})))).catch(() => {});
@@ -270,6 +302,7 @@ async function wipeMine(cid) {                       // 한 팀 안의 내 흔�
   if (marks) await Promise.all(marks.docs.map((m) => deleteDoc(m.ref).catch(() => {})));
   const u = await getDoc(doc(db, 'clubs', cid, 'users', S.uid)).catch(() => null);
   if (u && u.exists()) await deleteDoc(doc(db, 'clubs', cid, 'claims', u.data().mid)).catch(() => {});
+  await deleteDoc(doc(db, 'clubs', cid, 'push', S.uid)).catch(() => {});
   await deleteDoc(doc(db, 'clubs', cid, 'users', S.uid)).catch(() => {});
   await deleteDoc(doc(db, 'clubs', cid, 'requests', S.uid)).catch(() => {});
 }
@@ -315,7 +348,7 @@ async function deleteClub(cid, name) {
   if (t.trim() !== name) return toast('팀 이름이 달라서 삭제하지 않았어요');
   view('<div class="center">삭제하는 중... (몇 초 걸려요)</div>');
   try {
-    for (const c of ['members', 'games', 'tx', 'config', 'private', 'pub', 'votes', 'goals', 'polls', 'pollvotes', 'anonvotes', 'anonmark', 'videos', 'vcomments', 'suggest', 'requests', 'claims', 'users']) {
+    for (const c of ['members', 'games', 'tx', 'config', 'private', 'pub', 'votes', 'goals', 'polls', 'pollvotes', 'anonvotes', 'anonmark', 'videos', 'vcomments', 'push', 'suggest', 'requests', 'claims', 'users']) {
       const q = await getDocs(collection(db, 'clubs', cid, c));
       for (let i = 0; i < q.docs.length; i += 400) { const b = writeBatch(db); q.docs.slice(i, i + 400).forEach((d) => b.delete(d.ref)); await b.commit(); }
     }
@@ -446,6 +479,7 @@ function bindCommon() {
   const h = $('#home'); if (h) h.onclick = () => { S.subs.forEach((f) => f()); S.subs = []; S.cid = ''; history.replaceState(null, '', './'); renderHome(); };
   const o = $('#out'); if (o) o.onclick = () => signOut(auth);
   const lv = $('#leave'); if (lv) lv.onclick = openLeave;
+  const nf = $('#ntf'); if (nf) nf.onclick = openNotify;
   const it = $('#inst'); if (it) it.onclick = async () => { installEv.prompt(); await installEv.userChoice.catch(() => {}); installEv = null; render(); };
   const ni = $('#noinst'); if (ni) ni.onclick = () => { try { localStorage.setItem('akick_noinstall', '1'); } catch (e) {} render(); };
   document.querySelectorAll('[data-gohome]').forEach((b) => (b.onclick = () => { S.tab = 'home'; S.wk = 0; render(); window.scrollTo(0, 0); }));
@@ -572,7 +606,7 @@ function homeHTML() {
       '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what + (t.pend ? ' · 통장 확인 전' : '')) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b></span></div>').join('') + '</div></section>' : '') +
     '<button class="sugbtn" id="sug">💬 관리자에게 건의하기</button>' +
     (S.owner ? '<a class="bigbtn" href="admin.html?c=' + esc(S.cid) + '">관리자 페이지</a>' : '') +
-    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button></div><div class="links"><a class="link" href="privacy.html">개인정보처리방침</a><a class="link" href="terms.html">이용약관</a></div></main>';
+    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button><button class="link" id="ntf">🔔 알림</button></div><div class="links"><a class="link" href="privacy.html">개인정보처리방침</a><a class="link" href="terms.html">이용약관</a></div></main>';
 }
 function duesHTML() {
   const d = S.pub.dues, paid = d.paid.indexOf(S.me.name) >= 0, due = paid || d.unpaid.indexOf(S.me.name) >= 0;

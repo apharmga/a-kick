@@ -308,3 +308,4 @@ body.noscroll{overflow:hidden}
 .ncm{display:block;font-style:normal;color:#EF4444;font-size:11px;font-weight:800;margin-top:2px}
 .tab{position:relative}
 .tb{position:absolute;top:4px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:#EF4444;color:#fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;border:2px solid #fff;font-style:normal}
+.ntfbox{background:#F1F5F9;border-radius:12px;padding:12px;font-size:14px;line-height:1.6}

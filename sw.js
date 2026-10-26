@@ -10,3 +10,18 @@ self.addEventListener('fetch', (e) => {
     return r;
   }).catch(() => caches.match(e.request, { ignoreSearch: true })));
 });
+
+/* 푸시 알림 받기 (서버 발송은 앱 출시 때 켬 · functions/index.js) */
+self.addEventListener('push', (e) => {
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (er) { d = { notification: { title: 'A-KICK', body: e.data ? e.data.text() : '' } }; }
+  const n = d.notification || d, data = d.data || {};
+  e.waitUntil(self.registration.showNotification(n.title || 'A-KICK', { body: n.body || '', icon: 'icon-192.png', badge: 'icon-192.png', tag: data.tag || undefined, data: { url: data.url || './' } }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ws) => {
+    const w = ws.find((x) => x.url.startsWith(self.registration.scope)); if (w) { w.navigate(url); return w.focus(); }
+    return self.clients.openWindow(url);
+  }));
+});

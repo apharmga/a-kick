@@ -118,6 +118,10 @@ service cloud.firestore {
           && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
         allow delete: if signedIn() && resource.data.uid == request.auth.uid;
       }
+      // 알림 받기 설정: 본인 것만 (발송은 서버가 함)
+      match /push/{uid} {
+        allow read, write: if isMember() && request.auth.uid == uid;
+      }
       match /suggest/{id} {
         allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
         allow create: if isMember()
