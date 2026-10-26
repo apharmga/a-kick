@@ -241,3 +241,14 @@ th.sortable.on{color:var(--navy)}th.sortable.on i{color:var(--navy)}
 .cdel{flex:none;border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:9px;min-height:34px;padding:0 10px;font-size:12px;font-weight:700}
 
 :root{--acc:#60A5FA;--tint:#EEF3FF}
+/* v0.18 테마 역할: 메인=상단, 서브1=버튼·글씨, 서브2=포인트 */
+:root{--hdr:#1E3A8A;--on-hdr:#fff;--on-acc:#0F172A}
+.hero{background:var(--hdr);color:var(--on-hdr)}
+.hero p,.who{color:var(--on-hdr);opacity:.8}
+.cname,.hero h1,.hrow b{color:var(--on-hdr)}
+.adm{color:var(--on-hdr);background:rgba(127,127,127,.22)}
+.tile{border-top:3px solid var(--acc)}
+.pitem em.todo{background:var(--acc);color:var(--on-acc)}
+.mystat.in{background:var(--tint);color:var(--navy);box-shadow:inset 0 0 0 1px var(--acc)}
+.tab.on svg{color:var(--acc)}
+.lbl,.ng-date{color:var(--navy)}

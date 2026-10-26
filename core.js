@@ -332,28 +332,28 @@
     return s;
   }
   /* ---- 팀 테마: 메인 · 서브1(포인트) · 서브2(바탕) ---- */
+  // 색 역할: c[0] 메인(상단 배경) · c[1] 서브1(버튼·강조 글씨) · c[2] 서브2(포인트: 배지·카드 선)
   var THEMES = [
-    { id: 'navy', name: '기본 네이비', c: ['#1E3A8A', '#60A5FA', '#EEF1F5'] },
-    { id: 'lavender', name: '오로라 라벤더', c: ['#5B4B9A', '#B4A2F0', '#F4F1FC'] },
-    { id: 'peach', name: '선셋 피치', c: ['#B4553E', '#F5B48F', '#FFF4EE'] },
-    { id: 'lemon', name: '레몬 소다', c: ['#1F7A70', '#F2D45C', '#F7FAEF'] },
-    { id: 'cotton', name: '코튼 캔디', c: ['#B34A86', '#9AD1F0', '#FDF2F8'] }
+    { id: 'navy', name: '기본 네이비', c: ['#1E3A8A', '#1E3A8A', '#60A5FA'] },
+    { id: 'lavender', name: '오로라 라벤더', c: ['#6D5BB8', '#4C3F8F', '#C4B5FD'] },
+    { id: 'peach', name: '선셋 피치', c: ['#E8896B', '#B4553E', '#FFD1B8'] },
+    { id: 'lemon', name: '레몬 소다', c: ['#2A9D8F', '#1F7A70', '#F2D45C'] },
+    { id: 'cotton', name: '코튼 캔디', c: ['#E58BB5', '#B34A86', '#9AD1F0'] }
   ];
   function hexRgb(h) { h = String(h || '').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); var n = parseInt(h, 16) || 0; return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
   function rgbHex(c) { return '#' + c.map(function (x) { return ('0' + Math.round(Math.max(0, Math.min(255, x))).toString(16)).slice(-2); }).join(''); }
   function mix(a, b, t) { var x = hexRgb(a), y = hexRgb(b); return rgbHex(x.map(function (v, i) { return v + (y[i] - v) * t; })); }
   function lum(h) { var c = hexRgb(h).map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
-  /** 테마 적용. 메인색이 너무 밝으면 흰 글씨가 읽히도록 자동으로 진하게 보정 */
+  /** 고른 색은 그대로 쓰고, 그 위 글씨 색만 자동으로(밝으면 검정·어두우면 흰색). 버튼색만 흰 글씨가 읽히게 살짝 보정 */
   function applyTheme(t) {
-    var d = THEMES[0].c, main = (t && t.main) || d[0], acc = (t && t.sub1) || d[1], bg = (t && t.sub2) || d[2], k = 0;
-    while (lum(main) > 0.18 && k++ < 20) main = mix(main, '#000000', 0.08);
-    if (lum(bg) < 0.75) bg = mix(bg, '#FFFFFF', 0.85);
-    if (typeof document === 'undefined') return { main: main, sub1: acc, sub2: bg };
-    var r = document.documentElement.style;
-    r.setProperty('--navy', main); r.setProperty('--navy-d', mix(main, '#000000', 0.2)); r.setProperty('--navy-l', mix(main, '#FFFFFF', 0.88));
-    r.setProperty('--tint', mix(main, '#FFFFFF', 0.9)); r.setProperty('--acc', acc); r.setProperty('--bg', bg);
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', main);
-    return { main: main, sub1: acc, sub2: bg };
+    var d = THEMES[0].c, hdr = (t && t.main) || d[0], btn = (t && t.sub1) || d[1], acc = (t && t.sub2) || d[2], k = 0;
+    while (lum(btn) > 0.22 && k++ < 12) btn = mix(btn, '#000000', 0.07);
+    var v = { '--hdr': hdr, '--on-hdr': lum(hdr) > 0.4 ? '#0F172A' : '#FFFFFF', '--navy': btn, '--navy-d': mix(btn, '#000000', 0.2), '--navy-l': mix(btn, '#FFFFFF', 0.88),
+      '--tint': mix(btn, '#FFFFFF', 0.9), '--acc': acc, '--on-acc': lum(acc) > 0.4 ? '#0F172A' : '#FFFFFF', '--bg': mix(hdr, '#FFFFFF', lum(hdr) > 0.4 ? 0.6 : 0.92) };
+    if (typeof document === 'undefined') return v;
+    var r = document.documentElement.style; Object.keys(v).forEach(function (k2) { r.setProperty(k2, v[k2]); });
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', hdr);
+    return v;
   }
   var Core = { THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,

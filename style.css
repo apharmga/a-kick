@@ -335,3 +335,6 @@ textarea.win{resize:vertical}
 .thpick{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0}
 .thpick label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:var(--sub)}
 .thpick input[type=color]{width:64px;height:44px;border:1px solid var(--line);border-radius:10px;padding:2px;background:#fff;cursor:pointer}
+:root{--hdr:#1E3A8A;--on-hdr:#fff;--on-acc:#0F172A}
+.bar{border-top:4px solid var(--hdr)}
+.game{border-top:3px solid var(--acc)}
