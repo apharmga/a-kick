@@ -1257,27 +1257,38 @@ function openSettingsReal() {
   const grp = (title, keys) => '<div class="sgrp"><div class="g-lbl2">' + title + '</div><div class="row2">' + CFG.filter(([k]) => keys.indexOf(k) >= 0).map(([k, l, ty]) => '<label class="f">' + l + '<input data-c="' + k + '" type="' + ty + '" value="' + esc(S.cfg[k] == null ? '' : S.cfg[k]) + '"></label>').join('') + '</div></div>';
   modal('<h2>설정</h2><div class="muted">팀 만든 구글 계정 + 관리자 비밀번호로만 열려요. 회원 화면에는 나오지 않아요.</div>' +
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
-    '<div class="sgrp"><div class="g-lbl2">경기 날씨 지역 · 지금: <b id="wxcur">' + esc((S.cfg.wxLoc || {}).name || '대구 (기본)') + '</b></div><div class="refin"><input id="wxq" maxlength="20" placeholder="동네·구 이름 (예: 대구 북구, 수성구)"><button class="btn" id="wxs">찾기</button></div><div id="wxr" class="wxr"></div></div>' +
+    '<div class="sgrp"><div class="g-lbl2">경기 날씨 지역 · 지금: <b id="wxcur">' + esc((S.cfg.wxLoc || {}).name || '대구 (기본)') + '</b></div><div class="refin"><input id="wxq" maxlength="40" placeholder="구장 주소 (예: 대구 북구 도남동)"><button class="btn" id="wxs">찾기</button><button class="btn" id="wxme">📍 지금 내 위치</button></div><div class="muted">구장에 있을 때 [지금 내 위치]를 누르면 가장 정확해요</div><div id="wxr" class="wxr"></div></div>' +
     themeHTML() + '<div class="sgrp" id="refbox"><div class="g-lbl2">추천</div><div class="muted">불러오는 중...</div></div>' +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
     '<div class="muted" style="margin-top:8px">A-KICK ' + C.VERSION + ' · <a href="privacy.html" target="_blank">개인정보처리방침</a> · <a href="terms.html" target="_blank">이용약관</a></div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
     bindTheme(m); loadRef(m);
+    // 구장 위치: 주소 검색(오픈스트리트맵) · 지금 내 위치 · 위도,경도 직접 입력
+    const wxSave = async (name, lat, lon, box) => {
+      S.cfg.wxLoc = { name, lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 };
+      await putCfg(); m.querySelector('#wxcur').textContent = name; box.textContent = '저장했어요 · 다음 경기 날씨부터 이 위치로 나와요';
+      const g = S.games.find((x) => x.date >= today() && !x.postponed); if (g) wxNow(g); schedulePublish();
+    };
     m.querySelector('#wxs').onclick = async () => {
-      const q = m.querySelector('#wxq').value.trim(); if (!q) return;
-      const box = m.querySelector('#wxr'); box.textContent = '찾는 중...';
-      const look = async (t) => ((await (await fetch('https://geocoding-api.open-meteo.com/v1/search?count=6&language=ko&countryCode=KR&name=' + encodeURIComponent(t))).json()).results || []);
+      const q = m.querySelector('#wxq').value.trim(), box = m.querySelector('#wxr'); if (!q) return;
+      const ll = q.match(/^\s*(3[3-9]\.\d+)\s*,\s*(12[4-9]\.\d+)\s*$/);
+      if (ll) return wxSave('직접 입력 ' + ll[1] + ', ' + ll[2], +ll[1], +ll[2], box);
+      box.textContent = '찾는 중...';
       try {
-        let rs = await look(q); if (!rs.length) rs = await look(q.split(/\s+/).pop()); if (!rs.length) rs = await look(q.split(/\s+/)[0]);
-        if (!rs.length) { box.textContent = '못 찾았어요. 구·동 이름만 넣어보세요 (예: 북구)'; return; }
-        box.innerHTML = rs.map((r, i) => '<button class="btn xs" data-wx="' + i + '">' + esc([r.admin1, r.admin2, r.name].filter(Boolean).filter((v, k, a) => a.indexOf(v) === k).join(' ')) + '</button>').join('');
-        box.querySelectorAll('[data-wx]').forEach((b) => (b.onclick = async () => {
-          const r = rs[+b.dataset.wx]; S.cfg.wxLoc = { name: b.textContent, lat: Math.round(r.latitude * 1e4) / 1e4, lon: Math.round(r.longitude * 1e4) / 1e4 };
-          await putCfg(); m.querySelector('#wxcur').textContent = b.textContent; box.textContent = '저장했어요 · 다음 경기 날씨부터 이 지역으로 나와요';
-          const g = S.games.find((x) => x.date >= today() && !x.postponed); if (g) wxNow(g); schedulePublish();
-        }));
+        const rs = await (await fetch('https://nominatim.openstreetmap.org/search?format=json&countrycodes=kr&accept-language=ko&limit=6&q=' + encodeURIComponent(q))).json();
+        if (!rs.length) { box.textContent = '못 찾았어요. "대구 북구 도남동"처럼 시·구·동으로 넣어보세요'; return; }
+        const nm = (r) => r.display_name.split(',').map((x) => x.trim()).filter((x) => !/^\d{5}$/.test(x) && x !== '대한민국').slice(0, 4).reverse().join(' ');
+        box.innerHTML = rs.map((r, i) => '<button class="btn xs" data-wx="' + i + '">' + esc(nm(r)) + '</button>').join('');
+        box.querySelectorAll('[data-wx]').forEach((b) => (b.onclick = () => { const r = rs[+b.dataset.wx]; wxSave(nm(r), +r.lat, +r.lon, box); }));
       } catch (e) { box.textContent = '찾기 실패: ' + e.message; }
+    };
+    m.querySelector('#wxme').onclick = () => {
+      const box = m.querySelector('#wxr');
+      if (!navigator.geolocation) return (box.textContent = '이 브라우저는 위치를 못 써요');
+      box.textContent = '위치 확인 중... (허용을 눌러주세요)';
+      navigator.geolocation.getCurrentPosition((p) => wxSave('구장 현장 위치', p.coords.latitude, p.coords.longitude, box),
+        () => (box.textContent = '위치 권한이 꺼져 있어요. 주소로 찾아주세요'), { enableHighAccuracy: true, timeout: 15000 });
     };
     m.querySelector('#bk').onclick = backup;
     m.querySelector('#lo').onclick = () => { closeModal(); try { sessionStorage.clear(); } catch (e) {} signOut(auth); };
