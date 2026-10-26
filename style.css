@@ -325,3 +325,5 @@ textarea.win{resize:vertical}
   .bar-in .logo{margin-right:auto}
   .wrap{padding-left:12px;padding-right:12px}
 }
+.tsel{display:flex;gap:6px}
+.tsel select{flex:1;min-height:46px;border:1.5px solid #C3CCE3;border-radius:12px;padding:0 10px;font:inherit;font-size:16px;background:#fff}

@@ -119,6 +119,15 @@ async function loadAll() {
 }
 
 /* ---------------- 처음 설정: 구글시트 가져오기 ---------------- */
+/* 시간 고르기: 무한 스크롤 대신 '오전/오후 ○시' + '○○분'(00·10·20·30·40·50) */
+function timeSel(id, val) {
+  const p = String(val || '16:00').split(':'), h = +p[0] || 0, mi = +p[1] || 0, ms = [0, 10, 20, 30, 40, 50];
+  if (ms.indexOf(mi) < 0) { ms.push(mi); ms.sort((a, b) => a - b); }
+  return '<span class="tsel" id="' + id + '"><select data-h aria-label="시">' + [...Array(24)].map((_, i) => '<option value="' + i + '"' + (i === h ? ' selected' : '') + '>' + (i < 12 ? '오전 ' : '오후 ') + ((i % 12) || 12) + '시</option>').join('') +
+    '</select><select data-m aria-label="분">' + ms.map((x) => '<option value="' + x + '"' + (x === mi ? ' selected' : '') + '>' + String(x).padStart(2, '0') + '분</option>').join('') + '</select></span>';
+}
+function timeVal(root, id) { const el = root.querySelector('#' + id); return String(el.querySelector('[data-h]').value).padStart(2, '0') + ':' + String(el.querySelector('[data-m]').value).padStart(2, '0'); }
+
 /* ---------------- 처음 시작: 폰에서 4단계로 끝내는 팀 설정 ---------------- */
 function renderSetup() {
   const W = S.wiz = S.wiz || { step: 1, sport: '', dow: 0, time: '16:00', place: '', fee: 30000, guestFee: 10000, account: '', me: '', names: '' };
@@ -130,7 +139,7 @@ function renderSetup() {
     '<button class="wsport' + (W.sport === 'futsal' ? ' on' : '') + '" data-sport="futsal"><b>⚽ 풋살</b><span>한 팀 5~6명</span></button>' +
     '<button class="wsport' + (W.sport === 'soccer' ? ' on' : '') + '" data-sport="soccer"><b>🥅 축구</b><span>한 팀 11명</span></button></div>';
   if (W.step === 2) body = '<h2>보통 언제 경기하나요?</h2><div class="wl">요일</div><div class="wchips">' + [...DOW].map((d, i) => chip('data-dow', i, W.dow === i, d)).join('') + '</div>' +
-    '<div class="wl">시간</div><input class="win" id="wt" type="time" value="' + esc(W.time) + '">' +
+    '<div class="wl">시간</div>' + timeSel('wt', W.time) +
     '<div class="wl">구장 (선택)</div><input class="win" id="wp" placeholder="예: OO풋살장" value="' + esc(W.place) + '">';
   if (W.step === 3) body = '<h2>회비는 얼마인가요?</h2><div class="wl">월회비 (정회원)</div><div class="wchips">' + [0, 20000, 30000, 40000, 50000].map((v) => chip('data-fee', v, W.fee === v, v ? won(v) + '원' : '없음')).join('') + '</div>' +
     '<div class="wl">게스트 참가비 (1회)</div><div class="wchips">' + [0, 5000, 10000, 15000, 20000].map((v) => chip('data-gfee', v, W.guestFee === v, v ? won(v) + '원' : '없음')).join('') + '</div>' +
@@ -145,7 +154,7 @@ function renderSetup() {
       '<label class="scard"><b>구글시트 엑셀 가져오기</b><span>A-KICK 전용 구글시트 양식만 가능</span><input type="file" accept=".xlsx" id="f" hidden></label>' +
       '<button class="scard" id="s3" hidden><b>예전 A-FUTSAL 데이터 옮기기</b><span>도남풋살에서 쓰던 데이터 그대로</span></button></div></details>' : '') + '</div>';
   const save = () => { const g = (id) => { const e = $(id); return e ? e.value.trim() : null; };
-    if (W.step === 2) { W.time = g('#wt') || W.time; W.place = g('#wp'); } if (W.step === 3) W.account = g('#wa'); if (W.step === 4) { W.me = g('#wme'); W.names = $('#wn').value; } };
+    if (W.step === 2) { W.time = timeVal(document, 'wt'); W.place = g('#wp'); } if (W.step === 3) W.account = g('#wa'); if (W.step === 4) { W.me = g('#wme'); W.names = $('#wn').value; } };
   document.querySelectorAll('[data-sport]').forEach((b) => (b.onclick = () => { W.sport = b.dataset.sport; renderSetup(); }));
   document.querySelectorAll('[data-dow]').forEach((b) => (b.onclick = () => { save(); W.dow = +b.dataset.dow; renderSetup(); }));
   document.querySelectorAll('[data-fee]').forEach((b) => (b.onclick = () => { save(); W.fee = +b.dataset.fee; renderSetup(); }));
@@ -408,10 +417,10 @@ const perSide = () => S.cfg.perSide || 5, maxSide = () => Math.max(perSide(), S.
 function sideTxt(total) { if (total < minN()) return (minN() - total) + '명 더 필요'; const k = Math.min(Math.floor(total / 2), maxSide()); return k + '대' + k + ' 가능'; }
 function newGameAsk(date) {
   if (S.cfg.dow != null) { const d = new Date(C.addDays(date, -6) + 'T00:00:00'); d.setDate(d.getDate() + ((S.cfg.dow - d.getDay() + 7) % 7)); date = C.ymd(d); }
-  modal('<h2>경기 만들기</h2><div class="row"><label class="f">날짜<input id="nd" type="date" value="' + esc(date) + '"></label><label class="f">시간<input id="nt" type="time" value="' + esc(S.cfg.time || '16:00') + '"></label></div>' +
+  modal('<h2>경기 만들기</h2><div class="row"><label class="f">날짜<input id="nd" type="date" value="' + esc(date) + '"></label><label class="f">시간' + timeSel('nt', S.cfg.time || '16:00') + '</label></div>' +
     '<div class="muted">요일·시간 상관없이 만들 수 있어요. 기본 시간은 설정에서 바꿔요.</div><div class="mfoot"><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">만들기</button></div>', (m) => {
     m.querySelector('#cx').onclick = closeModal;
-    m.querySelector('#ok').onclick = () => { const d = m.querySelector('#nd').value, t = m.querySelector('#nt').value; if (!d) return toast('날짜를 골라주세요'); if (S.games.some((g) => g.id === 'G' + d.replace(/-/g, ''))) return toast('그 날은 이미 경기가 있어요'); closeModal(); newGame(d, t); };
+    m.querySelector('#ok').onclick = () => { const d = m.querySelector('#nd').value, t = timeVal(m, 'nt'); if (!d) return toast('날짜를 골라주세요'); if (S.games.some((g) => g.id === 'G' + d.replace(/-/g, ''))) return toast('그 날은 이미 경기가 있어요'); closeModal(); newGame(d, t); };
   });
 }
 async function newGame(date, time) {
@@ -536,11 +545,11 @@ function bindTeam() {
 
 function editDeadline(gid) {
   const g = S.games.find((x) => x.id === gid), def = C.addDays(g.date, -1) + 'T22:00';
-  modal('<h2>' + md(g.date) + ' 경기 · 투표 마감</h2><label class="f">마감 날짜와 시간<input id="dlv" type="datetime-local" value="' + esc(g.deadline || def) + '"></label><div class="muted">마감이 지나면 회원 화면의 투표 버튼이 잠겨요. 비우면 경기 시작까지 투표할 수 있어요.</div>' +
+  modal('<h2>' + md(g.date) + ' 경기 · 투표 마감</h2><div class="row"><label class="f">마감 날짜<input id="dlv" type="date" value="' + esc((g.deadline || def).substr(0, 10)) + '"></label><label class="f">마감 시간' + timeSel('dlt', (g.deadline || def).substr(11, 5)) + '</label></div><div class="muted">마감이 지나면 회원 화면의 투표 버튼이 잠겨요. 비우면 경기 시작까지 투표할 수 있어요.</div>' +
     '<div class="mfoot"><button class="btn ghost" id="clr">마감 없음</button><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = closeModal;
     m.querySelector('#clr').onclick = async () => { g.deadline = ''; closeModal(); render(); await putGame(g); };
-    m.querySelector('#ok').onclick = async () => { g.deadline = m.querySelector('#dlv').value; closeModal(); render(); await putGame(g); toast('투표 마감을 저장했어요'); };
+    m.querySelector('#ok').onclick = async () => { g.deadline = m.querySelector('#dlv').value ? m.querySelector('#dlv').value + 'T' + timeVal(m, 'dlt') : ''; closeModal(); render(); await putGame(g); toast('투표 마감을 저장했어요'); };
   });
 }
 
@@ -898,7 +907,7 @@ function newPoll() {
     '<label class="f">설명 · 공지 내용 (선택)<textarea id="pd" rows="3" placeholder="예: 후보 중에 골라주세요. 좋은 이름 있으면 직접 추가해도 돼요!"></textarea></label>' +
     '<label class="f">보기 (한 줄에 하나 · 공지만 할 거면 비워두세요)<textarea id="po" rows="4" placeholder="OO FC&#10;킥앤런&#10;일요일의 전설"></textarea></label>' +
     '<div class="row"><label class="chk"><input type="checkbox" id="pm"> 여러 개 고를 수 있게</label><label class="chk"><input type="checkbox" id="pa" checked> 회원이 보기 추가 가능</label></div>' +
-    '<label class="f">마감 (비우면 마감 없음)<input id="pdl" type="datetime-local"></label>' +
+    '<div class="row"><label class="f">마감 날짜 (비우면 마감 없음)<input id="pdl" type="date"></label><label class="f">마감 시간' + timeSel('pdt', '22:00') + '</label></div>' +
     '<div class="muted">만들면 회원이 앱을 열 때 아직 안 한 투표가 바로 팝업으로 떠요.</div>' +
     '<div class="mfoot"><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">만들기</button></div>', (m) => {
     m.querySelector('#cx').onclick = closeModal;
@@ -907,7 +916,7 @@ function newPoll() {
       const lines = m.querySelector('#po').value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 20);
       const id = 'P' + Date.now().toString(36);
       const p = { title, desc: m.querySelector('#pd').value.trim(), options: lines.map((t, i) => ({ id: 'o' + (i + 1), text: t })), multi: m.querySelector('#pm').checked,
-        allowAdd: m.querySelector('#pa').checked, deadline: m.querySelector('#pdl').value, created: new Date().toISOString(), closed: false };
+        allowAdd: m.querySelector('#pa').checked, deadline: m.querySelector('#pdl').value ? m.querySelector('#pdl').value + 'T' + timeVal(m, 'pdt') : '', created: new Date().toISOString(), closed: false };
       await setDoc(D('polls', id), p).catch(fail); closeModal(); toast('만들었어요 · 카톡 공지 문구도 복사해 보세요'); S.view = 'polls'; render();
     };
   });
