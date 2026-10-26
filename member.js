@@ -320,7 +320,7 @@ function openProfile() {
       if (n && (n < 1 || n > 99)) return toast('등번호는 1~99로 넣어주세요');
       const dup = n && Object.entries(S.profs || {}).find(([mid, x]) => mid !== S.me.mid && x.num === n);
       if (dup) { const who = (S.pub.members || []).find((m) => m.id === dup[0]); if (!confirm((who ? who.name + ' 님이' : '다른 회원이') + ' 이미 ' + n + '번이에요. 그래도 쓸까요?')) return; }
-      try { await setDoc(doc(db, 'clubs', S.cid, 'profiles', S.me.mid), Object.assign({ num: n, pos, uid: S.uid, at: Date.now() }, p.ach ? { ach: p.ach, plat: p.plat || 0 } : {})); el.hidden = true; toast('저장했어요'); }
+      try { await setDoc(doc(db, 'clubs', S.cid, 'profiles', S.me.mid), Object.assign({ num: n, pos, uid: S.uid, at: Date.now() }, p.ach ? { ach: p.ach, plat: p.plat || 0 } : {}, p.xp ? { xp: p.xp, lv: p.lv || 1 } : {})); el.hidden = true; toast('저장했어요'); }
       catch (e) { toast('저장 실패: ' + e.message); logErr('프로필 저장 실패: ' + e.message, e.stack); }
     };
   });
@@ -332,7 +332,7 @@ async function wipeMine(cid) {                       // 한 팀 안의 내 흔�
   const marks = await getDocs(query(C('anonmark'), where('uid', '==', S.uid))).catch(() => null);
   if (marks) for (const m of marks.docs) { await deleteDoc(doc(db, 'clubs', cid, 'anonvotes', m.data().pid + '__' + m.data().key)).catch(() => {}); }
   await Promise.all([del(query(C('votes'), where('uid', '==', S.uid))), del(query(C('pollvotes'), where('uid', '==', S.uid))),
-    del(query(C('goals'), where('by', '==', S.uid))), del(query(C('suggest'), where('uid', '==', S.uid))), del(query(C('vcomments'), where('uid', '==', S.uid)))]);
+    del(query(C('goals'), where('by', '==', S.uid))), del(query(C('suggest'), where('uid', '==', S.uid))), del(query(C('vcomments'), where('uid', '==', S.uid))), del(query(C('rps'), where('uid', '==', S.uid)))]);
   if (marks) await Promise.all(marks.docs.map((m) => deleteDoc(m.ref).catch(() => {})));
   const u = await getDoc(doc(db, 'clubs', cid, 'users', S.uid)).catch(() => null);
   if (u && u.exists()) await deleteDoc(doc(db, 'clubs', cid, 'claims', u.data().mid)).catch(() => {});
@@ -384,7 +384,7 @@ async function deleteClub(cid, name) {
   if (t.trim() !== name) return toast('팀 이름이 달라서 삭제하지 않았어요');
   view('<div class="center">삭제하는 중... (몇 초 걸려요)</div>');
   try {
-    for (const c of ['members', 'games', 'tx', 'config', 'private', 'pub', 'votes', 'goals', 'polls', 'pollvotes', 'anonvotes', 'anonmark', 'videos', 'vcomments', 'push', 'profiles', 'suggest', 'requests', 'claims', 'users']) {
+    for (const c of ['members', 'games', 'tx', 'config', 'private', 'pub', 'votes', 'goals', 'polls', 'pollvotes', 'anonvotes', 'anonmark', 'videos', 'vcomments', 'push', 'profiles', 'rps', 'wx', 'suggest', 'requests', 'claims', 'users']) {
       const q = await getDocs(collection(db, 'clubs', cid, c));
       for (let i = 0; i < q.docs.length; i += 400) { const b = writeBatch(db); q.docs.slice(i, i + 400).forEach((d) => b.delete(d.ref)); await b.commit(); }
     }
@@ -516,6 +516,9 @@ function render() {
   document.querySelectorAll('[data-vid]').forEach((b) => (b.onclick = () => openVideo(b.dataset.vid)));
   const sg = $('#sug'); if (sg) sg.onclick = openSuggest;
   const aa = $('#achall'); if (aa) aa.onclick = openAch;
+  const lva = $('#lvall'); if (lva) lva.onclick = openLevel;
+  const rg = $('#rpsgo'); if (rg) rg.onclick = openRps;
+  rpsWatch(); wxWatch(game());
   if (S.tab === 'bank') achFlag('bank');
   achSoon();
   autoPopup();
@@ -614,11 +617,11 @@ function weekHTML() {
   return '<header class="hero">' + heroTop() + '' +
     '<h1>' + md(g.date) + ' (' + day(g.date) + ') ' + esc(g.time) + '</h1><p>' + esc(S.pub.place || '') + ' · 투표 마감 ' + dlTxt + (lk ? ' (마감됨)' : '') + '</p></header>' +
     '<main class="pad lift">' +
-    '<section class="card"><h2>이번 주 참석할까요?</h2>' + cdHTML(g) + '<div class="vote">' +
+    '<section class="card"><h2>이번 주 참석할까요?</h2>' + wxLine(g) + cdHTML(g) + '<div class="vote">' +
     '<button data-vote="참석" class="' + (amIn ? 'on' : '') + '"' + (lk ? ' disabled' : '') + '>참석</button>' +
     '<button data-vote="불참" class="' + (!amIn && mine && mine.v === '불참' ? 'on no' : '') + '"' + (lk ? ' disabled' : '') + '>불참</button></div>' +
     '<div class="cnt"><span>지금 <b>' + total + '명</b> · 회원 ' + att.length + ' + 게스트 ' + (g.guests || []).length + '</span><em class="' + (total >= minN() ? 'ok' : 'low') + '">' + status + '</em></div>' +
-    '<div class="names">' + att.map((n) => '<span class="' + (n === S.me.name ? 'me' : '') + '">' + esc(n) + '</span>').join('') + ((g.guests || []).length ? '<span class="g">게스트 ' + g.guests.length + '명</span>' : '') + '</div></section>' +
+    '<div class="names">' + att.map((n) => '<span class="' + (n === S.me.name ? 'me' : '') + '">' + lvPill(lvOfName(n)) + esc(n) + '</span>').join('') + ((g.guests || []).length ? '<span class="g">게스트 ' + g.guests.length + '명</span>' : '') + '</div></section>' +
     (teams.length >= 2 ? '<section class="card"><div class="h2row"><h2>팀 편성</h2>' + (myTeam >= 0 ? '<span class="myteam t' + myTeam + '">나는 ' + 'ABC'[myTeam] + '팀</span>' : '') + '</div>' +
       '<div class="tl"><b class="tb">B팀 ' + teams[1].length + '명</b></div><div class="vpitch"><span class="vm"></span><span class="vc"></span><span class="vbT"></span><span class="vbB"></span>' +
       side(teams[1], false, 'b', g.id + ':1') + side(teams[0], true, 'a', g.id + ':0') + '</div><div class="tl"><b class="ta">A팀 ' + teams[0].length + '명</b></div>' +
@@ -637,7 +640,7 @@ function homeHTML() {
     const st = amIn ? ['in', '참석'] : mine && mine.v === '불참' ? ['out', '불참'] : ['none', '아직 응답 안 함'];
     gcard = '<section class="card nextg"><div class="h2row"><span class="lbl">다음 경기</span><span class="mystat ' + st[0] + '">나: ' + st[1] + '</span></div>' +
       '<div class="ng-date">' + md(g.date) + ' <small>(' + day(g.date) + ')</small> ' + esc(g.time) + '</div>' +
-      '<div class="ng-sub">' + esc(S.pub.place || '') + (S.pub.place ? ' · ' : '') + '지금 <b>' + total + '명</b> · ' + sideTxt(total) + '</div>' +
+      '<div class="ng-sub">' + esc(S.pub.place || '') + (S.pub.place ? ' · ' : '') + '지금 <b>' + total + '명</b> · ' + sideTxt(total) + '</div>' + wxLine(g) +
       cdHTML(g) +
       (lk ? '' : '<div class="vote sm"><button data-vote="참석" class="' + (amIn ? 'on' : '') + '">참석</button><button data-vote="불참" class="' + (st[0] === 'out' ? 'on no' : '') + '">불참</button></div>') +
       '<button class="more" data-go="week">참석 명단 · 팀 편성 보기 ›</button></section>';
@@ -645,7 +648,7 @@ function homeHTML() {
   const tile = (go, lbl, val, sub, cls) => '<button class="tile ' + (cls || '') + '" data-go="' + go + '"><span>' + lbl + '</span><b>' + val + '</b><small>' + sub + '</small></button>';
   const recent = txs.slice(-3).reverse();
   return '<header class="hero home">' + heroTop() + '<h1>안녕하세요, ' + esc(S.me.name) + ' 님 👋</h1><p>' + esc(clubName()) + '에 오신 걸 환영해요</p></header>' +
-    '<main class="pad lift">' + gcard + pollsCard() + vidsHome() + achCard() + installCard() +
+    '<main class="pad lift">' + gcard + lvCard() + pollsCard() + vidsHome() + achCard() + installCard() +
     '<div class="tiles">' +
     tile('dues', mon(d.ym) + ' 회비', !due ? '대상 아님' : paid ? '납부 완료' : '미납', won(d.fee) + '원 · 납부 ' + d.paid.length + '/' + (d.paid.length + d.unpaid.length) + '명', !due ? '' : paid ? 'ok' : 'bad') +
     tile('bank', '통장 잔액', won(bal) + '원', '입출금 전부 공개') +
@@ -896,7 +899,7 @@ function achCtx() {
     inst: A.f.inst || 0, push: A.f.push || 0, num: ((S.profs || {})[S.me.mid] || {}).num ? 1 : 0, bank: A.f.bank || 0,
     ny: A.f.ny || 0, yr: S.me.at ? Math.floor((Date.now() - S.me.at) / 864e5) : 0, got: ACH.filter((x) => x[0] !== 'plat' && A.got[x[0]]).length };
 }
-function achSoon() { clearTimeout(achT); achT = setTimeout(achCheck, 1200); }
+function achSoon() { clearTimeout(achT); achT = setTimeout(() => { achCheck(); lvSync(); }, 1200); }
 function achCheck() {
   if (!A || !S.pub || !S.me || !S.cid || !(S.pub.members || []).some((m) => m.id === S.me.mid)) return;
   const d = S.pub.dues, t = ymd(new Date());
@@ -912,11 +915,15 @@ function achCheck() {
   if (S.tab === 'home') render();
 }
 /** 팀원에게 보일 업적 수 (선수 정보 문서에 같이 저장) */
-function achSyncProf() {
-  if (!S.profs) return;
-  const n = Object.keys(A.got).length, p = S.profs[S.me.mid] || {}, plat = A.got.plat ? 1 : 0;
-  if (p.ach === n && (p.plat || 0) === plat) return;
-  setDoc(doc(db, 'clubs', S.cid, 'profiles', S.me.mid), { num: p.num || 0, pos: p.pos || [], uid: S.uid, at: Date.now(), ach: n, plat }).catch(() => {});
+function achSyncProf() { profPut(); }
+/** 팀원에게 보일 내 값(업적 수·레벨·EXP)을 한 번에 저장 — 따로 쓰면 서로 덮어써서 */
+function profPut() {
+  if (!S.profs || !A || S.rpsNet === undefined || !S.pollsLoaded || !S.pvLoaded || !S.goals || !S.vcAll) return;
+  const p = S.profs[S.me.mid] || {}, n = Object.keys(A.got).length, plat = A.got.plat ? 1 : 0, xp = myXp(), lv = window.Core.lvOf(xp).lv;
+  if (p.ach === n && (p.plat || 0) === plat && p.xp === xp && p.lv === lv) return;
+  const v = { num: p.num || 0, pos: p.pos || [], uid: S.uid, at: Date.now(), ach: n, plat, xp, lv };
+  S.profs[S.me.mid] = Object.assign({}, p, v);
+  setDoc(doc(db, 'clubs', S.cid, 'profiles', S.me.mid), v).catch(() => {});
 }
 /* ---- 업적 뱃지 그림 (방패 엠블럼) : 테마와 상관없이 남색 코어 + 금속 테두리 ---- */
 const AIC = {
@@ -1034,4 +1041,171 @@ function openAch() {
         (on ? '<small class="adt">' + ymd(new Date(A.got[a[0]])).replace(/-/g, '.') + ' 달성</small>' : hid || a[7] === 1 ? '' : '<i><u style="width:' + Math.round(cur / a[7] * 100) + '%"></u></i><small>' + cur + '/' + a[7] + '</small>') + '</div></div>';
     }).join('') + '</div>').join('') +
     '<div class="srow"><button class="pri" id="ax">닫기</button></div>', (el) => (el.querySelector('#ax').onclick = () => (el.hidden = true)));
+}
+
+/* ---------------- 레벨 (EXP) ----------------
+   EXP는 따로 쌓아두지 않고 실제 기록(접속·투표·참석·골·댓글·회비·업적)에서 계산 → 조작이 어렵고 지난 기록도 반영됨.
+   가위바위보 손익과 관리자 지급만 더함 */
+const XP_ACH = { B: 20, S: 50, G: 150, P: 500 };
+const LVMET = { B: ['#FFE7D1', '#D08A55', '#7A4220'], S: ['#FFFFFF', '#BCC6D3', '#5E6B7E'], G: ['#FFF6C9', '#E8B423', '#8A5E00'], E: ['#D5FFF3', '#2BC7A4', '#0B6B57'] };
+const LVSTOP = (k) => k === 'P' ? '<stop offset="0" stop-color="#F7FAFF"/><stop offset=".3" stop-color="#C9D8FF"/><stop offset=".55" stop-color="#F1DCFF"/><stop offset=".8" stop-color="#C6F1EA"/><stop offset="1" stop-color="#8F88D8"/>'
+  : k === 'X' ? '<stop offset="0" stop-color="#FFF1B5"/><stop offset=".3" stop-color="#FFB36B"/><stop offset=".55" stop-color="#F07BFF"/><stop offset=".8" stop-color="#76B8FF"/><stop offset="1" stop-color="#7CF5D2"/>'
+  : '<stop offset="0" stop-color="' + LVMET[k][0] + '"/><stop offset=".5" stop-color="' + LVMET[k][1] + '"/><stop offset="1" stop-color="' + LVMET[k][2] + '"/>';
+const LVBG = (k) => k === 'P' ? 'linear-gradient(135deg,#F7FAFF,#C9D8FF 30%,#F1DCFF 55%,#C6F1EA 80%,#8F88D8)' : k === 'X' ? 'linear-gradient(120deg,#FFF1B5,#FFB36B,#F07BFF,#76B8FF,#7CF5D2)'
+  : 'linear-gradient(135deg,' + LVMET[k][0] + ',' + LVMET[k][1] + ' 50%,' + LVMET[k][2] + ')';
+/** 작은 자리용 알약 (테두리 색으로 구간 구분) */
+function lvPill(lv) { if (!lv) return ''; const b = window.Core.lvBand(lv); return '<span class="lvp" style="background:' + LVBG(b.key) + '"><i>' + (lv >= 50 ? 'GOAT' : 'LV.' + lv) + '</i></span>'; }
+let lvUid = 0;
+/** 큰 자리용 엠블럼: 깎인 보석 + 구간이 오를수록 길어지는 월계수 (GOAT는 원 + 별) */
+function lvEmblem(lv, size) {
+  const b = window.Core.lvBand(lv), k = b.key, u = 'lv' + (++lvUid), PH = { B: 0, S: 70, G: 100, E: 128, P: 152, X: 178 }[k];
+  const cx = 60, cy = 62, R = 40, rad = (d) => d * Math.PI / 180, f = (n) => n.toFixed(1);
+  const light = k === 'P' || k === 'X' ? '#E8EEFF' : LVMET[k][0];
+  let g = '';
+  if (k === 'X') g += '<circle cx="60" cy="60" r="58" fill="url(#gl' + u + ')"/>';
+  if (PH) for (const sd of [-1, 1]) {
+    let pts = []; for (let p = 18; p <= PH; p += 3) pts.push(f(cx + sd * R * Math.sin(rad(p))) + ' ' + f(cy + R * Math.cos(rad(p))));
+    g += '<path d="M' + pts.join(' L') + '" fill="none" stroke="url(#m' + u + ')" stroke-width="1.6" stroke-linecap="round"/>';
+    const n = Math.max(2, Math.round((PH - 20) / 24) + 1);
+    for (let j = 0; j < n; j++) {
+      const p = rad(22 + j * (PH - 28) / Math.max(n - 1, 1)), x = cx + sd * R * Math.sin(p), y = cy + R * Math.cos(p);
+      const tang = Math.atan2(-Math.sin(p), sd * Math.cos(p)) * 180 / Math.PI + 90, L = 15 - j * 1.1, W = 6.2 - j * .35;
+      for (const side of [1, -1]) {
+        const ox = x + side * 4.2 * Math.sin(p) * sd, oy = y + side * 4.2 * Math.cos(p);
+        g += '<g transform="translate(' + f(ox) + ' ' + f(oy) + ') rotate(' + f(tang + side * sd * -32) + ')"><path d="M0 ' + f(-L / 2) + ' Q' + f(W / 2) + ' 0 0 ' + f(L / 2) + ' Q' + f(-W / 2) + ' 0 0 ' + f(-L / 2) + 'Z" fill="url(#m' + u + ')"/><path d="M0 ' + f(-L / 2) + ' Q' + f(W / 2) + ' 0 0 ' + f(L / 2) + 'Z" fill="#fff" fill-opacity=".38"/></g>';
+      }
+    }
+  }
+  if (k === 'X') g += '<path d="M60 3.5l3.1 6.4 7 .9-5.1 4.8 1.3 6.9L60 19.2l-6.3 3.3 1.3-6.9-5.1-4.8 7-.9z" fill="url(#m' + u + ')" stroke="#fff" stroke-opacity=".6" stroke-width=".8"/>';
+  const fac = (a, b2, c, d, col, op) => '<path d="M' + a + 'L' + b2 + 'L' + c + 'L' + d + 'Z" fill="' + col + '" fill-opacity="' + op + '"/>';
+  g += '<path d="M60 30L88 58L60 86L32 58Z" fill="url(#m' + u + ')" stroke="#0B0F1E" stroke-opacity=".25" stroke-width=".8" stroke-linejoin="round"/>' +
+    fac('60 30', '88 58', '80 58', '60 38', '#fff', .35) + fac('88 58', '60 86', '60 78', '80 58', '#000', .18) + fac('60 86', '32 58', '40 58', '60 78', '#000', .28) + fac('32 58', '60 30', '60 38', '40 58', '#fff', .55) +
+    '<path d="M60 38L80 58L60 78L40 58Z" fill="url(#c' + u + ')"/><path d="M60 38L80 58L60 78L40 58Z" fill="none" stroke="#fff" stroke-opacity=".14"/>' +
+    '<text x="60" y="' + (lv < 10 ? 63.6 : 63.2) + '" text-anchor="middle" font-family="Bungee,sans-serif" font-size="' + (lv < 10 ? 17 : 15.5) + '" fill="url(#n' + u + ')">' + lv + '</text>';
+  return '<svg class="lvem" viewBox="0 0 120 120" width="' + size + '" height="' + size + '" aria-label="레벨 ' + lv + '"><defs><linearGradient id="m' + u + '" x1="0" y1="0" x2="1" y2="1">' + LVSTOP(k) + '</linearGradient>' +
+    '<radialGradient id="c' + u + '" cx=".5" cy=".28" r=".85"><stop offset="0" stop-color="#2C3657"/><stop offset="1" stop-color="#0B0F1E"/></radialGradient>' +
+    '<linearGradient id="n' + u + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="' + light + '"/></linearGradient>' +
+    '<radialGradient id="gl' + u + '" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#F07BFF" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>' +
+    '<g style="filter:drop-shadow(0 3px 4px rgba(11,16,32,.28))">' + g + '</g></svg>';
+}
+/** 내 EXP 내역 (활동별) */
+function xpParts() {
+  const x = achCtx(), byDay = {};
+  (S.vcAll || []).filter((c) => c.uid === S.uid).forEach((c) => { const d = ymd(new Date(c.at || 0)); byDay[d] = (byDay[d] || 0) + 1; });
+  const cm = Object.values(byDay).reduce((a, n) => a + Math.min(10, n), 0);
+  const ach = ACH.filter((a) => A.got[a[0]]).reduce((s, a) => s + XP_ACH[a[2]], 0);
+  const adj = ((S.pub.xpAdj || {})[S.me.mid]) || 0;
+  return [['접속한 날', x.days, 5], ['참석 투표', x.vg, 10], ['경기 참석', x.came, 30], ['골', x.g, 10], ['도움', x.a, 7], ['하이라이트 댓글', cm, 3], ['투표·공지 참여', x.pv, 5], ['회비 기한 내 납부', x.pe, 20]]
+    .map(([l, n, p]) => [l, n + '회', n * p]).concat([['업적 보너스', ACH.filter((a) => A.got[a[0]]).length + '개', ach], ['가위바위보', '', S.rpsNet || 0], ['관리자 지급', '', adj]]);
+}
+function myXp() { return Math.max(0, xpParts().reduce((s, p) => s + p[2], 0)); }
+function lvOfMid(mid) { const p = (S.profs || {})[mid]; return p && p.lv ? p.lv : 0; }
+function lvOfName(n) { const m = (S.pub.members || []).find((x) => x.name === n); return m ? lvOfMid(m.id) : 0; }
+function lvCard() {
+  if (!A) return '';
+  const L = window.Core.lvOf(myXp()), b = window.Core.lvBand(L.lv), rk = lvRank(), my = rk.findIndex((r) => r.mid === S.me.mid);
+  return '<section class="card lvc"><div class="lvhead">' + lvEmblem(L.lv, 76) + '<div class="lvnm"><b>' + esc(S.me.name) + ' <em class="lvb">' + b.name + '</em></b>' +
+    '<small>' + (L.lv >= 50 ? '최고 레벨 GOAT 🐐' : 'LV.' + (L.lv + 1) + '까지 ' + (L.need - L.cur) + ' EXP') + (my >= 0 && rk.length > 1 ? ' · 팀 ' + (my + 1) + '위' : '') + '</small></div><button class="more inl" id="lvall">내역 ›</button></div>' +
+    '<div class="lvbar"><u style="width:' + (L.lv >= 50 ? 100 : Math.round(L.cur / L.need * 100)) + '%"></u></div><div class="lvxp"><span>LV.' + L.lv + '</span><span><b>' + L.xp.toLocaleString() + '</b> EXP</span><span>' + (L.lv >= 50 ? 'GOAT' : 'LV.' + (L.lv + 1)) + '</span></div>' +
+    '<button class="rpsbtn" id="rpsgo"><span>✊✌️🖐️</span><b>오늘의 가위바위보</b><em>' + Math.max(0, 5 - ((S.rpsToday || {}).n || 0)) + '판 남음</em></button></section>';
+}
+function lvRank() {
+  return Object.entries(S.profs || {}).filter(([, p]) => p.xp).map(([mid, p]) => ({ mid, name: ((S.pub.members || []).find((m) => m.id === mid) || {}).name, xp: p.xp, lv: p.lv || 1 })).filter((r) => r.name).sort((a, b) => b.xp - a.xp);
+}
+function openLevel() {
+  const parts = xpParts(), L = window.Core.lvOf(myXp()), rk = lvRank().slice(0, 10);
+  sheet('<div class="lvtop">' + lvEmblem(L.lv, 96) + '<div><h2>LV.' + L.lv + ' ' + window.Core.lvBand(L.lv).name + '</h2><div class="muted">총 ' + L.xp.toLocaleString() + ' EXP · 꾸준히 1년이면 GOAT(50)</div></div></div>' +
+    '<div class="acat">내 EXP 내역</div><table class="xpt">' + parts.filter((p) => p[2]).map((p) => '<tr><td>' + p[0] + '</td><td class="muted">' + p[1] + '</td><td class="' + (p[2] < 0 ? 'n' : 'p') + '">' + (p[2] > 0 ? '+' : '') + p[2].toLocaleString() + '</td></tr>').join('') + '</table>' +
+    (rk.length ? '<div class="acat">팀 레벨 순위</div><div class="lvrk">' + rk.map((r, i) => '<div class="' + (r.mid === S.me.mid ? 'me' : '') + '"><span>' + (i + 1) + '</span>' + lvPill(r.lv) + '<b>' + esc(r.name) + '</b><em>' + r.xp.toLocaleString() + '</em></div>').join('') + '</div>' : '') +
+    '<div class="acat">EXP 얻는 법</div><div class="muted" style="font-size:12.5px;line-height:1.7">하루 접속 +5 · 참석 투표 +10 · 경기 참석 +30 · 골 +10 · 도움 +7 · 하이라이트 댓글 +3 (하루 10개까지) · 투표·공지 참여 +5 · 회비 기한 내 납부 +20 · 업적 브론즈 +20 · 실버 +50 · 골드 +150 · 플래티넘 +500</div>' +
+    '<div class="srow"><button class="pri" id="lx">닫기</button></div>', (el) => (el.querySelector('#lx').onclick = () => (el.hidden = true)));
+}
+/** 레벨 변화 확인 → 팀원에게 보일 값 저장 · 올랐으면 축하 */
+function lvSync() {
+  if (!A || !S.profs || S.rpsNet === undefined || !S.pollsLoaded || !S.pvLoaded || !S.goals || !S.vcAll) return;   // 기록을 다 불러온 뒤에만 (중간값으로 레벨업 축하가 두 번 뜨지 않게)
+  const L = window.Core.lvOf(myXp());
+  if (A.lv && L.lv > A.lv) lvCelebrate(A.lv, L.lv);
+  if (A.lv !== L.lv) { A.lv = L.lv; achSave(); }
+  profPut();
+}
+function lvCelebrate(from, to) {
+  const old = document.querySelector('.lvwrap'); if (old) { from = +old.dataset.from; old.remove(); }   // 연달아 오르면 한 장으로
+  const b = window.Core.lvBand(to), newBand = window.Core.lvBand(from).name !== b.name, goat = to >= 50;
+  const el = document.createElement('div'); el.className = 'apop lvwrap'; el.dataset.from = from;
+  el.innerHTML = '<div class="apbox lvpop' + (goat ? ' goat' : '') + '"><i class="ray"></i>' + lvEmblem(to, 140) + '<div class="lu">' + (goat ? 'GOAT' : 'LEVEL UP') + '</div><b>LV.' + to + ' ' + b.name + '</b>' +
+    '<span>' + (goat ? '팀에서 가장 꾸준한 사람에게만' : newBand ? b.name + ' 구간 진입! 엠블럼이 바뀌었어요' : 'LV.' + from + ' → LV.' + to) + '</span></div>';
+  document.body.appendChild(el); const bye = () => el.remove(); el.onclick = bye; setTimeout(bye, 4000);
+}
+
+/* ---------------- 가위바위보 (EXP 걸기 · 하루 5판 · 한 판 최대 100) ---------------- */
+const RPS = [['r', '✊', '바위'], ['s', '✌️', '가위'], ['p', '🖐️', '보']];
+const todayKey = () => ymd(new Date()).replace(/-/g, '');
+function rpsWatch() {
+  if (S.rpsSub || !S.me) return;
+  S.rpsSub = onSnapshot(query(collection(db, 'clubs', S.cid, 'rps'), where('uid', '==', S.uid)), (q) => {
+    const all = q.docs.map((d) => d.data()); S.rpsNet = all.reduce((s, x) => s + (x.net || 0), 0); S.rpsToday = all.find((x) => x.date === todayKey()) || null; lvSync(); if (S.tab === 'home' && !$('#rpsov')) render();
+  }, () => { S.rpsNet = 0; });
+}
+async function openRps() {
+  const day = todayKey();
+  const top = (await getDocs(query(collection(db, 'clubs', S.cid, 'rps'), where('date', '==', day))).catch(() => ({ docs: [] }))).docs.map((d) => d.data());
+  const me = S.rpsToday || { n: 0, w: 0, l: 0, net: 0 }, left = 5 - (me.n || 0), have = myXp();
+  const row = (x, i, neg) => '<div><span>' + (i + 1) + '위</span><b>' + esc(x.name) + '</b><em class="' + (neg ? 'n' : 'p') + '">' + (x.net > 0 ? '+' : '') + x.net + '</em></div>';
+  const win = top.filter((x) => x.net > 0).sort((a, b) => b.net - a.net).slice(0, 10), lose = top.filter((x) => x.net < 0).sort((a, b) => a.net - b.net).slice(0, 10);
+  sheet('<h2>✊✌️🖐️ 가위바위보</h2><div class="rstat"><div><span>보유 EXP</span><b>' + have.toLocaleString() + '</b></div><div><span>남은 판</span><b>' + left + '/5</b></div>' +
+    '<div><span>오늘 승률</span><b>' + (me.w + me.l ? Math.round(me.w / (me.w + me.l) * 100) + '%' : '-') + '</b></div><div><span>오늘 결과</span><b class="' + (me.net < 0 ? 'n' : 'p') + '">' + (me.net > 0 ? '+' : '') + (me.net || 0) + '</b></div></div>' +
+    '<div class="rvs"><div><small>' + esc(S.me.name) + '</small><i id="rme">❔</i></div><b class="vs">VS</b><div><small>킥봇</small><i id="rbot">❔</i></div></div><div class="rres" id="rres">' + (left > 0 ? '걸 EXP를 넣고 하나를 고르세요' : '오늘은 다 했어요. 내일 또 만나요!') + '</div>' +
+    '<label class="rbet">걸 EXP <input id="rbet" type="number" inputmode="numeric" min="1" max="100" value="' + Math.min(50, Math.max(1, have)) + '"><small>한 판 최대 100 · 비기면 그대로</small></label>' +
+    '<div class="rbtns">' + RPS.map(([k, e, l]) => '<button data-rps="' + k + '"' + (left > 0 && have > 0 ? '' : ' disabled') + '><i>' + e + '</i>' + l + '</button>').join('') + '</div>' +
+    '<div class="rtop"><div><h3>오늘의 다승왕</h3>' + (win.map((x, i) => row(x, i)).join('') || '<p class="muted">아직 없어요</p>') + '</div><div><h3>오늘의 불행왕</h3>' + (lose.map((x, i) => row(x, i, 1)).join('') || '<p class="muted">아직 없어요</p>') + '</div></div>' +
+    '<div class="srow"><button id="rx">닫기</button></div>', (el) => {
+    el.querySelector('.sbox').id = 'rpsov';
+    el.querySelector('#rx').onclick = () => { el.hidden = true; render(); };
+    el.querySelectorAll('[data-rps]').forEach((b) => (b.onclick = () => rpsPlay(b.dataset.rps, el)));
+  });
+}
+let rpsBusy = false;
+async function rpsPlay(mine, el) {
+  if (rpsBusy) return;
+  const me = Object.assign({ n: 0, w: 0, l: 0, net: 0 }, S.rpsToday || {}), have = myXp();
+  let bet = Math.floor(+el.querySelector('#rbet').value || 0);
+  if (me.n >= 5) return toast('오늘 5판을 다 했어요');
+  if (bet < 1) return toast('걸 EXP를 넣어주세요');
+  bet = Math.min(bet, 100, have);
+  rpsBusy = true; el.querySelectorAll('[data-rps]').forEach((b) => (b.disabled = true));
+  const bot = RPS[crypto.getRandomValues(new Uint8Array(1))[0] % 3][0], E = (k) => RPS.find((x) => x[0] === k)[1];
+  const bi = el.querySelector('#rbot'); let t = 0; const spin = setInterval(() => (bi.textContent = RPS[t++ % 3][1]), 90);
+  el.querySelector('#rme').textContent = E(mine);
+  await new Promise((r) => setTimeout(r, 900)); clearInterval(spin); bi.textContent = E(bot);
+  const res = mine === bot ? 0 : (mine === 'r' && bot === 's') || (mine === 's' && bot === 'p') || (mine === 'p' && bot === 'r') ? 1 : -1;
+  const nx = { uid: S.uid, mid: S.me.mid, name: S.me.name, date: todayKey(), n: me.n + 1, w: me.w + (res > 0 ? 1 : 0), l: me.l + (res < 0 ? 1 : 0), net: me.net + res * bet, at: Date.now() };
+  el.querySelector('#rres').innerHTML = res > 0 ? '<b class="p">이겼어요! +' + bet + ' EXP</b>' : res < 0 ? '<b class="n">졌어요 −' + bet + ' EXP</b>' : '<b>비겼어요 · EXP 그대로</b>';
+  try { await setDoc(doc(db, 'clubs', S.cid, 'rps', S.uid + '_' + nx.date), nx); S.rpsToday = nx; }
+  catch (e) { toast('저장 실패: ' + e.message); logErr('가위바위보 저장 실패: ' + e.message, e.stack); }
+  rpsBusy = false; setTimeout(() => { if (!el.hidden) openRps(); }, 1300);
+}
+
+/* ---------------- 다음 경기 날씨 (경기가 정해지면 자동 · 6시간마다 새로) ----------------
+   서버가 없어서, 6시간이 지난 뒤 앱을 처음 연 사람이 새로 받아와 모두와 나눔 */
+const WX_TTL = 6 * 3600e3;
+function wxWatch(g) {
+  if (!g || S.wxGid === g.id) return;
+  if (S.wxSub) S.wxSub(); S.wxGid = g.id; S.wx = null;
+  S.wxSub = onSnapshot(doc(db, 'clubs', S.cid, 'wx', g.id), (d) => { S.wx = d.exists() ? d.data() : null; wxRefresh(g); if (S.tab === 'home' || S.tab === 'week') render(); }, () => {});
+}
+let wxBusy = false;
+async function wxRefresh(g) {
+  const loc = S.pub.wxLoc || { lat: 35.8714, lon: 128.6014 }, days = (Date.parse(g.date) - Date.now()) / 864e5;
+  if (wxBusy || days > 15 || days < -1 || (S.wx && S.wx.date === g.date && S.wx.time === (g.time || '') && Date.now() - S.wx.at < WX_TTL)) return;
+  wxBusy = true;
+  try { const w = await window.Core.fetchWx(loc.lat, loc.lon, g.date, g.time); await setDoc(doc(db, 'clubs', S.cid, 'wx', g.id), Object.assign(w, { gid: g.id, date: g.date, time: g.time || '', at: Date.now() })); }
+  catch (e) { /* 날씨 서버가 잠깐 안 되면 다음에 다시 */ }
+  wxBusy = false;
+}
+function wxLine(g) {
+  const w = S.wx; if (!g) return '';
+  if (!w || w.date !== g.date) return (Date.parse(g.date) - Date.now()) / 864e5 > 15 ? '<div class="wx soft">🌤️ 날씨는 경기 15일 전부터 나와요</div>' : '';
+  const [ic, lb] = window.Core.wxLabel(w.code), rain = w.pop >= 50 || w.pr >= 1;
+  return '<div class="wx' + (rain ? ' rain' : '') + '"><span class="wi">' + ic + '</span><b>' + w.t + '°</b><span>' + lb + '</span><span>강수 ' + w.pop + '%</span><span>바람 ' + w.wind + 'm/s</span>' +
+    (rain ? '<em>우산 챙기세요 · 우천 공지 확인</em>' : w.t <= 3 ? '<em>추워요 · 따뜻하게</em>' : w.t >= 30 ? '<em>더워요 · 물 챙기세요</em>' : '') + '<small>' + new Date(w.at).getHours() + '시 기준</small></div>';
 }

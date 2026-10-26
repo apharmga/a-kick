@@ -153,10 +153,27 @@ service cloud.firestore {
       match /profiles/{mid} {
         allow read: if isMember();
         allow write: if isMember() && mid == myMid()
-          && (request.resource == null || (request.resource.data.keys().hasOnly(['num', 'pos', 'uid', 'at', 'ach', 'plat'])
+          && (request.resource == null || (request.resource.data.keys().hasOnly(['num', 'pos', 'uid', 'at', 'ach', 'plat', 'xp', 'lv'])
             && request.resource.data.uid == request.auth.uid
             && request.resource.data.num is int && request.resource.data.num >= 0 && request.resource.data.num <= 99
             && request.resource.data.pos is list && request.resource.data.pos.size() <= 2));
+      }
+      // 가위바위보: 본인 하루 기록 1개 (하루 5판, 한 판 최대 100이라 하루 ±500 안)
+      match /rps/{id} {
+        allow read: if isMember();
+        allow write: if isMember() && id == request.auth.uid + '_' + request.resource.data.date
+          && request.resource.data.keys().hasOnly(['uid', 'mid', 'name', 'date', 'n', 'w', 'l', 'net', 'at'])
+          && request.resource.data.uid == request.auth.uid && request.resource.data.mid == myMid()
+          && request.resource.data.date is string && request.resource.data.date.size() == 8
+          && request.resource.data.n is int && request.resource.data.n >= 1 && request.resource.data.n <= 5
+          && request.resource.data.net is int && request.resource.data.net >= -500 && request.resource.data.net <= 500;
+      }
+      // 다음 경기 날씨: 회원 누구나 새로 받아와 공유
+      match /wx/{gid} {
+        allow read: if isMember();
+        allow write: if isMember()
+          && request.resource.data.keys().hasOnly(['gid', 'date', 'time', 't', 'pop', 'pr', 'code', 'wind', 'at'])
+          && request.resource.data.gid == gid && request.resource.data.at is int;
       }
       match /suggest/{id} {
         allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;

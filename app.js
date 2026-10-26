@@ -475,10 +475,16 @@ function newGameAsk(date) {
 async function newGame(date, time) {
   const id = 'G' + date.replace(/-/g, '');
   const g = { id, date, time: time || S.cfg.time || '16:00', type: S.cfg.rentPerGame ? '정기' : '일회성', fee: S.cfg.rentPerGame || S.cfg.oneOff, cap: S.cfg.cap || 12, attend: [], deadline: '' };
-  S.games.push(g); S.games.sort((a, b) => (a.date < b.date ? -1 : 1)); render(); await putGame(g); toast(md(date) + ' 경기를 만들었어요');
+  S.games.push(g); S.games.sort((a, b) => (a.date < b.date ? -1 : 1)); render(); await putGame(g); toast(md(date) + ' 경기를 만들었어요'); wxNow(g);
 }
 
 
+/** 경기가 생기면 그 경기 날씨를 바로 받아 회원 화면에 공유 (이후엔 회원 앱이 6시간마다 새로) */
+async function wxNow(g) {
+  const loc = S.cfg.wxLoc || { lat: 35.8714, lon: 128.6014 };
+  if ((Date.parse(g.date) - Date.now()) / 864e5 > 15) return;
+  try { const w = await C.fetchWx(loc.lat, loc.lon, g.date, g.time); await setDoc(D('wx', g.id), Object.assign(w, { gid: g.id, date: g.date, time: g.time || '', at: Date.now() })); } catch (e) {}
+}
 /* ---------------- 팀 편성 ---------------- */
 const TEAMC = ['A', 'B', 'C'];
 // 팀 인원별 대형 (가로 경기장 왼쪽 절반 기준 x%, y%) · 첫 자리는 GK
@@ -628,7 +634,7 @@ function pubData() {
   let bal = 0;
   const txs = S.txs.map((x) => { bal = !x.manual && x.bal ? x.bal : bal + (x.kind === '입금' ? x.amt : -x.amt); return { dt: x.dt.substr(0, 16).replace(/\./g, '-'), io: x.kind === '입금' ? 1 : 0, amt: x.amt, who: x.desc, what: x.state === '확인필요' ? '관리자 확인 중' : partLabel(x), off: x.state === '무시' ? 1 : 0, bal, pend: x.manual ? 1 : 0 }; }).slice(-1500);
   const played = S.games.filter((g) => g.date <= t && g.date >= statFrom() && !g.postponed).slice(-200).map((g) => { const pl = playersOf(g); return { id: g.id, date: g.date, players: pl, teams: g.teams ? g.teams.map((x) => x.filter((n) => pl.indexOf(n) >= 0).join('|')) : [] }; });
-  return { updatedAt: new Date().toISOString(), club: S.club.name, perSide: perSide(), maxSide: maxSide(), txs, played, statFrom: statFrom(), place: S.cfg.place || '', members: act.map((m) => ({ id: m.id, name: m.name })), games, records, ledger,
+  return { updatedAt: new Date().toISOString(), xpAdj: S.cfg.xpAdj || {}, wxLoc: S.cfg.wxLoc || null, club: S.club.name, perSide: perSide(), maxSide: maxSide(), txs, played, statFrom: statFrom(), place: S.cfg.place || '', members: act.map((m) => ({ id: m.id, name: m.name })), games, records, ledger,
            dues: { ym, fee: S.cfg.fee, dueDay: S.cfg.dueDay || 30, account: S.cfg.account || '', paid: list.filter((m) => paid[m.name]).map((m) => m.name), unpaid: list.filter((m) => !paid[m.name]).map((m) => m.name) } };
 }
 async function publish() {
@@ -1001,6 +1007,7 @@ function editMember(id) {
     '<label class="f">탈퇴일<input id="q" type="date" value="' + esc(m.quit || '') + '"></label></div>' +
     '<label class="f">통장에 찍히는 이름 (여러 개면 쉼표 · 부부는 상대 이름도)<input id="p" value="' + esc((m.payers || []).join(', ')) + '"></label>' +
     '<div class="card" style="background:#F6F7FA" id="fm"></div>' +
+    (id ? '<div class="xpadj"><span>EXP 지급·차감 <small>지금까지 ' + ((S.cfg.xpAdj || {})[m.id] || 0) + '</small></span><input id="xpa" type="number" inputmode="numeric" placeholder="예: 100 또는 -50"></div>' : '') +
     (id ? '<div class="linkacc">' + (S.claims[m.id] ? '연결된 구글 계정: <b>' + esc(S.claims[m.id].email || '') + '</b> <button class="btn xs" id="unl">연결 해제</button>' : '<span class="muted">아직 이 이름을 고른 계정이 없어요</span>') + '</div>' : '') +
     '<div class="row"><button class="btn" id="c">취소</button><button class="btn" id="cp">안내 문구 복사</button><button class="btn pri" id="ok">저장</button></div>', (el) => {
     const calc = () => {
@@ -1039,7 +1046,9 @@ function editMember(id) {
       if (m.state === '탈퇴' && !m.quit) m.quit = today();
       m.payers = el.querySelector('#p').value.split(',').map((x) => x.trim()).filter(Boolean); if (m.payers.indexOf(m.name) < 0) m.payers.unshift(m.name);
       if (!id) S.members.push(m);
-      closeModal(); render(); await putMember(m); toast('저장했어요');
+      const xa = el.querySelector('#xpa'), xv = xa ? Math.round(+xa.value || 0) : 0;
+      if (xv) { S.cfg.xpAdj = S.cfg.xpAdj || {}; S.cfg.xpAdj[m.id] = (S.cfg.xpAdj[m.id] || 0) + xv; await putCfg(); }
+      closeModal(); render(); await putMember(m); toast(xv ? '저장했어요 · EXP ' + (xv > 0 ? '+' : '') + xv : '저장했어요');
     };
   });
 }
@@ -1248,12 +1257,28 @@ function openSettingsReal() {
   const grp = (title, keys) => '<div class="sgrp"><div class="g-lbl2">' + title + '</div><div class="row2">' + CFG.filter(([k]) => keys.indexOf(k) >= 0).map(([k, l, ty]) => '<label class="f">' + l + '<input data-c="' + k + '" type="' + ty + '" value="' + esc(S.cfg[k] == null ? '' : S.cfg[k]) + '"></label>').join('') + '</div></div>';
   modal('<h2>설정</h2><div class="muted">팀 만든 구글 계정 + 관리자 비밀번호로만 열려요. 회원 화면에는 나오지 않아요.</div>' +
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
+    '<div class="sgrp"><div class="g-lbl2">경기 날씨 지역 · 지금: <b id="wxcur">' + esc((S.cfg.wxLoc || {}).name || '대구 (기본)') + '</b></div><div class="refin"><input id="wxq" maxlength="20" placeholder="동네·구 이름 (예: 대구 북구, 수성구)"><button class="btn" id="wxs">찾기</button></div><div id="wxr" class="wxr"></div></div>' +
     themeHTML() + '<div class="sgrp" id="refbox"><div class="g-lbl2">추천</div><div class="muted">불러오는 중...</div></div>' +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
     '<div class="muted" style="margin-top:8px">A-KICK ' + C.VERSION + ' · <a href="privacy.html" target="_blank">개인정보처리방침</a> · <a href="terms.html" target="_blank">이용약관</a></div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };
     bindTheme(m); loadRef(m);
+    m.querySelector('#wxs').onclick = async () => {
+      const q = m.querySelector('#wxq').value.trim(); if (!q) return;
+      const box = m.querySelector('#wxr'); box.textContent = '찾는 중...';
+      const look = async (t) => ((await (await fetch('https://geocoding-api.open-meteo.com/v1/search?count=6&language=ko&countryCode=KR&name=' + encodeURIComponent(t))).json()).results || []);
+      try {
+        let rs = await look(q); if (!rs.length) rs = await look(q.split(/\s+/).pop()); if (!rs.length) rs = await look(q.split(/\s+/)[0]);
+        if (!rs.length) { box.textContent = '못 찾았어요. 구·동 이름만 넣어보세요 (예: 북구)'; return; }
+        box.innerHTML = rs.map((r, i) => '<button class="btn xs" data-wx="' + i + '">' + esc([r.admin1, r.admin2, r.name].filter(Boolean).filter((v, k, a) => a.indexOf(v) === k).join(' ')) + '</button>').join('');
+        box.querySelectorAll('[data-wx]').forEach((b) => (b.onclick = async () => {
+          const r = rs[+b.dataset.wx]; S.cfg.wxLoc = { name: b.textContent, lat: Math.round(r.latitude * 1e4) / 1e4, lon: Math.round(r.longitude * 1e4) / 1e4 };
+          await putCfg(); m.querySelector('#wxcur').textContent = b.textContent; box.textContent = '저장했어요 · 다음 경기 날씨부터 이 지역으로 나와요';
+          const g = S.games.find((x) => x.date >= today() && !x.postponed); if (g) wxNow(g); schedulePublish();
+        }));
+      } catch (e) { box.textContent = '찾기 실패: ' + e.message; }
+    };
     m.querySelector('#bk').onclick = backup;
     m.querySelector('#lo').onclick = () => { closeModal(); try { sessionStorage.clear(); } catch (e) {} signOut(auth); };
     m.querySelector('#sv').onclick = async () => {
