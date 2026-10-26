@@ -881,6 +881,7 @@ function openSettingsReal() {
   modal('<h2>설정</h2><div class="muted">팀 만든 구글 계정 + 관리자 비밀번호로만 열려요. 회원 화면에는 나오지 않아요.</div>' +
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
     '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" autocomplete="new-password"></label></div>' +
+    '<div class="muted" style="margin-top:8px">A-KICK v0.15.2</div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = closeModal;
     m.querySelector('#bk').onclick = backup;
