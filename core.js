@@ -162,7 +162,7 @@
     while (l < LV_MAX && xp >= acc + lvNeed(l)) { acc += lvNeed(l); l++; }
     return { lv: l, cur: xp - acc, need: l < LV_MAX ? lvNeed(l) : 0, xp: xp, base: acc };
   }
-  var LV_BAND = [[1, '루키', 'B'], [10, '레귤러', 'S'], [20, '에이스', 'G'], [30, '캡틴', 'E'], [40, '레전드', 'P'], [50, 'GOAT', 'X']];
+  var LV_BAND = [[1, '루키', 'B'], [10, '스타터', 'S'], [20, '에이스', 'G'], [30, '캡틴', 'E'], [40, '레전드', 'P'], [50, 'GOAT', 'X']];
   function lvBand(lv) { var b = LV_BAND[0]; LV_BAND.forEach(function (x) { if (lv >= x[0]) b = x; }); return { name: b[1], key: b[2], from: b[0] }; }
 
   /* ---------- 날씨 (Open-Meteo · 키 없이 무료) ---------- */
@@ -556,7 +556,7 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.48';
+  var VERSION = 'v0.49';
   var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
