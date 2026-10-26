@@ -307,10 +307,24 @@ function staleManual() {
   const bank = S.txs.filter((t) => !t.manual), last = bank.length ? C.dtDate(bank[bank.length - 1].dt) : '';
   return S.txs.filter((t) => t.manual && t.state !== '무시' && last && C.dtDate(t.dt) < C.addDays(last, -1));
 }
+function manualIssues() { return C.pendingManual(S.txs).list.map((t) => ({ t, d: C.diagnoseManual(t, S.txs) })).filter((x) => x.d.code !== 'wait'); }
 function manualPill() {
-  const pm = C.pendingManual(S.txs), st = staleManual();
-  if (!pm.n) return '';
-  return '<span class="pill ' + (st.length ? 'warn' : 'gry') + '" title="통장 엑셀을 넣으면 같은 거래와 자동으로 합쳐져요">직접 입력 ' + pm.n + '건 · 통장 확인 전' + (st.length ? ' · ' + st.length + '건은 통장에 안 보여요' : '') + '</span>';
+  const pm = C.pendingManual(S.txs), iss = manualIssues(), gaps = C.balanceGaps(S.txs);
+  if (!pm.n && !gaps.length) return '';
+  return '<button class="pill ' + (iss.length || gaps.length ? 'warn' : 'gry') + '" id="mchk">' + (pm.n ? '직접 입력 ' + pm.n + '건 · 통장 확인 전' : '') +
+    (iss.length ? ' · ' + iss.length + '건 확인 필요' : '') + (gaps.length ? (pm.n ? ' · ' : '') + '통장 잔액 안 맞는 곳 ' + gaps.length + '곳' : '') + '</button>';
+}
+/** 직접 입력·잔액을 통장(진짜)과 맞춰본 결과 */
+function checkReport(title) {
+  const iss = manualIssues(), gaps = C.balanceGaps(S.txs), wait = C.pendingManual(S.txs).n - iss.length;
+  modal('<h2>' + (title || '통장과 맞춰보기') + '</h2>' +
+    (iss.length ? '<div class="g-lbl2">직접 입력 ' + iss.length + '건 확인 필요</div>' + iss.map((x) => '<div class="chk"><b>' + esc(x.t.dt.substr(5, 5).replace('.', '/')) + ' ' + esc(x.t.desc) + ' ' + won(x.t.amt) + '원</b><span>' + esc(x.d.msg) + '</span><button class="btn xs pri" data-open="' + x.t.id + '">열어서 고치기</button></div>').join('') : '') +
+    (gaps.length ? '<div class="g-lbl2">통장 잔액이 안 맞는 곳 ' + gaps.length + '곳</div>' + gaps.map((g) => '<div class="chk"><b>' + esc(g.from.substr(5, 11)) + ' → ' + esc(g.to.substr(5, 11)) + '</b><span>앞 거래 잔액에서 계산한 값과 ' + won(Math.abs(g.diff)) + '원 차이가 나요. 이 사이 거래가 엑셀에서 빠진 것 같아요. 그 기간을 포함해 거래내역 엑셀을 다시 받아 넣어주세요 (이미 있는 건은 중복으로 안 들어가요).</span></div>').join('') : '') +
+    (!iss.length && !gaps.length ? '<div class="muted">문제없어요 👍' + (wait > 0 ? ' 직접 입력 ' + wait + '건은 통장 엑셀이 아직 그 날짜까지 안 들어와서 기다리는 중이에요.' : '') + '</div>' : (wait > 0 ? '<div class="muted">그 밖에 ' + wait + '건은 통장 엑셀이 그 날짜까지 안 들어와서 기다리는 중이에요 (정상).</div>' : '')) +
+    '<div class="mfoot"><span style="flex:1"></span><button class="btn pri" id="cx">확인</button></div>', (m) => {
+    m.querySelector('#cx').onclick = closeModal;
+    m.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => { closeModal(); editTx(b.dataset.open); }));
+  });
 }
 function weekHTML() {
   const days = [...Array(7)].map((_, i) => C.addDays(S.week, i));
@@ -353,7 +367,7 @@ function weekHTML() {
 function txHTML(t) {
   const io = t.kind === '입금';
   const cls = t.state === '확인필요' ? 'ask' : t.state === '무시' ? 'ign' : '';
-  let h = '<div class="tx ' + cls + '"><button class="tx-main" data-edit="' + t.id + '"><span class="tx-top"><span class="tx-name">' + esc(t.desc) + '</span><span class="tx-amt ' + (io ? 'pos' : 'neg') + '">' + (io ? '+' : '−') + won(t.amt) + '</span></span><span class="tx-sub">' + (t.manual ? '<em class="mtag' + (staleManual().some((x) => x.id === t.id) ? ' bad' : '') + '">직접 입력 · 통장 확인 전</em> ' : '') + esc(partLabel(t)) + '</span></button>';
+  let h = '<div class="tx ' + cls + '"><button class="tx-main" data-edit="' + t.id + '"><span class="tx-top"><span class="tx-name">' + esc(t.desc) + '</span><span class="tx-amt ' + (io ? 'pos' : 'neg') + '">' + (io ? '+' : '−') + won(t.amt) + '</span></span><span class="tx-sub">' + (t.manual ? '<em class="mtag' + (C.diagnoseManual(t, S.txs).code !== 'wait' ? ' bad' : '') + '">직접 입력 · ' + (C.diagnoseManual(t, S.txs).code !== 'wait' ? '확인 필요' : '통장 확인 전') + '</em> ' : '') + esc(partLabel(t)) + '</span></button>';
   if (t.state === '확인필요') {
     const acts = [];
     if (t.suggest && t.suggest.label) acts.push(['sug', t.suggest.label, 'pri']);
@@ -441,6 +455,7 @@ function bindWeek() {
   document.querySelectorAll('[data-newgame]').forEach((b) => (b.onclick = () => newGameAsk(b.dataset.newgame)));
   document.querySelectorAll('[data-dl]').forEach((b) => (b.onclick = () => editDeadline(b.dataset.dl)));
   const ma = $('#madd'); if (ma) ma.onclick = () => addManual();
+  const mc = $('#mchk'); if (mc) mc.onclick = () => checkReport();
   const ml = $('#mlink'), ml2 = $('#mlink2'); if (ml2) ml2.onclick = () => ml.click(); if (ml) ml.onclick = () => copy('⚽ ' + S.club.name + ' 온라인 라커룸에 초대합니다\n' + MEMBER_URL + '\n\n① 링크 열고 구글 로그인\n② 내 실명 쓰고 가입 신청\n③ 관리자 승인 후 바로 입장 🙌\n\n카톡에서 로그인이 안 되면 \'사파리/크롬으로 열기\' 버튼을 눌러주세요.');
   $('#dues').onclick = duesText;
   const tw = $('#tw'); if (tw) tw.onclick = () => { S.week = monday(today()); render(); };
@@ -716,9 +731,11 @@ function addManual() {
       if (!F.name || !F.amt || !F.date) { box.textContent = '이름과 금액을 넣으면 어떻게 분류될지 보여드려요'; box.className = 'mprev'; return null; }
       const t = mk(), dupBank = S.txs.find((x) => !x.manual && C.sameTx(t, x)), dupMan = S.txs.find((x) => x.manual && C.sameTx(t, x, 0));
       const r = C.classify(t, { cfg: cfgC(), games: S.games, members: S.members, alias: C.aliasMap(S.members), done: S.txs.slice() });
-      box.className = 'mprev' + (dupBank || dupMan ? ' warn' : '');
+      let dg = null; const dg0 = !dupBank && !dupMan ? C.diagnoseManual(t, S.txs) : null;
+      box.className = 'mprev' + (dupBank || dupMan || (dg0 && dg0.code !== 'wait') ? ' warn' : '');
       box.innerHTML = dupBank ? '⚠ 통장 내역에 이미 있어요: ' + esc(dupBank.dt.substr(5, 11)) + ' ' + esc(dupBank.desc) + ' ' + won(dupBank.amt) + '원 — 따로 넣을 필요 없어요'
         : dupMan ? '⚠ 같은 건을 이미 직접 입력했어요 (' + esc(dupMan.dt.substr(5, 5)) + '). 진짜 두 번째 입금일 때만 저장하세요'
+        : (dg = C.diagnoseManual(t, S.txs)).code !== 'wait' ? '⚠ ' + esc(dg.msg) + '<br><small>그래도 맞으면 저장하세요. 자동 분류: ' + esc(r.reason || '확인 필요') + '</small>'
         : '자동 분류: <b>' + esc(r.state === '확인필요' ? '확인 필요 — ' + (r.reason || '') : r.reason || '') + '</b> <small>(저장 후 눌러서 바꿀 수 있어요)</small>';
       return { t, r, dupBank, dupMan };
     };
@@ -743,23 +760,36 @@ function addManual() {
   });
 }
 function manualTools(t) {
-  // 매주 비슷한 게스트비가 많아서 후보는 3일 이내·가까운 순 4건만 (넓게 잡으면 엉뚱한 짝이 생김)
-  const cands = S.txs.filter((x) => !x.manual && x.amt === t.amt && x.kind === t.kind && C.dayGap(x.dt, t.dt) <= 3 && !/직접 입력\(/.test(x.note || '')).sort((a, b) => C.dayGap(a.dt, t.dt) - C.dayGap(b.dt, t.dt)).slice(0, 4);
-  return '<div class="mtool"><div class="g-lbl2">직접 입력한 거래 · 통장 확인 전</div>' +
-    (cands.length ? '<div class="muted">통장 거래 중 같은 금액이 있어요. 같은 돈이면 눌러서 합치세요 (이름이 달라도 돼요)</div>' + cands.map((x) => '<button class="btn xs" data-merge="' + x.id + '">' + esc(x.dt.substr(5, 11)) + ' ' + esc(x.desc) + ' ' + won(x.amt) + '원과 합치기</button>').join('') : '<div class="muted">아직 통장 엑셀에서 같은 거래를 못 찾았어요. 엑셀을 넣으면 자동으로 합쳐져요.</div>') +
-    '<button class="btn xs ghost" id="mdel">이 직접 입력 지우기</button></div>';
+  const dg = C.diagnoseManual(t, S.txs);
+  return '<div class="mtool"><div class="g-lbl2">직접 입력한 거래 · 통장과 맞춰본 결과</div>' +
+    '<div class="mdiag ' + (dg.code === 'wait' ? '' : 'warn') + '">' + (dg.code === 'wait' ? '⏳ ' : '⚠ ') + esc(dg.msg) + '</div>' +
+    dg.cands.map((x) => '<button class="btn xs" data-merge="' + x.id + '">' + esc(x.dt.substr(5, 11)) + ' ' + esc(x.desc) + ' ' + won(x.amt) + '원' + (x.amt !== t.amt ? '이 맞아요 (통장 기준으로 합치기)' : '과 합치기') + '</button>').join('') +
+    '<div class="row"><label class="f">날짜<input id="fxd" type="date" value="' + C.dtDate(t.dt) + '"></label><label class="f">이름<input id="fxn" value="' + esc(t.desc) + '"></label><label class="f">금액<input id="fxa" type="number" value="' + t.amt + '"></label></div>' +
+    '<div class="row"><button class="btn xs" id="fix">잘못 넣은 것 고치기</button><button class="btn xs danger" id="mdel">🗑 직접 입력 삭제</button></div></div>';
 }
 function bindManualTools(m, t) {
   if (!t.manual) return;
   m.querySelectorAll('[data-merge]').forEach((b) => (b.onclick = async () => {
     const x = S.txs.find((y) => y.id === b.dataset.merge);
-    if (!confirm(x.desc + ' ' + won(x.amt) + '원(통장)과 합칠까요?\n직접 고른 분류가 통장 거래로 옮겨가고, 직접 입력 건은 지워져요.')) return;
-    x.parts = t.parts; x.state = t.state; x.reason = t.reason; x.note = [x.note, t.note, '직접 입력(' + md(C.dtDate(t.dt)) + ')과 합침'].filter(Boolean).join(' · '); delete x.suggest;
+    const same = x.amt === t.amt;
+    if (!confirm(x.desc + ' ' + won(x.amt) + '원(통장)과 합칠까요?\n' + (same ? '직접 고른 분류가 통장 거래로 옮겨가고, ' : '금액이 달라서 통장 금액·분류를 그대로 쓰고, ') + '직접 입력 건은 지워져요.')) return;
+    if (same) { x.parts = t.parts; x.state = t.state; x.reason = t.reason; } x.note = [x.note, t.note, '직접 입력(' + md(C.dtDate(t.dt)) + ')과 합침'].filter(Boolean).join(' · '); delete x.suggest;
     S.txs = S.txs.filter((y) => y.id !== t.id); closeModal(); render();
     await putTx(x); await deleteDoc(D('tx', t.id)).catch(fail); toast('합쳤어요');
   }));
+  m.querySelector('#fix').onclick = async () => {
+    const d = m.querySelector('#fxd').value, n = m.querySelector('#fxn').value.trim(), a = +m.querySelector('#fxa').value || 0;
+    if (!d || !n || !a) return toast('날짜·이름·금액을 넣어주세요');
+    const amtChanged = a !== t.amt; t.dt = d.replace(/-/g, '.') + ' 12:00:00'; t.desc = n; t.amt = a;
+    if (amtChanged) {                                  // 금액이 바뀌면 분류를 다시 계산
+      const r = C.classify(t, { cfg: cfgC(), games: S.games, members: S.members, alias: C.aliasMap(S.members), done: S.txs.filter((x) => x.id !== t.id) });
+      t.parts = r.parts; t.state = r.state; t.reason = r.reason || ''; if (r.suggest) t.suggest = r.suggest; else delete t.suggest;
+    }
+    S.txs.sort((x, y) => (x.dt < y.dt ? -1 : 1)); await putTx(t); const dg = C.diagnoseManual(t, S.txs);
+    toast(dg.code === 'wait' ? '고쳤어요 · 통장 엑셀이 들어오면 자동으로 맞춰봐요' : '고쳤어요 · ' + dg.msg, 6000); editTx(t.id);
+  };
   m.querySelector('#mdel').onclick = async () => {
-    if (!confirm('이 직접 입력 건을 지울까요?')) return;
+    if (!confirm(t.desc + ' ' + won(t.amt) + '원 직접 입력을 삭제할까요?\n(통장 엑셀로 들어온 거래는 그대로 남아요)')) return;
     S.txs = S.txs.filter((y) => y.id !== t.id); closeModal(); render(); schedulePublish();
     await deleteDoc(D('tx', t.id)).catch(fail); toast('지웠어요');
   };
@@ -803,6 +833,7 @@ async function importBank(file) {
     S.week = monday(C.dtDate((S.txs.find((t) => t.state === '확인필요') || last).dt));
     S.view = 'week'; render();
     toast('새 거래 ' + fresh.length + '건 · 자동 확정 ' + auto + '건 · 확인 ' + need + '건' + (gone.length ? ' · 직접 입력 ' + gone.length + '건 합침' : '') + ' · 잔액 ' + won(C.balance(S.txs)) + '원', 7000);
+    if (manualIssues().length || C.balanceGaps(S.txs).length) checkReport('엑셀 넣고 확인할 것');
   } catch (e) { toast(e.message, 7000); }
 }
 

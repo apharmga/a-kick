@@ -155,6 +155,39 @@
   function nmMatch(a, b) { var x = nmCore(a), y = nmCore(b); return !!x && !!y && (x === y || x.indexOf(y) >= 0 || y.indexOf(x) >= 0); }
   function dayGap(a, b) { return Math.abs((new Date(dtDate(a) + 'T00:00:00') - new Date(dtDate(b) + 'T00:00:00')) / 86400000); }
   function sameTx(m, b, days) { return m.amt === b.amt && m.kind === b.kind && dayGap(m.dt, b.dt) <= (days == null ? 1 : days) && nmMatch(m.desc, b.desc); }
+  /** 직접 입력 건을 '진짜'인 통장 거래와 비교해서 무엇이 이상한지 알려줌 */
+  function diagnoseManual(t, txs) {
+    var bank = txs.filter(function (x) { return !x.manual && x.kind === t.kind && !/직접 입력\(/.test(x.note || ''); });
+    var lastBank = txs.filter(function (x) { return !x.manual; }).map(function (x) { return dtDate(x.dt); }).sort().pop() || '';
+    var d = dtDate(t.dt), near = bank.filter(function (x) { return dayGap(x.dt, t.dt) <= 3; });
+    var w = function (x) { return dtDate(x.dt).substr(5).replace('-', '/') + ' ' + x.desc + ' ' + String(x.amt).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '원'; };
+    var pick = function (f) { return near.filter(f).sort(function (a, b) { return dayGap(a.dt, t.dt) - dayGap(b.dt, t.dt); }); };
+    var exact = pick(function (x) { return x.amt === t.amt && nmMatch(x.desc, t.desc); });
+    if (exact.length && dayGap(exact[0].dt, t.dt) <= 1) return { code: 'dup', msg: '통장 내역에 이미 ' + w(exact[0]) + '이 있어요. 같은 돈이면 [합치기], 잘못 넣은 거면 [삭제]하세요.', cands: exact };
+    if (exact.length) return { code: 'date', msg: '날짜가 다르게 들어간 것 같아요. 통장엔 ' + w(exact[0]) + '이 있어요. 같은 돈이면 [합치기]를 누르세요.', cands: exact };
+    var amtDiff = pick(function (x) { return x.amt !== t.amt && nmMatch(x.desc, t.desc); });
+    if (amtDiff.length) return { code: 'amt', msg: '금액이 달라요. 통장엔 ' + w(amtDiff[0]) + '이 들어왔어요. 직접 입력 금액을 잘못 넣었으면 금액을 고친 뒤 합치세요.', cands: amtDiff };
+    var nameDiff = pick(function (x) { return x.amt === t.amt && dayGap(x.dt, t.dt) <= 1; });
+    if (nameDiff.length) return { code: 'name', msg: '이름이 달라요. 같은 무렵 ' + w(nameDiff[0]) + '이 있어요. 다른 사람이 대신 냈다면 [합치기]를 누르세요.', cands: nameDiff };
+    if (!lastBank || d > lastBank) return { code: 'wait', msg: '통장 엑셀이 아직 이 날짜(' + d.substr(5).replace('-', '/') + ')까지 안 들어왔어요. 엑셀을 넣으면 자동으로 맞춰봐요.', cands: [] };
+    return { code: 'none', msg: '이 날짜 앞뒤로 통장에 비슷한 거래가 없어요. 날짜·이름·금액을 다시 확인하고, 현금으로 받은 돈이면 통장에 넣은 날짜로 고치세요.', cands: near.filter(function (x) { return x.amt === t.amt; }).slice(0, 3) };
+  }
+  /** 통장 잔액 이어짐 검사: 앞 거래 잔액 ± 금액 = 이번 잔액이 아니면 그 사이 거래가 엑셀에서 빠진 것 */
+  function balanceGaps(txs) {
+    var b = txs.filter(function (x) { return !x.manual && typeof x.bal === 'number'; }).sort(function (a, c) { return a.dt < c.dt ? -1 : a.dt > c.dt ? 1 : 0; });
+    var groups = [];                                                   // 같은 시각 거래는 순서가 섞일 수 있어 한 묶음으로
+    b.forEach(function (x) { var g = groups[groups.length - 1]; if (g && g.dt === x.dt) g.list.push(x); else groups.push({ dt: x.dt, list: [x] }); });
+    var out = [];
+    for (var i = 1; i < groups.length; i++) {
+      var prev = groups[i - 1].list, cur = groups[i].list;
+      var start = prev.map(function (x) { return x.bal; }), net = cur.reduce(function (a, x) { return a + (x.kind === '입금' ? x.amt : -x.amt); }, 0);
+      var ends = cur.map(function (x) { return x.bal; });
+      var ok = start.some(function (s0) { return ends.some(function (e) { return s0 + net === e; }); }) ||
+               (cur.length === 1 && start.some(function (s0) { return s0 + net === ends[0]; }));
+      if (!ok) out.push({ from: prev[prev.length - 1].dt, to: cur[0].dt, diff: ends[ends.length - 1] - (start[start.length - 1] + net) });
+    }
+    return out;
+  }
   /** 새로 들어온 통장 거래(fresh)마다 짝이 되는 직접 입력 건 1:1로 찾기 → [[통장건, 직접입력건], ...] */
   function matchManual(fresh, txs) {
     var man = txs.filter(function (t) { return t.manual; }), used = {}, out = [];
@@ -412,8 +445,8 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.30';
-  var Core = { pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
+  var VERSION = 'v0.31';
+  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
     balance: balance, book: book, nearestGame: nearestGame, nextGameAfter: nextGameAfter, gamesInMonth: gamesInMonth,
