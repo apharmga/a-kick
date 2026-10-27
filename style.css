@@ -391,3 +391,24 @@ button.pill{cursor:pointer;border:0;font:inherit}
 /* 관리자 체험 */
 .demob{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 16px;background:#fef3c7;color:#78350f;font-size:13px;border-bottom:1px solid #fcd34d}
 .demob a{flex:none;padding:5px 12px;border-radius:999px;background:#78350f;color:#fff;font-size:12px;font-weight:700;text-decoration:none}
+/* A-COACH 도우미 */
+.coachb{position:fixed;right:18px;bottom:18px;z-index:60;display:flex;align-items:center;gap:8px;padding:8px 16px 8px 8px;border:0;border-radius:999px;background:#14306B;color:#fff;font:inherit;font-weight:800;box-shadow:0 10px 24px rgba(20,48,107,.35);cursor:pointer}
+.coachb span{width:34px;height:34px;border-radius:50%;background:#FFD23F;color:#14306B;display:grid;place-items:center;font-family:Bungee,sans-serif;font-size:13px}
+.coachb em{font-style:normal;font-size:14px}
+.coachp{position:fixed;right:18px;bottom:76px;z-index:61;width:min(380px,calc(100vw - 24px));height:min(560px,calc(100vh - 110px));display:flex;flex-direction:column;background:#fff;border-radius:20px;box-shadow:0 20px 50px rgba(15,23,42,.28);overflow:hidden}
+.coachp[hidden]{display:none}
+.coachp header{display:flex;align-items:center;gap:8px;padding:14px 16px;background:#14306B;color:#fff}
+.coachp header b{font-family:Bungee,sans-serif;font-size:16px;letter-spacing:.5px}.coachp header small{opacity:.8;flex:1}
+.coachp .cx{border:0;background:none;color:#fff;font-size:18px;cursor:pointer}
+.coachp .cb{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#F6F7FB}
+.cm{max-width:90%;padding:10px 13px;border-radius:14px 14px 14px 4px;background:#fff;border:1px solid #E5E9F0;font-size:14px;line-height:1.6;align-self:flex-start}
+.cm.me{align-self:flex-end;background:#14306B;color:#fff;border:0;border-radius:14px 14px 4px 14px}
+.cm small{color:#64748B}
+.ca,.cc{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ca button{border:0;border-radius:999px;padding:6px 12px;background:#14306B;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.cc button{border:1.5px solid #C9D3E6;border-radius:999px;padding:5px 11px;background:#fff;color:#14306B;font:inherit;font-size:13px;cursor:pointer}
+.cdev{margin-top:8px;font-size:12px;color:#64748B}
+.cf{display:flex;gap:6px;padding:10px;border-top:1px solid #E5E9F0}
+.cf input{flex:1;min-width:0;border:1.5px solid #DDE2EC;border-radius:12px;padding:10px 12px;font:inherit;font-size:15px}
+.cf button{border:0;border-radius:12px;padding:0 14px;background:#FFD23F;color:#14306B;font:inherit;font-weight:800;cursor:pointer}
+@media(max-width:700px){.coachp{right:12px;left:12px;width:auto;bottom:72px}.coachb{right:12px;bottom:12px}}

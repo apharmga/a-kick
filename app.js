@@ -2,6 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, doc, getDocs as _getDocs, getDoc as _getDoc, setDoc as _setDoc, deleteDoc as _deleteDoc, writeBatch as _writeBatch, onSnapshot as _onSnapshot, addDoc as _addDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { demoAdmin } from './demo.js';
+import { mountCoach } from './coach.js';
 /* 관리자 체험 (admin.html?demo=1): 서버 대신 메모리 속 샘플 데이터를 읽고 씀 · 새로고침하면 처음 상태로 */
 const DEMO = new URLSearchParams(location.search).get('demo') === '1';
 const MEM = DEMO ? demoAdmin() : null;
@@ -304,6 +305,7 @@ function render() {
     '<label class="btn pri up">' + IC.up + '<span>거래내역 엑셀 넣기</span><input type="file" accept=".xlsx,.xls,.csv" id="up" hidden></label>' +
     '<a class="btn" href="' + MHOME + '">' + IC.home + ' 홈</a><button class="iconbtn" id="gear" aria-label="설정">' + IC.gear + '</button></div></header>';
   const body = v === 'week' ? weekHTML() : v === 'members' ? membersHTML() : v === 'team' ? teamHTML() : v === 'stats' ? statsHTML() : v === 'polls' ? pollsHTML() : ledgerHTML();
+  mountCoach({ S, C, payYM, attOf, duesText, openSettings, demo: DEMO, go: (v) => { S.view = v; render(); window.scrollTo(0, 0); } });
   $('#app').innerHTML = (DEMO ? '<div class="demob"><span>👀 <b>총무 화면 체험</b> · 새로고침하면 처음으로 돌아가요</span><a href="./">나가기</a></div>' : '') + nav + '<main class="wrap">' + body + '</main>';
   document.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { S.view = b.dataset.v; render(); }));
   $('#up').onchange = (e) => e.target.files[0] && importBank(e.target.files[0]);
