@@ -1,0 +1,54 @@
+/* A-KICK 소개·가이드 페이지 공통 */
+:root{
+  --navy:#14306B; --court:#1F4FB8; --line:#FFFFFF; --ball:#FFD23F;
+  --paper:#F6F7FB; --ink:#101828; --mut:#5B6476; --rule:#DDE2EC; --ok:#16A34A; --warn:#F59E0B; --bad:#DC2626;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:17px;line-height:1.75;-webkit-font-smoothing:antialiased;word-break:keep-all}
+a{color:var(--court)}
+:focus-visible{outline:3px solid var(--ball);outline-offset:3px;border-radius:6px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.narrow{max-width:680px;margin:0 auto;padding:0 20px}
+
+/* 상단바 */
+.top{position:sticky;top:0;z-index:20;background:rgba(246,247,251,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--rule)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+.brand{font-family:Bungee,sans-serif;font-size:22px;color:var(--navy);text-decoration:none;letter-spacing:.5px}
+.top nav{display:flex;gap:22px;align-items:center;font-size:15px}
+.top nav a{color:var(--ink);text-decoration:none}
+.top nav a.go{background:var(--navy);color:#fff;padding:8px 16px;border-radius:999px;font-weight:700}
+@media(max-width:640px){.top nav a:not(.go){display:none}}
+
+/* 버튼 */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:15px 24px;border-radius:14px;font-weight:800;font-size:16px;text-decoration:none;transition:transform .15s}
+.btn:active{transform:scale(.97)}
+.btn.ball{background:var(--ball);color:var(--navy)}
+.btn.line{border:2px solid currentColor;color:#fff}
+.btn.navy{background:var(--navy);color:#fff}
+.btn.ghost{border:2px solid var(--navy);color:var(--navy)}
+
+/* 글 페이지 */
+.doc{padding:56px 0 80px}
+.doc .crumb{font-size:14px;color:var(--mut)}
+.doc h1{font-size:clamp(30px,5vw,42px);line-height:1.25;letter-spacing:-.02em;margin:10px 0 14px}
+.doc .lede{font-size:19px;color:#334155;margin:0 0 32px}
+.doc h2{font-size:23px;letter-spacing:-.01em;margin:44px 0 10px}
+.doc p,.doc li{color:#28303F}
+.doc ul,.doc ol{padding-left:22px}
+.calc{background:#fff;border-left:5px solid var(--court);border-radius:4px 14px 14px 4px;padding:18px 20px;margin:20px 0;font-variant-numeric:tabular-nums}
+.calc b{color:var(--navy)}
+.doc table{width:100%;border-collapse:collapse;margin:16px 0;background:#fff;font-size:15px}
+.doc th,.doc td{padding:10px 12px;border-bottom:1px solid var(--rule);text-align:left}
+.doc th{color:var(--mut);font-weight:600}
+.next{margin-top:56px;padding-top:24px;border-top:1px solid var(--rule);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-weight:700}
+.tryit{margin-top:40px;background:var(--navy);color:#fff;border-radius:20px;padding:26px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.tryit p{margin:0;color:#DCE4F5}.tryit b{color:#fff;font-size:19px}
+
+/* 바닥 */
+.foot{background:var(--navy);color:#B8C4DE;font-size:14px;padding:40px 0 48px}
+.foot .wrap{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.foot a{color:#fff;text-decoration:none}
+.foot .brand{color:#fff}
+.foot ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
