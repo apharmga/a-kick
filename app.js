@@ -612,12 +612,13 @@ function triTimeHTML(g) {
 /** 3파전 타임테이블 → 캘린더 파일(.ics): 판 시작·종료 1분 전·종료 시각에 알림 (아이폰 캘린더 → 애플워치로 진동 알림) */
 function triIcs(g) {
   const t = triOf(g), P = C.triPlan(t), d = g.date.replace(/-/g, ''), hm = (x) => x.replace(':', '') + '00', now = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
-  const ev = P.rows.map((r) => ['BEGIN:VEVENT', 'UID:akick-' + g.id + '-' + (r.i + 1) + '@apharmga.github.io', 'DTSTAMP:' + now,
-    'DTSTART;TZID=Asia/Seoul:' + d + 'T' + hm(r.s), 'DTEND;TZID=Asia/Seoul:' + d + 'T' + hm(r.e),
-    'SUMMARY:⚽ ' + (r.i + 1) + '판 ' + TEAMC[r.a] + ':' + TEAMC[r.b] + ' (' + TEAMC[r.off] + ' 휴식)',
-    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + (r.i + 1) + '판 시작 ' + TEAMC[r.a] + ':' + TEAMC[r.b], 'TRIGGER:PT0S', 'END:VALARM',
-    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + (r.i + 1) + '판 1분 남음', 'TRIGGER;RELATED=END:-PT1M', 'END:VALARM',
-    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + (r.i + 1) + '판 종료', 'TRIGGER;RELATED=END:PT0S', 'END:VALARM', 'END:VEVENT'].join('\r\n'));
+  // 아이폰 캘린더는 '끝난 시각 기준' 알림을 지원하지 않아서, 판마다 [경기 일정(시작 알림)] + [종료 표시 일정(1분 전·종료 알림)] 두 개로 만듦
+  const evt = (uid, s0, e0, sum, alarms) => ['BEGIN:VEVENT', 'UID:akick-' + g.id + '-' + uid + '@apharmga.github.io', 'DTSTAMP:' + now,
+    'DTSTART;TZID=Asia/Seoul:' + d + 'T' + hm(s0), 'DTEND;TZID=Asia/Seoul:' + d + 'T' + hm(e0), 'SUMMARY:' + sum]
+    .concat(...alarms.map(([tr, desc]) => ['BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + desc, 'TRIGGER:' + tr, 'END:VALARM']), ['END:VEVENT']).join('\r\n');
+  const ev = [].concat(...P.rows.map((r) => [
+    evt(r.i + 1, r.s, r.e, '⚽ ' + (r.i + 1) + '판 ' + TEAMC[r.a] + ':' + TEAMC[r.b] + ' (' + TEAMC[r.off] + ' 휴식)', [['PT0S', (r.i + 1) + '판 시작 ' + TEAMC[r.a] + ':' + TEAMC[r.b]]]),
+    evt((r.i + 1) + 'end', r.e, r.e, '🔔 ' + (r.i + 1) + '판 종료', [['-PT1M', (r.i + 1) + '판 1분 남음'], ['PT0S', (r.i + 1) + '판 종료']])]));
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AnQuA//A-KICK//KO', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:A-KICK 3파전',
     'BEGIN:VTIMEZONE', 'TZID:Asia/Seoul', 'BEGIN:STANDARD', 'DTSTART:19700101T000000', 'TZOFFSETFROM:+0900', 'TZOFFSETTO:+0900', 'TZNAME:KST', 'END:STANDARD', 'END:VTIMEZONE']
     .concat(ev, ['END:VCALENDAR']).join('\r\n');
