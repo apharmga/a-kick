@@ -110,7 +110,7 @@ export function demoAdmin() {
   });
   // 총무가 확인할 거래 2건
   const last = D(add(today, -1)).replace(/-/g, '.');
-  tx(last + ' 11:20:00', '입금', 40000, '김민준엄마', [], '확인필요', '회원 이름과 달라요');
+  tx(last + ' 11:20:00', '입금', 40000, '김민준지인', [], '확인필요', '회원 이름과 달라요');
   tx(last + ' 15:05:00', '입금', 30000, '한도현', [], '확인필요', '회비 금액(40,000원)과 달라요');
   txs.sort((a, b) => (a.dt < b.dt ? -1 : 1)); let b2 = 300000; txs.forEach((t) => { b2 += t.kind === '입금' ? t.amt : -t.amt; t.bal = b2; put('tx/' + t.id, t); });
   put('polls/p1', { title: '11월 회식 날짜 골라주세요', desc: '경기 끝나고 같이 밥 먹어요 🍖', options: [{ id: 'a', text: '첫째 주 목요일' }, { id: 'b', text: '둘째 주 목요일' }], multi: true, allowAdd: true, anon: false, deadline: D(add(today, 3)) + 'T23:00', created: new Date(Date.now() - 864e5).toISOString() });
