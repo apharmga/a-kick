@@ -1005,7 +1005,7 @@ function editMember(id) {
     '<label class="f">이름<input id="n" value="' + esc(m.name) + '"></label><label class="f">가입일<input id="j" type="date" value="' + esc(m.join) + '"></label>' +
     '<label class="f">상태<select id="s"><option' + (m.state !== '탈퇴' ? ' selected' : '') + '>활동</option><option' + (m.state === '탈퇴' ? ' selected' : '') + '>탈퇴</option></select></label>' +
     '<label class="f">탈퇴일<input id="q" type="date" value="' + esc(m.quit || '') + '"></label></div>' +
-    '<label class="f">통장에 찍히는 이름 (여러 개면 쉼표 · 부부는 상대 이름도)<input id="p" value="' + esc((m.payers || []).join(', ')) + '"></label>' +
+    '<label class="f">통장에 찍히는 이름 (여러 개면 쉼표 · 동반지인이 대신 내면 그 이름도)<input id="p" value="' + esc((m.payers || []).join(', ')) + '"></label>' +
     '<div class="card" style="background:#F6F7FA" id="fm"></div>' +
     (id ? '<div class="xpadj"><span>EXP 지급·차감 <small>지금까지 ' + ((S.cfg.xpAdj || {})[m.id] || 0) + '</small></span><input id="xpa" type="number" inputmode="numeric" placeholder="예: 100 또는 -50"></div>' : '') +
     (id ? '<div class="linkacc">' + (S.claims[m.id] ? '연결된 구글 계정: <b>' + esc(S.claims[m.id].email || '') + '</b> <button class="btn xs" id="unl">연결 해제</button>' : '<span class="muted">아직 이 이름을 고른 계정이 없어요</span>') + '</div>' : '') +

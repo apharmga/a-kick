@@ -210,7 +210,7 @@
       return true;
     });
   }
-  /** 입금자명 → 회원들 (부부처럼 한 이름에 여러 명) */
+  /** 입금자명 → 회원들 (동반지인처럼 한 이름에 여러 명) */
   function aliasMap(members) {
     var map = {};
     members.forEach(function (m) {
@@ -390,7 +390,7 @@
       if (/취소/.test(t.desc)) return need('취소 입금이에요. 같은 금액 출금과 짝이면 "무시"를 눌러주세요.', { label: '무시', state: '무시' });
 
       // 동명이인: 같은 입금자명을 가진 회원이 둘 이상이고 금액이 '전원 합계'가 아니면 자동으로 정하지 않음
-      // (부부·가족이 대신 내는 경우와 구분: 실제 이름(realName, 없으면 표시 이름)이 입금자명과 같은 회원이 둘 이상일 때만)
+      // (동반지인·가족이 대신 내는 경우와 구분: 실제 이름(realName, 없으면 표시 이름)이 입금자명과 같은 회원이 둘 이상일 때만)
       if (hit && !partial) {
         var twins = hit.filter(function (m) { return String(m.realName || m.name).replace(/\s/g, '') === key; });
         if (twins.length > 1) return need('동명이인 ' + twins.map(function (m) { return m.name; }).join('·') + ' — 누구 돈인지 골라주세요');
@@ -406,7 +406,7 @@
               return { parts: [{ cls: '첫달회비', amt: t.amt, names: [m.name], ym: dtYM, games: fm.games }], state: '자동', reason: m.name + ' 첫 달 회비 (' + fm.games.length + '경기)' };
           }
         }
-        // 2) 회비 (부부 등 여러 명 포함). 25일부터는 다음 달분
+        // 2) 회비 (동반지인 등 여러 명 포함). 25일부터는 다음 달분
         var payers = hit.filter(function (m) { return startYM(m); });
         var self = payers.filter(function (m) { return m.name === t.desc.trim(); });
         if (payers.length > 1 && !self.length && hit !== ctx.alias[key]) self = [];
@@ -556,7 +556,7 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.52';
+  var VERSION = 'v0.53';
   var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
