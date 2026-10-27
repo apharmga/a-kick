@@ -597,9 +597,25 @@ function teamHTML() {
 function triTxt(g) { const M = (S.games.find((x) => x.id === g.id) || {}).matches || []; if (!M.length) return '3파전'; const r = C.standings(3, M)[0]; return '3파전 ' + M.length + '판 · 1위 ' + TEAMC[r.t] + '팀 (승점 ' + r.pts + ')'; }
 const nTeamsOf = (g) => g.nTeams || (g.teams && g.teams.length >= 3 ? 3 : playersOf(g).length >= perSide() * 3 ? 3 : 2);
 /** 3파전 판 기록: 관리자가 판마다 결과를 넣으면 순위가 자동 계산되고 회원 화면에도 보임 */
+const triOf = (g) => Object.assign({ min: 10, rest: 3, n: 9, start: g.time || S.cfg.time || '16:00' }, g.tri || {});
+const TCI = ['🟠', '🔵', '🟢'];
+/** 3파전 진행 방식: 한 판 시간 · 휴식 · 판 수 · 시작 시간 → 타임테이블 (회원 화면에도 공개) */
+function triTimeHTML(g) {
+  const t = triOf(g), P = C.triPlan(t), T = (g.teams || []).map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0));
+  const num = (k, l, v, mn, mx) => '<label class="f">' + l + '<input type="number" data-tri="' + k + '" min="' + mn + '" max="' + mx + '" inputmode="numeric" value="' + v + '"></label>';
+  return '<div class="panel pad"><div class="ph"><div class="g-lbl2">⏱ 3파전 진행 방식 · ' + T.map((x) => x.length).join('/') + '명</div><button class="btn sm" id="ttcp">' + IC.copy + ' 타임테이블 복사</button></div>' +
+    '<div class="trow4">' + num('min', '한 판 (분)', P.min, 3, 40) + num('rest', '판 사이 휴식 (분)', P.rest, 0, 20) + num('n', '총 판 수', P.n, 1, 30) + '<label class="f">시작 시간<input type="time" data-tri="start" value="' + esc(t.start) + '"></label></div>' +
+    '<div class="tpre">빠른 선택 <button class="btn xs" data-tpre="10,3,9">10분 × 9판</button><button class="btn xs" data-tpre="15,6,6">15분 × 6판</button><button class="btn xs" data-tpre="12,4,6">12분 × 6판</button><button class="btn xs" data-tpre="8,2,12">8분 × 12판</button></div>' +
+    '<div class="tsum ' + (P.fair ? 'ok' : 'warn') + '">' + (P.fair ? '✅ 공평해요 · 모든 팀이 ' + P.play[0] + '판(' + P.play[0] * P.min + '분) 뛰고 ' + (P.n - P.play[0]) + '판 쉬어요' : '⚠️ 판 수가 3의 배수가 아니라 팀마다 뛰는 판 수가 달라요 (' + P.play.map((x, i) => TEAMC[i] + ' ' + x + '판').join(' · ') + ')') + ' · ' + esc(t.start) + ' 시작 → <b>' + P.end + ' 끝</b> (총 ' + P.total + '분)</div>' +
+    '<table class="ttab"><thead><tr><th>판</th><th>시간</th><th>경기</th><th>쉬는 팀</th></tr></thead><tbody>' + P.rows.map((r) => '<tr><td>' + (r.i + 1) + '판</td><td>' + r.s + ' – ' + r.e + '</td><td><b class="tn t' + r.a + '">' + TEAMC[r.a] + '</b> : <b class="tn t' + r.b + '">' + TEAMC[r.b] + '</b></td><td><span class="tn t' + r.off + '">' + TEAMC[r.off] + '</span></td></tr>').join('') + '</tbody></table></div>';
+}
+function triCopy(g) {
+  const t = triOf(g), P = C.triPlan(t);
+  return '⚽ ' + md(g.date) + '(' + C.dayName(g.date) + ') 3파전 타임테이블 (' + P.min + '분 × ' + P.n + '판)\n' + P.rows.map((r) => r.s + ' ' + (r.i + 1) + '판 ' + TCI[r.a] + TEAMC[r.a] + ' : ' + TCI[r.b] + TEAMC[r.b] + ' (' + TCI[r.off] + TEAMC[r.off] + ' 휴식)').join('\n') + '\n' + P.end + ' 종료\n- 판 사이 ' + P.rest + '분 휴식' + (P.fair ? ' · 모든 팀 ' + P.play[0] + '판씩 동일' : '') + '\n- 승 3점 · 무 1점 · ' + P.n + '판 후 1위 결정';
+}
 function matchPanel(g) {
   const M = g.matches || [], R = C.standings(3, M);
-  return '<div class="panel pad"><div class="ph"><div class="g-lbl2">🏆 3파전 기록 · ' + M.length + '판</div><button class="btn sm pri" id="madd3">+ 판 결과 넣기</button></div>' +
+  return triTimeHTML(g) + '<div class="panel pad"><div class="ph"><div class="g-lbl2">🏆 3파전 기록 · ' + M.length + '판</div><button class="btn sm pri" id="madd3">+ 판 결과 넣기</button></div>' +
     '<table class="sttab"><thead><tr><th>순위</th><th>팀</th><th>판</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승점</th></tr></thead><tbody>' +
     R.map((r, i) => '<tr><td>' + (i + 1) + '</td><td><b class="tn t' + r.t + '">' + TEAMC[r.t] + '팀</b></td><td>' + r.p + '</td><td>' + r.w + '</td><td>' + r.d + '</td><td>' + r.l + '</td><td>' + (r.gf - r.ga > 0 ? '+' : '') + (r.gf - r.ga) + '</td><td><b>' + r.pts + '</b></td></tr>').join('') + '</tbody></table>' +
     (M.length ? '<div class="mlist">' + M.map((m, i) => '<div class="mrow"><span>' + (i + 1) + '판</span><b class="tn t' + m.a + '">' + TEAMC[m.a] + '</b><strong>' + m.sa + ' : ' + m.sb + '</strong><b class="tn t' + m.b + '">' + TEAMC[m.b] + '</b><button class="x" data-mdel="' + i + '" aria-label="' + (i + 1) + '판 지우기">✕</button></div>').join('') + '</div>' : '<div class="muted" style="margin-top:8px">순서는 A:B → B:C → C:A 고정 (3의 배수 판이면 모든 팀이 똑같이 뛰고 쉬어요). 판이 끝날 때마다 결과를 넣으면 승 3점 · 무 1점으로 순위가 바로 계산돼요.</div>') + '</div>';
@@ -629,6 +645,10 @@ function bindTeam() {
   const mk = async () => { g.teams = makeTeams(playersOf(g), nTeamsOf(g)); S.pick = null; render(); await putGame(g); toast('팀을 짰어요 · 다시 누르면 새로 짜요'); };
   document.querySelectorAll('[data-nt]').forEach((b) => (b.onclick = async () => { const k = +b.dataset.nt; if (nTeamsOf(g) === k) return; if ((g.matches || []).length && !confirm('3파전 판 기록이 있어요. 팀 수를 바꾸면 기록이 지워져요. 바꿀까요?')) return; g.nTeams = k; if (k !== 3) delete g.matches; if (g.teams) { g.teams = makeTeams(playersOf(g), k); } S.pick = null; render(); await putGame(g); toast(k === 3 ? '3팀으로 나눴어요 (3파전)' : '2팀으로 나눴어요'); }));
   const m3 = $('#madd3'); if (m3) m3.onclick = () => addMatch(g);
+  const saveTri = async (patch) => { g.tri = Object.assign(triOf(g), patch); render(); await putGame(g); };
+  document.querySelectorAll('[data-tri]').forEach((el) => (el.onchange = () => { const k = el.dataset.tri; saveTri({ [k]: k === 'start' ? el.value : Math.max(+el.min, Math.min(+el.max, +el.value || 0)) }); }));
+  document.querySelectorAll('[data-tpre]').forEach((b) => (b.onclick = () => { const [mi, re, n] = b.dataset.tpre.split(',').map(Number); saveTri({ min: mi, rest: re, n }); }));
+  const tc = $('#ttcp'); if (tc) tc.onclick = () => copy(triCopy(g));
   document.querySelectorAll('[data-mdel]').forEach((b) => (b.onclick = async () => { const i = +b.dataset.mdel; if (!confirm((i + 1) + '판 기록을 지울까요?')) return; g.matches = g.matches.filter((_, j) => j !== i); render(); await putGame(g); }));
   ['#mk', '#mk2', '#mk3'].forEach((id) => { const b = $(id); if (b) b.onclick = mk; });
   const pb = $('#pubT'); if (pb) pb.onclick = async () => { g.teamsPublic = !g.teamsPublic; render(); await putGame(g); toast(g.teamsPublic ? '회원 화면에 팀이 보여요' : '회원 화면에서 팀을 숨겼어요'); };
@@ -668,7 +688,7 @@ function pubData() {
   const games = S.games.filter((g) => g.date >= t).slice(0, 2).map((g) => {
     const a = attOf(g);
     return { id: g.id, date: g.date, postponed: !!g.postponed, time: g.time || '', cap: g.cap || S.cfg.cap, deadline: g.deadline || '', attend: a,
-             guests: C.guestNames(S.txs, g.id, a), teams: g.teamsPublic && g.teams ? g.teams.map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0).join('|')) : [], matches: g.teamsPublic && g.matches ? g.matches : [] };
+             guests: C.guestNames(S.txs, g.id, a), teams: g.teamsPublic && g.teams ? g.teams.map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0).join('|')) : [], matches: g.teamsPublic && g.matches ? g.matches : [], tri: g.teamsPublic && g.teams && g.teams.length >= 3 ? triOf(g) : null };
   });
   const past = S.games.filter((g) => g.date < t && !g.postponed);
   const records = {};

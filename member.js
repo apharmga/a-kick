@@ -810,11 +810,18 @@ function triTable(M) {
     R.map((r, i) => '<tr><td>' + (i === 0 && M.length ? '🏆' : i + 1) + '</td><td><b class="tn t' + r.t + '">' + TC[r.t] + '팀</b></td><td>' + r.p + '</td><td>' + r.w + '</td><td>' + r.d + '</td><td>' + r.l + '</td><td>' + (r.gf - r.ga > 0 ? '+' : '') + (r.gf - r.ga) + '</td><td><b>' + r.pts + '</b></td></tr>').join('') + '</tbody></table>' +
     (M.length ? '<div class="mlist">' + M.map((m, i) => '<div class="mrow"><span>' + (i + 1) + '판</span><b class="tn t' + m.a + '">' + TC[m.a] + '</b><strong>' + m.sa + ' : ' + m.sb + '</strong><b class="tn t' + m.b + '">' + TC[m.b] + '</b></div>').join('') + '</div>' : '');
 }
+function triTime(g, my) {
+  if (!g.tri) return '<div class="trule">순서 고정: A:B → B:C → C:A 반복 · 승 3점 · 무 1점</div>';
+  const P = window.Core.triPlan(g.tri), mine = my >= 0 ? P.rows.filter((r) => r.a === my || r.b === my).length : 0;
+  return '<h3 class="h3s">⏱ 타임테이블 · ' + P.min + '분 × ' + P.n + '판</h3><div class="trule">' + (my >= 0 ? '나는 <b>' + TC[my] + '팀</b> · ' + mine + '판 뛰고 ' + (P.n - mine) + '판 쉬어요 · ' : '') + '판 사이 ' + P.rest + '분 휴식 · ' + P.end + ' 종료</div>' +
+    '<table class="ttab"><tbody>' + P.rows.map((r) => { const me = my === r.a || my === r.b, off = my === r.off;
+      return '<tr class="' + (me ? 'play' : off ? 'rest' : '') + '"><td>' + (r.i + 1) + '판</td><td>' + r.s + '</td><td><b class="tn t' + r.a + '">' + TC[r.a] + '</b> : <b class="tn t' + r.b + '">' + TC[r.b] + '</b></td><td>' + (my < 0 ? '<small>' + TC[r.off] + ' 휴식</small>' : me ? '<em class="tp1">경기</em>' : '<em class="tp0">휴식</em>') + '</td></tr>'; }).join('') + '</tbody></table>';
+}
 function triCard(g, teams, myTeam) {
   const M = g.matches || [];
   return '<section class="card"><div class="h2row"><h2>팀 편성 · 3파전</h2>' + (myTeam >= 0 ? '<span class="myteam t' + myTeam + '">나는 ' + TC[myTeam] + '팀</span>' : '') + '</div>' +
     '<div class="tri">' + teams.map((t, i) => '<div class="tcol t' + i + (i === myTeam ? ' mine' : '') + '"><b class="tn t' + i + '">' + TC[i] + '팀 <small>' + t.length + '명</small></b><ul>' + t.map((n) => '<li class="' + (n === S.me.name ? 'me' : '') + '">' + ((profOf(n) || {}).num ? '<em>' + profOf(n).num + '</em>' : '') + esc(n) + '</li>').join('') + '</ul></div>').join('') + '</div>' +
-    '<div class="trule">순서 고정: A:B → B:C → C:A 반복 · 모든 팀이 2판 뛰고 1판 쉬어요 · 승 3점 · 무 1점</div>' +
+    triTime(g, myTeam) +
     (M.length ? '<h3 class="h3s">오늘의 3파전 순위</h3>' + triTable(M) : '<p class="muted" style="margin-top:8px">경기가 시작되면 판 결과와 순위가 여기에 떠요.</p>') + '</section>';
 }
 function lastRecHTML() {

@@ -501,6 +501,14 @@
     goals.forEach(function (x) { if (x.gid !== game.id) return; T.forEach(function (t, i) { if (t.indexOf(x.scorer) >= 0) s[i]++; }); });
     return s;
   }
+  /** 3파전 타임테이블: tri {min 한 판(분), rest 판 사이 휴식(분), n 판 수, start 'HH:MM'} → 판마다 시간·경기 팀·쉬는 팀 (순서 고정 A:B → B:C → C:A) */
+  function triPlan(tri) {
+    var t = tri || {}, min = +t.min || 10, rest = +t.rest || 0, n = Math.max(1, Math.min(30, +t.n || 9)), st = String(t.start || '16:00').split(':'), m0 = (+st[0] || 0) * 60 + (+st[1] || 0);
+    var hm = function (m) { m = ((m % 1440) + 1440) % 1440; return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }, P = [[0, 1], [1, 2], [2, 0]], R = [];
+    for (var i = 0; i < n; i++) { var s0 = m0 + i * (min + rest); R.push({ i: i, a: P[i % 3][0], b: P[i % 3][1], off: 3 - P[i % 3][0] - P[i % 3][1], s: hm(s0), e: hm(s0 + min) }); }
+    var play = [0, 0, 0]; R.forEach(function (r) { play[r.a]++; play[r.b]++; });
+    return { rows: R, min: min, rest: rest, n: n, end: hm(m0 + n * min + (n - 1) * rest), total: n * min + (n - 1) * rest, play: play, fair: n % 3 === 0 };
+  }
   /** 3파전 순위: matches [{a,b,sa,sb}] (a·b = 팀 번호 0·1·2) → 승점(승3·무1) · 골득실 · 다득점 순 */
   function standings(n, matches) {
     var R = []; for (var i = 0; i < n; i++) R.push({ t: i, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 });
@@ -566,8 +574,8 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.62';
-  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
+  var VERSION = 'v0.63';
+  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, triPlan: triPlan, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
     balance: balance, book: book, nearestGame: nearestGame, nextGameAfter: nextGameAfter, gamesInMonth: gamesInMonth,
