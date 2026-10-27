@@ -412,3 +412,29 @@ button.pill{cursor:pointer;border:0;font:inherit}
 .cf input{flex:1;min-width:0;border:1.5px solid #DDE2EC;border-radius:12px;padding:10px 12px;font:inherit;font-size:15px}
 .cf button{border:0;border-radius:12px;padding:0 14px;background:#FFD23F;color:#14306B;font:inherit;font-weight:800;cursor:pointer}
 @media(max-width:700px){.coachp{right:12px;left:12px;width:auto;bottom:72px}.coachb{right:12px;bottom:12px}}
+/* 3파전 */
+.ntg{display:inline-flex;border:1.5px solid var(--line,#DDE2EC);border-radius:999px;overflow:hidden;margin-right:6px}
+.ntg button{border:0;background:#fff;padding:7px 14px;font:inherit;font-size:13px;font-weight:700;color:#475569;cursor:pointer}
+.ntg button.on{background:#1E3A8A;color:#fff}
+.tri{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tri .tcol{background:#fff;border:1px solid #E5E9F0;border-top:4px solid #FF8A3D;border-radius:14px;padding:12px}
+.tri .tcol.t1{border-top-color:#5CB8FF}.tri .tcol.t2{border-top-color:#34C27A}
+.tri.sm .tcol{padding:8px 10px}.tri.sm .muted{font-size:12px;margin-top:4px}
+.tplist{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.tp{display:flex;align-items:center;gap:6px;border:1.5px solid #E5E9F0;background:#F8FAFC;border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;font-weight:700;text-align:left;cursor:pointer}
+.tp em{font-style:normal;font-size:11px;color:#64748B;min-width:18px}
+.tp.sel{border-color:#1E3A8A;background:#EEF2FF}
+.sttab{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px;text-align:center}
+.sttab th{font-size:12px;color:#64748B;font-weight:600;padding:6px 4px;border-bottom:1px solid #E5E9F0}
+.sttab td{padding:8px 4px;border-bottom:1px solid #F1F4F8}
+.tn{font-weight:800}.tn.t0{color:#C2410C}.tn.t1{color:#1D4ED8}.tn.t2{color:#15803D}
+.mlist{margin-top:10px;display:grid;gap:6px}
+.mrow{display:grid;grid-template-columns:44px 1fr 70px 1fr 32px;align-items:center;text-align:center;background:#F8FAFC;border-radius:10px;padding:6px 8px;font-size:14px}
+.mrow span{color:#64748B;font-size:12px}.mrow strong{font-size:16px}
+.mrow .x{border:0;background:none;color:#94A3B8;cursor:pointer;font-size:14px}
+.mform{display:flex;align-items:center;justify-content:center;gap:10px;margin:10px 0}
+.mform div{display:flex;gap:6px;align-items:center}.mform span{font-size:22px;font-weight:800}
+.mform input{width:64px;font-size:22px;text-align:center;font-weight:800}
+.mform select{font-size:15px}
+@media(max-width:640px){.tri{gap:6px}.tri .tcol{padding:8px}.tp{font-size:13px;padding:7px 6px}.mform{flex-direction:column}}
+.panel .sttab,.panel .mlist{max-width:680px}

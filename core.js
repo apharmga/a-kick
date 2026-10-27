@@ -501,6 +501,16 @@
     goals.forEach(function (x) { if (x.gid !== game.id) return; T.forEach(function (t, i) { if (t.indexOf(x.scorer) >= 0) s[i]++; }); });
     return s;
   }
+  /** 3파전 순위: matches [{a,b,sa,sb}] (a·b = 팀 번호 0·1·2) → 승점(승3·무1) · 골득실 · 다득점 순 */
+  function standings(n, matches) {
+    var R = []; for (var i = 0; i < n; i++) R.push({ t: i, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 });
+    (matches || []).forEach(function (m) {
+      var A = R[m.a], B = R[m.b]; if (!A || !B) return;
+      A.p++; B.p++; A.gf += m.sa; A.ga += m.sb; B.gf += m.sb; B.ga += m.sa;
+      if (m.sa > m.sb) { A.w++; B.l++; A.pts += 3; } else if (m.sa < m.sb) { B.w++; A.l++; B.pts += 3; } else { A.d++; B.d++; A.pts++; B.pts++; }
+    });
+    return R.slice().sort(function (x, y) { return (y.pts - x.pts) || ((y.gf - y.ga) - (x.gf - x.ga)) || (y.gf - x.gf) || (x.t - y.t); });
+  }
   /* ---- 팀 테마: 메인 · 서브1(포인트) · 서브2(바탕) ---- */
   // 색 역할: c[0] 메인(상단 배경) · c[1] 서브1(버튼·강조 글씨) · c[2] 서브2(포인트: 배지·카드 선)
   // c: [메인, 서브1, 서브2] · g: 오로라 그라데이션 3색(프리셋 전용)
@@ -556,8 +566,8 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.60';
-  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
+  var VERSION = 'v0.61';
+  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
     balance: balance, book: book, nearestGame: nearestGame, nextGameAfter: nextGameAfter, gamesInMonth: gamesInMonth,

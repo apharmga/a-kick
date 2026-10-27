@@ -366,10 +366,11 @@ function weekHTML() {
   let teamBox = '';
   if (tg) {
     const pl = playersOf(tg), T = tg.teams.map((t) => t.filter((n) => pl.indexOf(n) >= 0));
-    teamBox = '<section class="panel txpanel"><div class="tbhead"><span class="g-lbl2">' + md(tg.date) + ' 팀 편성 · ' + (tg.teamsPublic ? '회원 공개 중' : '회원 비공개') + '</span><button class="btn sm" data-team="' + tg.id + '">고치기</button></div>' +
-      '<div class="tlabels"><div class="tlabel t0"><b>A팀 ' + T[0].length + '명</b></div><div class="tlabel t1"><b>B팀 ' + T[1].length + '명</b></div></div>' +
-      '<div class="pitch sm"><span class="pl-mid"></span><span class="pl-circle"></span><span class="pl-boxL"></span><span class="pl-boxR"></span>' + pitchSide(T[0], 'L', 0, tg.id, true) + pitchSide(T[1], 'R', 1, tg.id, true) + '</div>' +
-      (T[2] ? '<div class="muted" style="margin-top:8px">C팀: ' + esc(T[2].join(', ')) + '</div>' : '') + '</section>';
+    const head = '<section class="panel txpanel"><div class="tbhead"><span class="g-lbl2">' + md(tg.date) + ' 팀 편성' + (T.length >= 3 ? ' (3파전)' : '') + ' · ' + (tg.teamsPublic ? '회원 공개 중' : '회원 비공개') + '</span><button class="btn sm" data-team="' + tg.id + '">' + (T.length >= 3 ? '고치기 · 판 기록' : '고치기') + '</button></div>';
+    teamBox = head + (T.length >= 3
+      ? '<div class="tri sm">' + T.map((t, i) => '<div class="tcol t' + i + '"><div class="tlabel t' + i + '"><b>' + TEAMC[i] + '팀 ' + t.length + '명</b></div><div class="muted">' + esc(t.join(', ')) + '</div></div>').join('') + '</div>'
+      : '<div class="tlabels"><div class="tlabel t0"><b>A팀 ' + T[0].length + '명</b></div><div class="tlabel t1"><b>B팀 ' + T[1].length + '명</b></div></div>' +
+        '<div class="pitch sm"><span class="pl-mid"></span><span class="pl-circle"></span><span class="pl-boxL"></span><span class="pl-boxR"></span>' + pitchSide(T[0], 'L', 0, tg.id, true) + pitchSide(T[1], 'R', 1, tg.id, true) + '</div>') + '</section>';
   }
   const side = wg.map(gameHTML).join('') + '<button class="newgame" data-newgame="' + days[6] + '">+ 이번 주 경기 만들기</button>';
   const ym = payYM(), list = C.membersFor(S.members, ym), paid = C.duesPaid(S.txs, ym);
@@ -536,7 +537,7 @@ function teamCost(T) {
   let split = 0; Object.keys(where).forEach((k) => (split += Object.keys(where[k]).length - 1));
   return gap(avg) * 10 + gap(hi) * 0.6 + gap(lo) * 0.6 + gap(top) * 0.6 + split * 3;
 }
-function makeTeams(names) {
+function makeTeams(names, k) {
   const bd = bundles(), cnt = {};
   const P = names.map((n) => {
     const base = n.replace(/\s*일행\d+$/, ''), g = bd[base] ? '#' + bd[base] : base;
@@ -544,7 +545,7 @@ function makeTeams(names) {
     return { n, s: scoreOf(n), g };
   });
   P.forEach((p) => { if (cnt[p.g] < 2) p.g = ''; });
-  const k = names.length >= 18 ? 3 : 2, cand = [];
+  k = k || (names.length >= 18 ? 3 : 2); const cand = [];
   let best = 1e9;
   for (let it = 0; it < 3000; it++) {
     const a = P.slice().sort(() => Math.random() - 0.5), T = [...Array(k)].map(() => []);
@@ -577,7 +578,7 @@ function teamHTML() {
   if (!g) { S.view = 'week'; return weekHTML(); }
   const players = playersOf(g), st = teamOf(g);
   const head = '<div class="toolbar"><button class="btn" id="back">' + IC.l + ' 이번 주</button><b class="t-title">' + md(g.date) + ' (' + C.dayName(g.date) + ') ' + esc(g.time || '') + ' · ' + players.length + '명</b>' +
-    '<span style="flex:1"></span>' + (st ? '<button class="btn ' + (g.teamsPublic ? 'on-pub' : '') + '" id="pubT">' + (g.teamsPublic ? '회원에게 공개 중 · 숨기기' : '회원에게 공개하기') + '</button><button class="btn" id="copyT">' + IC.copy + ' 카톡 문구 복사</button>' : '') + '<button class="btn pri" id="mk">' + (st ? '다시 짜기' : '팀 짜기') + '</button></div>';
+    '<span style="flex:1"></span><span class="ntg" role="group" aria-label="팀 수"><button class="' + (nTeamsOf(g) === 2 ? 'on' : '') + '" data-nt="2">2팀</button><button class="' + (nTeamsOf(g) === 3 ? 'on' : '') + '" data-nt="3">3파전</button></span>' + (st ? '<button class="btn ' + (g.teamsPublic ? 'on-pub' : '') + '" id="pubT">' + (g.teamsPublic ? '회원에게 공개 중 · 숨기기' : '회원에게 공개하기') + '</button><button class="btn" id="copyT">' + IC.copy + ' 카톡 문구 복사</button>' : '') + '<button class="btn pri" id="mk">' + (st ? '다시 짜기' : '팀 짜기') + '</button></div>';
   if (players.length < 4) return head + '<div class="panel pad">참석자가 ' + players.length + '명이에요. 이번 주 화면에서 회원 참석을 체크하거나 게스트 입금을 확인해 주세요.</div>';
   let warn = '';
   if (st && (st.missing.length || st.gone.length)) warn = '<div class="tnote">팀을 짠 뒤 인원이 바뀌었어요' + (st.missing.length ? ' · 추가: <b>' + esc(st.missing.join(', ')) + '</b>' : '') + (st.gone.length ? ' · 빠짐: <b>' + esc(st.gone.join(', ')) + '</b>' : '') + ' → <button class="btn sm" id="mk2">다시 짜기</button></div>';
@@ -585,11 +586,38 @@ function teamHTML() {
   const T = st.teams.map((t) => t.filter((n) => players.indexOf(n) >= 0));
   const sum = (t) => t.reduce((a, n) => a + scoreOf(n), 0);
   const label = (t, i) => '<div class="tlabel t' + i + '"><b>' + TEAMC[i] + '팀 ' + t.length + '명</b><span>합 ' + sum(t) + '</span></div>';
+  if (T.length >= 3) return head + warn + '<div class="tri">' + T.map((t, i) => '<div class="tcol t' + i + '">' + label(t, i) + '<div class="tplist">' + t.map((n) => '<button class="tp' + (S.pick === n ? ' sel' : '') + '" data-pick="' + esc(n) + '">' + (numOf(n) ? '<em>' + numOf(n) + '</em>' : '') + esc(n) + '</button>').join('') + '</div></div>').join('') + '</div>' +
+    '<div class="muted" style="margin:8px 0 14px">선수를 누르고 다른 팀 선수를 누르면 <b>서로 자리 바꾸기</b></div>' + matchPanel(g) + scoreList(players);
   const pitch = '<div class="pitchwrap"><div class="tlabels">' + label(T[0], 0) + label(T[1], 1) + '</div><div class="pitch"><span class="pl-mid"></span><span class="pl-circle"></span><span class="pl-boxL"></span><span class="pl-boxR"></span>' +
     pitchSide(T[0], 'L', 0, g.id) + pitchSide(T[1], 'R', 1, g.id) + '</div>' +
     (T[2] ? '<div class="tlabel t2" style="margin-top:10px"><b>C팀 ' + T[2].length + '명 (대기)</b><span>' + esc(T[2].join(', ')) + '</span></div>' : '') +
     '<div class="muted" style="margin-top:8px">동그라미 숫자 = 실력 점수 · 선수를 누르고 상대 팀 선수를 누르면 <b>서로 자리 바꾸기</b> · 점수는 아래에서 고쳐요</div></div>';
   return head + warn + pitch + scoreList(players);
+}
+function triTxt(g) { const M = (S.games.find((x) => x.id === g.id) || {}).matches || []; if (!M.length) return '3파전'; const r = C.standings(3, M)[0]; return '3파전 ' + M.length + '판 · 1위 ' + TEAMC[r.t] + '팀 (승점 ' + r.pts + ')'; }
+const nTeamsOf = (g) => g.nTeams || (g.teams && g.teams.length >= 3 ? 3 : playersOf(g).length >= perSide() * 3 ? 3 : 2);
+/** 3파전 판 기록: 관리자가 판마다 결과를 넣으면 순위가 자동 계산되고 회원 화면에도 보임 */
+function matchPanel(g) {
+  const M = g.matches || [], R = C.standings(3, M);
+  return '<div class="panel pad"><div class="ph"><div class="g-lbl2">🏆 3파전 기록 · ' + M.length + '판</div><button class="btn sm pri" id="madd3">+ 판 결과 넣기</button></div>' +
+    '<table class="sttab"><thead><tr><th>순위</th><th>팀</th><th>판</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승점</th></tr></thead><tbody>' +
+    R.map((r, i) => '<tr><td>' + (i + 1) + '</td><td><b class="tn t' + r.t + '">' + TEAMC[r.t] + '팀</b></td><td>' + r.p + '</td><td>' + r.w + '</td><td>' + r.d + '</td><td>' + r.l + '</td><td>' + (r.gf - r.ga > 0 ? '+' : '') + (r.gf - r.ga) + '</td><td><b>' + r.pts + '</b></td></tr>').join('') + '</tbody></table>' +
+    (M.length ? '<div class="mlist">' + M.map((m, i) => '<div class="mrow"><span>' + (i + 1) + '판</span><b class="tn t' + m.a + '">' + TEAMC[m.a] + '</b><strong>' + m.sa + ' : ' + m.sb + '</strong><b class="tn t' + m.b + '">' + TEAMC[m.b] + '</b><button class="x" data-mdel="' + i + '" aria-label="' + (i + 1) + '판 지우기">✕</button></div>').join('') + '</div>' : '<div class="muted" style="margin-top:8px">경기 중에 판이 끝날 때마다 결과를 넣어주세요. 승 3점 · 무 1점으로 순위가 바로 계산돼요.</div>') + '</div>';
+}
+function addMatch(g) {
+  const M = g.matches || [], last = M[M.length - 1];
+  let a = 0, b = 1;
+  if (last) { const win = last.sa > last.sb ? last.a : last.sb > last.sa ? last.b : last.a; a = win; b = [0, 1, 2].find((x) => x !== last.a && x !== last.b); }   // 이긴 팀(비기면 먼저 뛴 팀) 남고 쉬던 팀 입장
+  const sel = (id, v) => '<select id="' + id + '">' + TEAMC.map((t, i) => '<option value="' + i + '"' + (i === v ? ' selected' : '') + '>' + t + '팀</option>').join('') + '</select>';
+  modal('<h2>' + (M.length + 1) + '판 결과</h2><div class="mform"><div>' + sel('ma', a) + '<input id="sa" type="number" min="0" max="30" inputmode="numeric" value="0"></div><span>:</span><div><input id="sb" type="number" min="0" max="30" inputmode="numeric" value="0">' + sel('mb', b) + '</div></div>' +
+    '<div class="muted">진 팀이 나가고 쉬던 팀이 들어오는 순서로 다음 판 팀을 미리 골라둬요.</div><div class="mfoot"><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">저장</button></div>', (m) => {
+    m.querySelector('#cx').onclick = closeModal;
+    m.querySelector('#ok').onclick = async () => {
+      const x = { a: +m.querySelector('#ma').value, b: +m.querySelector('#mb').value, sa: Math.max(0, +m.querySelector('#sa').value || 0), sb: Math.max(0, +m.querySelector('#sb').value || 0) };
+      if (x.a === x.b) return toast('서로 다른 두 팀을 골라주세요');
+      g.matches = M.concat([x]); closeModal(); render(); await putGame(g); toast((M.length + 1) + '판 결과를 넣었어요');
+    };
+  });
 }
 function scoreList(players) {
   return '<div class="panel pad"><div class="g-lbl2" style="margin-bottom:10px">실력 점수 (관리자만 보여요 · 카톡에는 이름만 나가요)</div><div class="slist">' +
@@ -599,7 +627,10 @@ function scoreList(players) {
 function bindTeam() {
   const g = S.games.find((x) => x.id === S.gid); if (!g) return;
   $('#back').onclick = () => { S.view = 'week'; render(); };
-  const mk = async () => { g.teams = makeTeams(playersOf(g)); S.pick = null; render(); await putGame(g); toast('팀을 짰어요 · 다시 누르면 새로 짜요'); };
+  const mk = async () => { g.teams = makeTeams(playersOf(g), nTeamsOf(g)); S.pick = null; render(); await putGame(g); toast('팀을 짰어요 · 다시 누르면 새로 짜요'); };
+  document.querySelectorAll('[data-nt]').forEach((b) => (b.onclick = async () => { const k = +b.dataset.nt; if (nTeamsOf(g) === k) return; if ((g.matches || []).length && !confirm('3파전 판 기록이 있어요. 팀 수를 바꾸면 기록이 지워져요. 바꿀까요?')) return; g.nTeams = k; if (k !== 3) delete g.matches; if (g.teams) { g.teams = makeTeams(playersOf(g), k); } S.pick = null; render(); await putGame(g); toast(k === 3 ? '3팀으로 나눴어요 (3파전)' : '2팀으로 나눴어요'); }));
+  const m3 = $('#madd3'); if (m3) m3.onclick = () => addMatch(g);
+  document.querySelectorAll('[data-mdel]').forEach((b) => (b.onclick = async () => { const i = +b.dataset.mdel; if (!confirm((i + 1) + '판 기록을 지울까요?')) return; g.matches = g.matches.filter((_, j) => j !== i); render(); await putGame(g); }));
   ['#mk', '#mk2', '#mk3'].forEach((id) => { const b = $(id); if (b) b.onclick = mk; });
   const pb = $('#pubT'); if (pb) pb.onclick = async () => { g.teamsPublic = !g.teamsPublic; render(); await putGame(g); toast(g.teamsPublic ? '회원 화면에 팀이 보여요' : '회원 화면에서 팀을 숨겼어요'); };
   const cp = $('#copyT'); if (cp) cp.onclick = () => {
@@ -638,7 +669,7 @@ function pubData() {
   const games = S.games.filter((g) => g.date >= t).slice(0, 2).map((g) => {
     const a = attOf(g);
     return { id: g.id, date: g.date, postponed: !!g.postponed, time: g.time || '', cap: g.cap || S.cfg.cap, deadline: g.deadline || '', attend: a,
-             guests: C.guestNames(S.txs, g.id, a), teams: g.teamsPublic && g.teams ? g.teams.map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0).join('|')) : [] };
+             guests: C.guestNames(S.txs, g.id, a), teams: g.teamsPublic && g.teams ? g.teams.map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0).join('|')) : [], matches: g.teamsPublic && g.matches ? g.matches : [] };
   });
   const past = S.games.filter((g) => g.date < t && !g.postponed);
   const records = {};
@@ -653,7 +684,7 @@ function pubData() {
   }
   let bal = 0;
   const txs = S.txs.map((x) => { bal = !x.manual && x.bal ? x.bal : bal + (x.kind === '입금' ? x.amt : -x.amt); return { dt: x.dt.substr(0, 16).replace(/\./g, '-'), io: x.kind === '입금' ? 1 : 0, amt: x.amt, who: x.desc, what: x.state === '확인필요' ? '관리자 확인 중' : partLabel(x), off: x.state === '무시' ? 1 : 0, bal, pend: x.manual ? 1 : 0 }; }).slice(-1500);
-  const played = S.games.filter((g) => g.date <= t && g.date >= statFrom() && !g.postponed).slice(-200).map((g) => { const pl = playersOf(g); return { id: g.id, date: g.date, players: pl, teams: g.teams ? g.teams.map((x) => x.filter((n) => pl.indexOf(n) >= 0).join('|')) : [] }; });
+  const played = S.games.filter((g) => g.date <= t && g.date >= statFrom() && !g.postponed).slice(-200).map((g) => { const pl = playersOf(g); return { id: g.id, date: g.date, players: pl, teams: g.teams ? g.teams.map((x) => x.filter((n) => pl.indexOf(n) >= 0).join('|')) : [], matches: g.matches || [] }; });
   return { updatedAt: new Date().toISOString(), xpAdj: S.cfg.xpAdj || {}, wxLoc: S.cfg.wxLoc || null, club: S.club.name, perSide: perSide(), maxSide: maxSide(), txs, played, statFrom: statFrom(), place: S.cfg.place || '', members: act.map((m) => ({ id: m.id, name: m.name })), games, records, ledger,
            dues: { ym, fee: S.cfg.fee, dueDay: S.cfg.dueDay || 30, account: S.cfg.account || '', paid: list.filter((m) => paid[m.name]).map((m) => m.name), unpaid: list.filter((m) => !paid[m.name]).map((m) => m.name) } };
 }
@@ -1152,7 +1183,7 @@ function statsHTML() {
   const rows = sortRows(data, 'stats').map((r) => '<tr><th scope="row">' + esc(r.name) + '</th><td>' + r.gp + '</td><td>' + r.g + '</td><td>' + r.a + '</td><td><b>' + r.ap + '</b></td></tr>').join('');
   const gl = games.filter((g) => !S.sym || g.date.substr(0, 7) === S.sym).reverse().map((g) => {
     const gs = S.goals.filter((x) => x.gid === g.id), sc = C.score(g, S.goals);
-    return '<div class="glog"><div class="glh"><b>' + md(g.date) + ' (' + C.dayName(g.date) + ')</b>' + (g.teams.length >= 2 ? '<span>A ' + sc[0] + ' : ' + sc[1] + ' B</span>' : '') + '</div>' +
+    return '<div class="glog"><div class="glh"><b>' + md(g.date) + ' (' + C.dayName(g.date) + ')</b>' + (g.teams.length >= 3 ? '<span>' + triTxt(g) + '</span>' : g.teams.length >= 2 ? '<span>A ' + sc[0] + ' : ' + sc[1] + ' B</span>' : '') + '</div>' +
       (gs.length ? gs.map((x) => '<div class="gli">⚽ <b>' + esc(x.scorer) + '</b>' + (x.assist ? ' <span class="muted">도움 ' + esc(x.assist) + '</span>' : '') + '<small>' + esc(x.byName || '') + ' 입력</small><button class="btn xs ghost" data-gdel="' + x.id + '">삭제</button></div>').join('') : '<div class="muted">기록 없음 · 회원 화면 \'경기기록\' 탭에서 누구나 넣을 수 있어요</div>') + '</div>';
   }).join('');
   return '<div class="pagehead"><h1>경기기록</h1><div class="ph-act"><select id="sym"><option value="">전체 기간</option>' + months.map((m) => '<option value="' + m + '"' + (m === S.sym ? ' selected' : '') + '>' + m.replace('-', '년 ') + '월</option>').join('') + '</select></div></div>' +

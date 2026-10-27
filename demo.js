@@ -15,7 +15,8 @@ export function demoData() {
   for (let w = 8; w >= 1; w--) {
     const d = add(thu, -7 * w), pl = N.filter(() => rnd() < 0.8);
     if (pl.indexOf(ME.name) < 0 && w % 3) pl.unshift(ME.name);
-    played.push({ id: gid(d), date: D(d), players: pl, teams: split(pl) });
+    const tri = w === 1, pl3 = tri ? pl.concat(['게스트1', '게스트2', '게스트3', '게스트4', '게스트5']).slice(0, 15) : pl;
+    played.push({ id: gid(d), date: D(d), players: pl3, teams: tri ? [0, 1, 2].map((k) => pl3.filter((_, i) => i % 3 === k).join('|')) : split(pl), matches: tri ? [{ a: 0, b: 1, sa: 2, sb: 1 }, { a: 0, b: 2, sa: 1, sb: 1 }, { a: 2, b: 1, sa: 0, sb: 2 }, { a: 1, b: 0, sa: 1, sb: 2 }, { a: 0, b: 2, sa: 0, sb: 2 }, { a: 2, b: 1, sa: 1, sb: 1 }] : [] });
     const k = 4 + Math.floor(rnd() * 5);
     for (let i = 0; i < k; i++) { const sc = pick(pl), as = rnd() < 0.6 ? pick(pl.filter((x) => x !== sc)) : ''; goals.push({ id: 'gl' + goals.length, gid: gid(d), scorer: sc, assist: as, by: 'x', byName: '체험', at: d.getTime() }); }
   }
@@ -87,7 +88,9 @@ export function demoAdmin() {
   for (let w = 9; w >= -1; w--) {
     const d = add(thu, -7 * w), past = w >= 1, pl = past ? N.filter(() => rnd() < 0.8) : [];
     const g = { id: gid(d), date: D(d), time: '20:00', type: '정기대관', fee: 100000, cap: 14, attend: pl, deadline: D(add(d, -1)) + 'T22:00' };
-    if (past) { const t = split(pl); g.teams = [t[0].join('|'), t[1].join('|')]; g.teamsPublic = true;
+    if (past && w === 1) { g.teams = [0, 1, 2].map((k) => pl.filter((_, i) => i % 3 === k).join('|')); g.nTeams = 3; g.teamsPublic = true; g.matches = [{ a: 0, b: 1, sa: 2, sb: 1 }, { a: 0, b: 2, sa: 1, sb: 1 }, { a: 2, b: 1, sa: 0, sb: 2 }, { a: 1, b: 0, sa: 1, sb: 2 }, { a: 0, b: 2, sa: 0, sb: 2 }, { a: 2, b: 1, sa: 1, sb: 1 }]; }
+    else if (past) { const t = split(pl); g.teams = [t[0].join('|'), t[1].join('|')]; g.teamsPublic = true; }
+    if (past) {
       const k = 3 + Math.floor(rnd() * 5); for (let i = 0; i < k; i++) { const sc = pl[Math.floor(rnd() * pl.length)]; put('goals/g' + w + '_' + i, { gid: g.id, scorer: sc, assist: '', by: 'u0', byName: N[0], at: d.getTime() }); } }
     put('games/' + g.id, g);
   }

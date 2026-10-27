@@ -430,3 +430,20 @@ body.noscroll{overflow:hidden}
 .pitem.past{opacity:.75}
 .about{display:block;margin:10px auto 0;font-size:13px;color:#475569;text-align:center}
 .demoa{display:flex;gap:6px;flex:none}.demoa a{padding:5px 10px;border-radius:999px;border:1.5px solid #78350f;color:#78350f;font-size:12px;font-weight:700;text-decoration:none}
+/* 3파전 */
+.tri{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+.tri .tcol{background:#F8FAFC;border-radius:12px;border-top:4px solid #FF8A3D;padding:10px 8px}
+.tri .tcol.t1{border-top-color:#5CB8FF}.tri .tcol.t2{border-top-color:#34C27A}
+.tri .tcol.mine{background:#EEF2FF;box-shadow:inset 0 0 0 2px #1E3A8A}
+.tri ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px;font-size:13.5px;font-weight:600}
+.tri li em{font-style:normal;font-size:11px;color:#64748B;margin-right:4px}
+.tri li.me{color:#1E3A8A;font-weight:800}
+.tn{font-weight:800}.tn.t0{color:#C2410C}.tn.t1{color:#1D4ED8}.tn.t2{color:#15803D}.tn small{font-weight:600;color:#64748B;font-size:11px}
+.trule{margin-top:10px;font-size:12px;color:#64748B;background:#F1F5F9;border-radius:8px;padding:6px 10px}
+.h3s{font-size:15px;margin:14px 0 2px}
+.sttab{width:100%;border-collapse:collapse;margin-top:6px;font-size:13.5px;text-align:center}
+.sttab th{font-size:11.5px;color:#64748B;font-weight:600;padding:5px 2px;border-bottom:1px solid #E5E9F0}
+.sttab td{padding:7px 2px;border-bottom:1px solid #F1F4F8}
+.mlist{margin-top:8px;display:grid;gap:5px}
+.mrow{display:grid;grid-template-columns:40px 1fr 64px 1fr;align-items:center;text-align:center;background:#F8FAFC;border-radius:10px;padding:5px 8px;font-size:14px}
+.mrow span{color:#64748B;font-size:12px}.mrow strong{font-size:15px}

@@ -656,7 +656,7 @@ function weekHTML() {
     '<button data-vote="불참" class="' + (!amIn && mine && mine.v === '불참' ? 'on no' : '') + '"' + (lk ? ' disabled' : '') + '>불참</button></div>' +
     '<div class="cnt"><span>지금 <b>' + total + '명</b> · 회원 ' + att.length + ' + 게스트 ' + (g.guests || []).length + '</span><em class="' + (total >= minN() ? 'ok' : 'low') + '">' + status + '</em></div>' +
     '<div class="names">' + att.map((n) => '<span class="' + (n === S.me.name ? 'me' : '') + '">' + lvPill(lvOfName(n)) + esc(n) + '</span>').join('') + ((g.guests || []).length ? '<span class="g">게스트 ' + g.guests.length + '명</span>' : '') + '</div></section>' +
-    (teams.length >= 2 ? '<section class="card"><div class="h2row"><h2>팀 편성</h2>' + (myTeam >= 0 ? '<span class="myteam t' + myTeam + '">나는 ' + 'ABC'[myTeam] + '팀</span>' : '') + '</div>' +
+    (teams.length >= 3 ? triCard(g, teams, myTeam) : teams.length >= 2 ? '<section class="card"><div class="h2row"><h2>팀 편성</h2>' + (myTeam >= 0 ? '<span class="myteam t' + myTeam + '">나는 ' + 'ABC'[myTeam] + '팀</span>' : '') + '</div>' +
       '<div class="tl"><b class="tb">B팀 ' + teams[1].length + '명</b></div><div class="vpitch"><span class="vm"></span><span class="vc"></span><span class="vbT"></span><span class="vbB"></span>' +
       side(teams[1], false, 'b', g.id + ':1') + side(teams[0], true, 'a', g.id + ':0') + '</div><div class="tl"><b class="ta">A팀 ' + teams[0].length + '명</b></div>' +
       (teams[2] ? '<div class="muted">C팀 (대기): ' + esc(teams[2].join(', ')) + '</div>' : '') + '</section>'
@@ -715,7 +715,7 @@ function duesHTML() {
 const played = () => {
   const P = S.pub.played || [], ids = P.map((g) => g.id), t = window.Core.ymd(new Date()), from = S.pub.statFrom || '';
   const extra = (S.pub.games || []).filter((g) => !g.postponed && g.date <= t && g.date >= from && ids.indexOf(g.id) < 0)
-    .map((g) => ({ id: g.id, date: g.date, players: attendOf(g).concat(g.guests || []), teams: g.teams || [] }));
+    .map((g) => ({ id: g.id, date: g.date, players: attendOf(g).concat(g.guests || []), teams: g.teams || [], matches: g.matches || [] }));
   return P.concat(extra).sort((a, b) => (a.date < b.date ? -1 : 1));
 };
 
@@ -802,6 +802,21 @@ function openSuggest() {
     };
   });
 }
+/* 3파전: 팀 3개 + 판 결과 순위 */
+const TC = ['A', 'B', 'C'];
+function triTable(M) {
+  const R = window.Core.standings(3, M);
+  return '<table class="sttab"><thead><tr><th>순위</th><th>팀</th><th>판</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승점</th></tr></thead><tbody>' +
+    R.map((r, i) => '<tr><td>' + (i === 0 && M.length ? '🏆' : i + 1) + '</td><td><b class="tn t' + r.t + '">' + TC[r.t] + '팀</b></td><td>' + r.p + '</td><td>' + r.w + '</td><td>' + r.d + '</td><td>' + r.l + '</td><td>' + (r.gf - r.ga > 0 ? '+' : '') + (r.gf - r.ga) + '</td><td><b>' + r.pts + '</b></td></tr>').join('') + '</tbody></table>' +
+    (M.length ? '<div class="mlist">' + M.map((m, i) => '<div class="mrow"><span>' + (i + 1) + '판</span><b class="tn t' + m.a + '">' + TC[m.a] + '</b><strong>' + m.sa + ' : ' + m.sb + '</strong><b class="tn t' + m.b + '">' + TC[m.b] + '</b></div>').join('') + '</div>' : '');
+}
+function triCard(g, teams, myTeam) {
+  const M = g.matches || [];
+  return '<section class="card"><div class="h2row"><h2>팀 편성 · 3파전</h2>' + (myTeam >= 0 ? '<span class="myteam t' + myTeam + '">나는 ' + TC[myTeam] + '팀</span>' : '') + '</div>' +
+    '<div class="tri">' + teams.map((t, i) => '<div class="tcol t' + i + (i === myTeam ? ' mine' : '') + '"><b class="tn t' + i + '">' + TC[i] + '팀 <small>' + t.length + '명</small></b><ul>' + t.map((n) => '<li class="' + (n === S.me.name ? 'me' : '') + '">' + ((profOf(n) || {}).num ? '<em>' + profOf(n).num + '</em>' : '') + esc(n) + '</li>').join('') + '</ul></div>').join('') + '</div>' +
+    '<div class="trule">한 판: 정해진 시간 또는 먼저 골 · 진 팀 나가고 쉬던 팀 입장</div>' +
+    (M.length ? '<h3 class="h3s">오늘의 3파전 순위</h3>' + triTable(M) : '<p class="muted" style="margin-top:8px">경기가 시작되면 판 결과와 순위가 여기에 떠요.</p>') + '</section>';
+}
 function lastRecHTML() {
   const t = ymd(new Date()), g = played().filter((x) => x.date <= t).slice(-1)[0];
   if (!g || (Date.now() - Date.parse(g.date)) / 864e5 > 7) return '';
@@ -809,8 +824,9 @@ function lastRecHTML() {
 }
 function gameRec(g) {
   const gs = (S.goals || []).filter((x) => x.gid === g.id), T = (g.teams || []).map((x) => x.split('|')).filter((x) => x[0]);
-  const sc = window.Core.score({ id: g.id, teams: T }, S.goals || []);
-  return '<div class="grec"><div class="grh"><b>' + md(g.date) + ' (' + day(g.date) + ')</b>' + (T.length >= 2 ? '<span class="score"><em class="a">A</em> ' + sc[0] + ' : ' + sc[1] + ' <em class="b">B</em></span>' : '<span class="muted">' + g.players.length + '명</span>') + '</div>' +
+  const sc = window.Core.score({ id: g.id, teams: T }, S.goals || []), M = g.matches || [];
+  const tri = T.length >= 3 ? (M.length ? triTable(M) : '<div class="muted" style="padding:4px 0">3파전 · 판 결과가 아직 없어요</div>') : '';
+  return '<div class="grec"><div class="grh"><b>' + md(g.date) + ' (' + day(g.date) + ')</b>' + (T.length >= 3 ? '<span class="score">3파전' + (M.length ? ' · 🏆 ' + TC[window.Core.standings(3, M)[0].t] + '팀' : '') + '</span>' : T.length >= 2 ? '<span class="score"><em class="a">A</em> ' + sc[0] + ' : ' + sc[1] + ' <em class="b">B</em></span>' : '<span class="muted">' + g.players.length + '명</span>') + '</div>' + tri +
     (gs.length ? gs.map((x) => '<div class="gli"><span>⚽ <b>' + lvPill(lvOfName(x.scorer)) + esc(x.scorer) + '</b>' + (x.assist ? ' <small>도움 ' + lvPill(lvOfName(x.assist)) + esc(x.assist) + '</small>' : '') + '</span>' + (x.by === S.uid || S.owner ? '<button class="x" data-gdel="' + esc(x.id) + '" aria-label="삭제">✕</button>' : '') + '</div>').join('') : '<div class="muted" style="padding:6px 0">아직 기록이 없어요</div>') +
     '<button class="addg" data-gadd="' + esc(g.id) + '">+ 골 기록 넣기</button></div>';
 }
