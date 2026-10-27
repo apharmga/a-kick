@@ -421,3 +421,7 @@ body.noscroll{overflow:hidden}
 .wx em{flex-direction:column;gap:1px;line-height:1.3}.wx em b{font-size:14px;color:inherit}.wx em i{font-style:normal;font-size:12px;font-weight:600;opacity:.85}
 .wx .wmain{flex:1 1 170px}.wx em{flex:1 1 140px}
 .pitem span.pcd{display:inline;white-space:nowrap}
+/* 체험 팀 */
+.demobtn{display:block;width:100%;max-width:320px;margin:12px auto 0;padding:12px;border:1.5px dashed #94a3b8;border-radius:12px;background:#fff;color:#334155;font:inherit;font-weight:700;cursor:pointer}
+.demob{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;background:#fef3c7;color:#78350f;font-size:13px;border-bottom:1px solid #fcd34d}
+.demob button{flex:none;padding:5px 12px;border:0;border-radius:999px;background:#78350f;color:#fff;font:inherit;font-size:12px;font-weight:700;cursor:pointer}

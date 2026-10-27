@@ -1,6 +1,16 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, deleteUser } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, doc, getDoc, setDoc, deleteDoc, writeBatch, onSnapshot, query, where, getDocs, addDoc, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, collection, doc, getDoc as _getDoc, setDoc as _setDoc, deleteDoc as _deleteDoc, writeBatch as _writeBatch, onSnapshot as _onSnapshot, query, where, getDocs as _getDocs, addDoc as _addDoc, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { demoData } from './demo.js';
+/* 체험 팀(로그인 없이 둘러보기): 서버를 읽지도 쓰지도 않음. 누른 건 화면에만 반영되고 저장 안 됨 */
+const DEMO_MSG = '체험 팀이라 저장되지 않아요 · 내 팀을 만들면 진짜로 저장돼요';
+let tapAt = 0; addEventListener('pointerdown', () => (tapAt = Date.now()), true);
+const noW = () => { if (Date.now() - tapAt < 2000) setTimeout(() => toast(DEMO_MSG), 60); return Promise.resolve(); };   // 배경 저장(업적 등)은 조용히, 직접 누른 것만 안내
+const setDoc = (...a) => (S.demo ? noW() : _setDoc(...a)), deleteDoc = (...a) => (S.demo ? noW() : _deleteDoc(...a)), addDoc = (...a) => (S.demo ? noW() : _addDoc(...a));
+const writeBatch = (d) => (S.demo ? { set() {}, update() {}, delete() {}, commit: noW } : _writeBatch(d));
+const onSnapshot = (...a) => (S.demo ? () => {} : _onSnapshot(...a));
+const getDoc = (...a) => (S.demo ? Promise.resolve({ exists: () => false, data: () => undefined }) : _getDoc(...a));
+const getDocs = (...a) => (S.demo ? Promise.resolve({ docs: [], empty: true, size: 0 }) : _getDocs(...a));
 
 /* 카카오톡 안 브라우저에서는 구글 로그인이 막혀 있어서 바깥 브라우저(크롬·사파리)로 엽니다 */
 const UA = navigator.userAgent || '';
@@ -66,18 +76,32 @@ async function copy(text, done) { try { await navigator.clipboard.writeText(text
 const view = (h) => ($('#app').innerHTML = h);
 
 /* ---------------- 1. 로그인 ---------------- */
-onAuthStateChanged(auth, (u) => { if (!u) return renderLogin(); S.uid = u.uid; S.email = u.email || ''; start(); });
+const IS_DEMO = new URLSearchParams(location.search).get('demo') === '1';
+onAuthStateChanged(auth, (u) => { if (IS_DEMO) return startDemo(); if (!u) return renderLogin(); S.uid = u.uid; S.email = u.email || ''; start(); });
 function renderLogin() {
   view('<div class="login"><div class="logo8"><div class="stk">A-KICK</div><div class="pills"><span class="p1">⚽ FUTSAL</span><span class="p2">🥅 FOOTBALL</span></div></div>' +
     '<p class="lt">우리 모임, 오늘도 킥오프!<br><span>참석 투표 · 팀 편성 · 회비 · 장부</span></p>' +
     (INAPP ? '<div class="warn"><b>카카오톡·밴드 안에서는 구글 로그인이 막혀 있어요.</b><br>아래 버튼을 누르면 ' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 바로 열려요.' +
       '<button id="ext" class="extbtn">' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 열기</button><button id="cpl" class="lnk">안 열리면 링크 복사</button></div>'
       : '<button class="gbtn" id="in"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>구글로 시작하기</button>' +
-        '<small>처음이면 로그인 → 이름 쓰고 가입 신청 → 관리자 승인 후 입장</small>') + LEGAL + '</div>');
+        '<small>처음이면 로그인 → 이름 쓰고 가입 신청 → 관리자 승인 후 입장</small>') + DEMO_BTN + LEGAL + '</div>');
+  bindDemoBtn();
   const i = $('#in'); if (i) i.onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => toast(e.code === 'auth/popup-closed-by-user' ? '로그인을 취소했어요' : '로그인 실패: ' + e.message));
   const x = $('#ext'); if (x) x.onclick = openOutside;
   const c = $('#cpl'); if (c) c.onclick = () => copy(location.href, '링크를 복사했어요. 사파리·크롬 주소창에 붙여넣으세요');
 }
+
+/* ---------------- 체험 팀 둘러보기 ---------------- */
+const DEMO_BTN = '<button class="demobtn" id="demo">👀 체험 팀 둘러보기 (샘플 · 로그인 없이 OK)</button>';
+function bindDemoBtn() { const b = $('#demo'); if (b) b.onclick = () => (location.href = './?demo=1'); }
+function startDemo() {
+  const d = demoData(), g = d.pub.games[0];
+  Object.assign(S, { demo: true, uid: 'demo', email: '', cid: 'demo', club: d.club, owner: false, pub: d.pub, me: d.me, polls: d.polls, pvotes: d.pvotes, avotes: d.avotes, ah: {},
+    goals: d.goals, profs: d.profs, vcAll: [], videos: [], votes: d.votes, pollsLoaded: true, pvLoaded: true, rpsNet: 0, rpsToday: null, wx: d.wx, wxGid: g.id, voteGid: g.id,
+    pollSub: [], goalSub: 1, profSub: 1, vcSub: 1, vidSub: 1, rpsSub: 1, myClubs: {}, seenAll: {} });
+  document.title = '체험FC · A-KICK'; window.Core.applyTheme(null); achLoad(); render();
+}
+const exitDemo = () => (location.href = './');
 
 /* ---------------- 2. 어느 팀인지 ---------------- */
 async function start() {
@@ -414,7 +438,8 @@ async function renderHome() {
       : '<section class="card soft"><h2>아직 들어간 팀이 없어요</h2><p class="muted">회원이라면 관리자에게 받은 <b>팀 링크</b>로 들어오세요.</p></section>') +
     '<section class="card"><h2>내가 관리자예요</h2><p class="muted">새 팀을 만들면 회비·참석·팀 편성을 관리할 수 있어요. 만들면 4단계 설정(운동·요일·회비·회원)이 바로 시작돼요.</p>' +
     '<div class="newc"><input id="cn" placeholder="팀 이름 (예: 대구FC)" maxlength="20"><button id="mk">팀 만들기</button></div>' +
-    '<label class="rcl">추천 코드 <small>(선택 · 받은 링크로 들어왔으면 자동으로 채워져요)</small><input id="rc" maxlength="12" placeholder="예: K7P2QX" value="' + esc(refSaved()) + '"></label></section>' + LEGAL + '</main>');
+    '<label class="rcl">추천 코드 <small>(선택 · 받은 링크로 들어왔으면 자동으로 채워져요)</small><input id="rc" maxlength="12" placeholder="예: K7P2QX" value="' + esc(refSaved()) + '"></label></section>' + DEMO_BTN + LEGAL + '</main>');
+  bindDemoBtn();
   $('#out').onclick = () => signOut(auth);
   if (S.email === OPERATOR) { $('main').insertAdjacentHTML('beforeend', '<button class="link" id="ops">운영자: 오류 기록 보기</button><button class="link" id="opf">운영자: 개발자 건의 보기</button>'); $('#ops').onclick = showErrs; $('#opf').onclick = showFeedback; }
   document.querySelectorAll('[data-cdel]').forEach((b) => (b.onclick = () => (b.dataset.own === '1' ? deleteClub(b.dataset.cdel, all[b.dataset.cdel]) : leaveList(b.dataset.cdel, all[b.dataset.cdel]))));
@@ -506,6 +531,7 @@ function render() {
     tab('dues', '회비', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>') +
     tab('bank', '통장', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/></svg>') +
     tab('rec', '경기기록', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>') + '</nav>');
+  if (S.demo) { $('#app').insertAdjacentHTML('afterbegin', '<div class="demob"><span>👀 <b>체험 팀</b> · 눌러봐도 저장되지 않아요</span><button id="demox">나가기</button></div>'); $('#demox').onclick = exitDemo; }
   document.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.t; if (S.tab === 'week' && teamKey()) markSeen(teamKey()); render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.go; render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-vote]').forEach((b) => (b.onclick = () => vote(b.dataset.vote)));
@@ -532,10 +558,11 @@ function render() {
   bindCommon();
 }
 function bindCommon() {
-  const h = $('#home'); if (h) h.onclick = () => { S.subs.forEach((f) => f()); S.subs = []; S.cid = ''; history.replaceState(null, '', './'); renderHome(); };
-  const o = $('#out'); if (o) o.onclick = () => signOut(auth);
-  const lv = $('#leave'); if (lv) lv.onclick = openLeave;
-  const nf = $('#ntf'); if (nf) nf.onclick = openNotify;
+  if (S.demo) { ['#home', '#out', '#leave'].forEach((k) => { const b = $(k); if (b) b.onclick = exitDemo; }); const n = $('#ntf'); if (n) n.onclick = () => toast(DEMO_MSG); }
+  const h = $('#home'); if (h && !S.demo) h.onclick = () => { S.subs.forEach((f) => f()); S.subs = []; S.cid = ''; history.replaceState(null, '', './'); renderHome(); };
+  const o = $('#out'); if (o && !S.demo) o.onclick = () => signOut(auth);
+  const lv = $('#leave'); if (lv && !S.demo) lv.onclick = openLeave;
+  const nf = $('#ntf'); if (nf && !S.demo) nf.onclick = openNotify;
   const dv = $('#dev'); if (dv) dv.onclick = openDev;
   const dn = $('#dona'); if (dn) dn.onclick = openDonate;
   const it = $('#inst'); if (it) it.onclick = async () => { installEv.prompt(); const ch = await installEv.userChoice.catch(() => null); if (ch && ch.outcome === 'accepted') achFlag('inst'); installEv = null; render(); };
@@ -1012,6 +1039,7 @@ function medal(a, on, big) {
     '</svg></span>';
 }
 function achCelebrate(list) {
+  if (S.demo) return;
   if (list.length > 3) return sheet('<div class="apop-h">🏆 업적 ' + list.length + '개 달성!</div><div class="agrid">' + list.map((a) => '<div class="ait">' + medal(a, 1) + '<b>' + esc(a[4]) + '</b><small>' + TIER[a[2]][0] + '</small></div>').join('') + '</div><div class="srow"><button class="pri" id="ax">좋아요</button></div>', (el) => (el.querySelector('#ax').onclick = () => (el.hidden = true)));
   let i = 0;
   const one = () => {
@@ -1142,6 +1170,7 @@ function lvSync() {
   profPut();
 }
 function lvCelebrate(from, to) {
+  if (S.demo) return;
   const old = document.querySelector('.lvwrap'); if (old) { from = +old.dataset.from; old.remove(); }   // 연달아 오르면 한 장으로
   const b = window.Core.lvBand(to), newBand = window.Core.lvBand(from).name !== b.name, goat = to >= 50;
   const el = document.createElement('div'); el.className = 'apop lvwrap'; el.dataset.from = from;
