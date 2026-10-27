@@ -127,6 +127,7 @@ async function start() {
     if (!S.me && !S.owner) return renderRequest();
     // 관리자가 강퇴하거나 연결을 끊으면 내 users 문서가 사라짐 → 바로 안내 화면으로
     if (S.me && !S.owner) S.subs.push(onSnapshot(CD('users', S.uid), (d) => { if (!d.exists()) kickedView(); }, () => {}));
+    if (S.owner) getDoc(CD('config', 'main')).then((d) => (S.pinH = d.exists() ? d.data().pinHash || '' : null)).catch(() => {});   // 관리자 버튼 → 이 화면에서 바로 비밀번호(숫자 키패드)
     S.subs.push(onSnapshot(CD('pub', 'state'), (d) => { S.pub = d.exists() ? d.data() : null; watchVotes(); render(); },
       (e) => view('<div class="center">불러오지 못했어요<br><small>' + esc(e.message) + '</small></div>')));
   } catch (e) { view('<div class="center">불러오지 못했어요<br><small>' + esc(e.message) + '</small></div>'); }
@@ -511,6 +512,24 @@ function locked(g) {
   return now > dl;
 }
 const clubName = () => (S.pub && S.pub.club) || (S.club && S.club.name) || '';
+/* 관리자 버튼을 누른 그 순간에 비밀번호 칸을 띄우고 바로 포커스 → 폰에서 숫자 키패드가 자동으로 올라옴
+   (브라우저는 '사용자가 누른 순간'에만 키보드를 띄워주기 때문에, 관리자 페이지로 넘어간 뒤에는 자동으로 못 띄움) */
+document.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('a.adm'); if (!a || S.pinH === undefined || S.pinH === null) return;
+  try { if (sessionStorage.getItem('afutsal_pin_' + S.cid) === '1') return; } catch (x) {}
+  e.preventDefault();
+  const ov = document.createElement('div'); ov.className = 'pinov';
+  ov.innerHTML = '<div class="pinbx"><b>관리자 비밀번호</b><input class="pinin pinmask" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" aria-label="관리자 비밀번호"><small>숫자 4자리를 넣으면 바로 들어가요</small><button type="button">취소</button></div>';
+  document.body.appendChild(ov);
+  const inp = ov.querySelector('input'); inp.focus();
+  ov.querySelector('button').onclick = () => ov.remove();
+  ov.onclick = (ev) => { if (ev.target === ov) ov.remove(); };
+  const ok = () => window.Core.md5('a-futsal:' + inp.value.trim()) === (S.pinH || 'd491e185da5e647a77d68eeaf393cd35');
+  const go = () => { try { sessionStorage.setItem('afutsal_pin_' + S.cid, '1'); } catch (x) {} location.href = a.href; };
+  let t = null;
+  inp.oninput = () => { inp.value = inp.value.replace(/\D/g, ''); clearTimeout(t); if (inp.value.length === 4) { if (ok()) return go(); t = setTimeout(() => { toast('비밀번호가 달라요'); inp.value = ''; inp.focus(); }, 600); } };
+  inp.onkeydown = (ev) => { if (ev.key === 'Enter' && inp.value) { if (ok()) go(); else { toast('비밀번호가 달라요'); inp.value = ''; } } };
+}, true);
 const adminBtn = () => (S.owner ? '<a class="adm" href="admin.html?c=' + esc(S.cid) + '">관리자</a>' : '');
 const HOME = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>';
 const heroTop = () => '<div class="hrow"><button class="cname" data-gohome>' + HOME + '<b>' + esc(clubName()) + '</b></button><span class="who">' + (S.me ? lvPill(lvOfMid(S.me.mid)) + esc(S.me.name) + ' 님' : '') + adminBtn() + '</span></div>';
