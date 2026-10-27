@@ -438,7 +438,7 @@ button.pill{cursor:pointer;border:0;font:inherit}
 .mform select{font-size:15px}
 @media(max-width:640px){.tri{gap:6px}.tri .tcol{padding:8px}.tp{font-size:13px;padding:7px 6px}.mform{flex-direction:column}}
 .panel .sttab,.panel .mlist{max-width:680px}
-.trow4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:680px;margin-top:8px}
+.trow4{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;max-width:860px;margin-top:8px}
 .trow4 input{width:100%;font-size:16px;font-weight:700}
 .tpre{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0;font-size:13px;color:#64748B}
 .tsum{max-width:680px;border-radius:10px;padding:10px 12px;font-size:14px}

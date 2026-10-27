@@ -505,9 +505,11 @@
   function triPlan(tri) {
     var t = tri || {}, min = +t.min || 10, rest = +t.rest || 0, n = Math.max(1, Math.min(30, +t.n || 9)), st = String(t.start || '16:00').split(':'), m0 = (+st[0] || 0) * 60 + (+st[1] || 0);
     var hm = function (m) { m = ((m % 1440) + 1440) % 1440; return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }, P = [[0, 1], [1, 2], [2, 0]], R = [];
-    for (var i = 0; i < n; i++) { var s0 = m0 + i * (min + rest); R.push({ i: i, a: P[i % 3][0], b: P[i % 3][1], off: 3 - P[i % 3][0] - P[i % 3][1], s: hm(s0), e: hm(s0 + min) }); }
+    var early = Math.max(0, Math.min(min - 1, +t.early || 0));   // 마지막 판만 n분 일찍 끝내기 (다음 팀을 위해 구장 비우기)
+    for (var i = 0; i < n; i++) { var s0 = m0 + i * (min + rest), len = i === n - 1 ? min - early : min; R.push({ i: i, a: P[i % 3][0], b: P[i % 3][1], off: 3 - P[i % 3][0] - P[i % 3][1], s: hm(s0), e: hm(s0 + len), len: len }); }
     var play = [0, 0, 0]; R.forEach(function (r) { play[r.a]++; play[r.b]++; });
-    return { rows: R, min: min, rest: rest, n: n, end: hm(m0 + n * min + (n - 1) * rest), total: n * min + (n - 1) * rest, play: play, fair: n % 3 === 0 };
+    var total = n * min + (n - 1) * rest - early;
+    return { rows: R, min: min, rest: rest, n: n, early: early, end: hm(m0 + total), total: total, play: play, fair: n % 3 === 0 };
   }
   /** 3파전 순위: matches [{a,b,sa,sb}] (a·b = 팀 번호 0·1·2) → 승점(승3·무1) · 골득실 · 다득점 순 */
   function standings(n, matches) {
@@ -574,7 +576,7 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.71';
+  var VERSION = 'v0.72';
   var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, triPlan: triPlan, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,

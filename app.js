@@ -597,16 +597,16 @@ function teamHTML() {
 function triTxt(g) { const M = (S.games.find((x) => x.id === g.id) || {}).matches || []; if (!M.length) return '3파전'; const r = C.standings(3, M)[0]; return '3파전 ' + M.length + '판 · 1위 ' + TEAMC[r.t] + '팀 (승점 ' + r.pts + ')'; }
 const nTeamsOf = (g) => g.nTeams || (g.teams && g.teams.length >= 3 ? 3 : playersOf(g).length >= perSide() * 3 ? 3 : 2);
 /** 3파전 판 기록: 관리자가 판마다 결과를 넣으면 순위가 자동 계산되고 회원 화면에도 보임 */
-const triOf = (g) => Object.assign({ min: 10, rest: 3, n: 9, start: g.time || S.cfg.time || '16:00' }, g.tri || {});
+const triOf = (g) => Object.assign({ min: 10, rest: 3, n: 9, early: 2, start: g.time || S.cfg.time || '16:00' }, g.tri || {});
 const TCI = ['🟠', '🔵', '🟢'];
 /** 3파전 진행 방식: 한 판 시간 · 휴식 · 판 수 · 시작 시간 → 타임테이블 (회원 화면에도 공개) */
 function triTimeHTML(g) {
   const t = triOf(g), P = C.triPlan(t), T = (g.teams || []).map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0));
   const num = (k, l, v, mn, mx) => '<label class="f">' + l + '<input type="number" data-tri="' + k + '" min="' + mn + '" max="' + mx + '" inputmode="numeric" value="' + v + '"></label>';
   return '<div class="panel pad"><div class="ph"><div class="g-lbl2">⏱ 3파전 진행 방식 · ' + T.map((x) => x.length).join('/') + '명</div><span><button class="btn sm" id="ttcal">⌚ 알람 받기</button> <button class="btn sm" id="ttcp">' + IC.copy + ' 타임테이블 복사</button></span></div>' +
-    '<div class="trow4">' + num('min', '한 판 (분)', P.min, 3, 40) + num('rest', '판 사이 휴식 (분)', P.rest, 0, 20) + num('n', '총 판 수', P.n, 1, 30) + '<label class="f">시작 시간<input type="time" data-tri="start" value="' + esc(t.start) + '"></label></div>' +
+    '<div class="trow4">' + num('min', '한 판 (분)', P.min, 3, 40) + num('rest', '판 사이 휴식 (분)', P.rest, 0, 20) + num('n', '총 판 수', P.n, 1, 30) + num('early', '마지막 판 일찍 끝내기 (분)', P.early, 0, 10) + '<label class="f">시작 시간<input type="time" data-tri="start" value="' + esc(t.start) + '"></label></div>' +
     '<div class="tpre">빠른 선택 <button class="btn xs" data-tpre="10,3,9">10분 × 9판</button><button class="btn xs" data-tpre="15,6,6">15분 × 6판</button><button class="btn xs" data-tpre="12,4,6">12분 × 6판</button><button class="btn xs" data-tpre="8,2,12">8분 × 12판</button></div>' +
-    '<div class="tsum ' + (P.fair ? 'ok' : 'warn') + '">' + (P.fair ? '✅ 공평해요 · 모든 팀이 ' + P.play[0] + '판(' + P.play[0] * P.min + '분) 뛰고 ' + (P.n - P.play[0]) + '판 쉬어요' : '⚠️ 판 수가 3의 배수가 아니라 팀마다 뛰는 판 수가 달라요 (' + P.play.map((x, i) => TEAMC[i] + ' ' + x + '판').join(' · ') + ')') + ' · ' + esc(t.start) + ' 시작 → <b>' + P.end + ' 끝</b> (총 ' + P.total + '분)</div>' +
+    '<div class="tsum ' + (P.fair ? 'ok' : 'warn') + '">' + (P.fair ? '✅ 공평해요 · 모든 팀이 ' + P.play[0] + '판(' + P.play[0] * P.min + '분) 뛰고 ' + (P.n - P.play[0]) + '판 쉬어요' : '⚠️ 판 수가 3의 배수가 아니라 팀마다 뛰는 판 수가 달라요 (' + P.play.map((x, i) => TEAMC[i] + ' ' + x + '판').join(' · ') + ')') + ' · ' + esc(t.start) + ' 시작 → <b>' + P.end + ' 끝</b> (총 ' + P.total + '분' + (P.early ? ' · 마지막 판 ' + (P.min - P.early) + '분' : '') + ')</div>' +
     '<table class="ttab"><thead><tr><th>판</th><th>시간</th><th>경기</th><th>쉬는 팀</th></tr></thead><tbody>' + P.rows.map((r) => '<tr><td>' + (r.i + 1) + '판</td><td>' + r.s + ' – ' + r.e + '</td><td><b class="tn t' + r.a + '">' + TEAMC[r.a] + '</b> : <b class="tn t' + r.b + '">' + TEAMC[r.b] + '</b></td><td><span class="tn t' + r.off + '">' + TEAMC[r.off] + '</span></td></tr>').join('') + '</tbody></table></div>';
 }
 /** 3파전 타임테이블 → 캘린더 파일(.ics): 판 시작·종료 시각에 정시 알림 (아이폰 캘린더 → 애플워치로 진동 알림) */
