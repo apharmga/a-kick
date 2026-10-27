@@ -609,16 +609,16 @@ function triTimeHTML(g) {
     '<div class="tsum ' + (P.fair ? 'ok' : 'warn') + '">' + (P.fair ? '✅ 공평해요 · 모든 팀이 ' + P.play[0] + '판(' + P.play[0] * P.min + '분) 뛰고 ' + (P.n - P.play[0]) + '판 쉬어요' : '⚠️ 판 수가 3의 배수가 아니라 팀마다 뛰는 판 수가 달라요 (' + P.play.map((x, i) => TEAMC[i] + ' ' + x + '판').join(' · ') + ')') + ' · ' + esc(t.start) + ' 시작 → <b>' + P.end + ' 끝</b> (총 ' + P.total + '분)</div>' +
     '<table class="ttab"><thead><tr><th>판</th><th>시간</th><th>경기</th><th>쉬는 팀</th></tr></thead><tbody>' + P.rows.map((r) => '<tr><td>' + (r.i + 1) + '판</td><td>' + r.s + ' – ' + r.e + '</td><td><b class="tn t' + r.a + '">' + TEAMC[r.a] + '</b> : <b class="tn t' + r.b + '">' + TEAMC[r.b] + '</b></td><td><span class="tn t' + r.off + '">' + TEAMC[r.off] + '</span></td></tr>').join('') + '</tbody></table></div>';
 }
-/** 3파전 타임테이블 → 캘린더 파일(.ics): 판 시작·종료 1분 전·종료 시각에 알림 (아이폰 캘린더 → 애플워치로 진동 알림) */
+/** 3파전 타임테이블 → 캘린더 파일(.ics): 판 시작·종료 시각에 정시 알림 (아이폰 캘린더 → 애플워치로 진동 알림) */
 function triIcs(g) {
   const t = triOf(g), P = C.triPlan(t), d = g.date.replace(/-/g, ''), hm = (x) => x.replace(':', '') + '00', now = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
-  // 아이폰 캘린더는 '끝난 시각 기준' 알림을 지원하지 않아서, 판마다 [경기 일정(시작 알림)] + [종료 표시 일정(1분 전·종료 알림)] 두 개로 만듦
+  // 아이폰 캘린더는 '끝난 시각 기준' 알림을 지원하지 않아서, 판마다 [경기 일정(시작 알림)] + [종료 표시 일정(종료 알림)] 두 개로 만듦
   const evt = (uid, s0, e0, sum, alarms) => ['BEGIN:VEVENT', 'UID:akick-' + g.id + '-' + uid + '@apharmga.github.io', 'DTSTAMP:' + now,
     'DTSTART;TZID=Asia/Seoul:' + d + 'T' + hm(s0), 'DTEND;TZID=Asia/Seoul:' + d + 'T' + hm(e0), 'SUMMARY:' + sum]
     .concat(...alarms.map(([tr, desc]) => ['BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + desc, 'TRIGGER:' + tr, 'END:VALARM']), ['END:VEVENT']).join('\r\n');
   const ev = [].concat(...P.rows.map((r) => [
     evt(r.i + 1, r.s, r.e, '⚽ ' + (r.i + 1) + '판 ' + TEAMC[r.a] + ':' + TEAMC[r.b] + ' (' + TEAMC[r.off] + ' 휴식)', [['PT0S', (r.i + 1) + '판 시작 ' + TEAMC[r.a] + ':' + TEAMC[r.b]]]),
-    evt((r.i + 1) + 'end', r.e, r.e, '🔔 ' + (r.i + 1) + '판 종료', [['-PT1M', (r.i + 1) + '판 1분 남음'], ['PT0S', (r.i + 1) + '판 종료']])]));
+    evt((r.i + 1) + 'end', r.e, r.e, '🔔 ' + (r.i + 1) + '판 종료 · 휴식', [['PT0S', (r.i + 1) + '판 종료 · 휴식']])]));
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AnQuA//A-KICK//KO', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:A-KICK 3파전',
     'BEGIN:VTIMEZONE', 'TZID:Asia/Seoul', 'BEGIN:STANDARD', 'DTSTART:19700101T000000', 'TZOFFSETFROM:+0900', 'TZOFFSETTO:+0900', 'TZNAME:KST', 'END:STANDARD', 'END:VTIMEZONE']
     .concat(ev, ['END:VCALENDAR']).join('\r\n');
@@ -626,7 +626,7 @@ function triIcs(g) {
 function triCal(g) {
   const url = URL.createObjectURL(new Blob([triIcs(g)], { type: 'text/calendar;charset=utf-8' })), a = document.createElement('a');
   a.href = url; a.download = 'A-KICK_' + g.date + '_3파전.ics'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
-  toast('캘린더 파일을 받았어요 · 열어서 [모두 추가]를 누르면 판마다 시작·1분 전·종료 알림이 와요', 6000);
+  toast('캘린더 파일을 받았어요 · 열어서 [모두 추가]를 누르면 판마다 시작·종료 시각에 알림이 와요', 6000);
 }
 function triCopy(g) {
   const t = triOf(g), P = C.triPlan(t);
