@@ -452,3 +452,5 @@ body.noscroll{overflow:hidden}
 .ttab tr.play{background:#EEF2FF}.ttab tr.rest td{color:#94A3B8}
 .ttab em{font-style:normal;font-size:11.5px;font-weight:800;border-radius:999px;padding:2px 8px}
 .tp1{background:#1E3A8A;color:#fff}.tp0{background:#F1F5F9;color:#64748B}
+/* 아이폰 입력칸 자동 확대 방지 */
+@media(max-width:640px){input,select,textarea{font-size:16px!important}}
