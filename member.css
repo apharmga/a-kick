@@ -425,3 +425,6 @@ body.noscroll{overflow:hidden}
 .demobtn{display:block;width:100%;max-width:320px;margin:12px auto 0;padding:12px;border:1.5px dashed #94a3b8;border-radius:12px;background:#fff;color:#334155;font:inherit;font-weight:700;cursor:pointer}
 .demob{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;background:#fef3c7;color:#78350f;font-size:13px;border-bottom:1px solid #fcd34d}
 .demob button{flex:none;padding:5px 12px;border:0;border-radius:999px;background:#78350f;color:#fff;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.pnone{padding:12px 4px;color:#64748b;font-size:14px}
+.pmore{display:block;width:100%;margin-top:6px;padding:9px;border:0;border-radius:10px;background:#f1f5f9;color:#475569;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.pitem.past{opacity:.75}

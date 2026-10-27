@@ -541,6 +541,7 @@ function render() {
   document.querySelectorAll('[data-gdel]').forEach((b) => (b.onclick = async () => { if (confirm('이 골 기록을 지울까요?')) await deleteDoc(CD('goals', b.dataset.gdel)).catch((e) => toast('삭제 실패: ' + e.message)); }));
   document.querySelectorAll('[data-sort]').forEach((h) => (h.onclick = () => { const [tb, k] = h.dataset.sort.split(':'), st = S.sort[tb] || {}; S.sort[tb] = st.k === k ? { k, d: ((st.d || 0) + 1) % 3 } : { k, d: 1 }; render(); }));
   document.querySelectorAll('[data-poll]').forEach((b) => (b.onclick = () => openPoll(b.dataset.poll)));
+  const pm = $('#pmore'); if (pm) pm.onclick = () => { S.pastOpen = !S.pastOpen; render(); };
   const pe = $('#pedit'); if (pe) pe.onclick = openProfile;
   document.querySelectorAll('[data-vid]').forEach((b) => (b.onclick = () => openVideo(b.dataset.vid)));
   const sg = $('#sug'); if (sg) sg.onclick = openSuggest;
@@ -734,13 +735,15 @@ function pollOpts(p) {
     .map((o) => Object.assign({}, o, { who: vs.filter((v) => (v.picks || []).indexOf(o.id) >= 0).map((v) => (p.anon ? '' : v.name)) }));
 }
 function pollsCard() {
-  const ps = (S.polls || []).slice().sort((a, b) => (pollOpen(b) - pollOpen(a)) || (a.created < b.created ? 1 : -1)).slice(0, 5);
-  if (!ps.length) return '';
-  return '<section class="card"><h2>투표 · 공지</h2><div class="plist">' + ps.map((p) => {
-    const mine = myPV(p), open = pollOpen(p), notice = !(p.options || []).length && !p.allowAdd;
-    return '<button class="pitem' + (open && !mine ? ' glow' : '') + '" data-poll="' + esc(p.id) + '"><span><b>' + esc(p.title) + (isNewPoll(p) ? NEWB : '') + '</b><small>' + (open ? (p.deadline ? '<span class="pcd" data-cd="' + Date.parse(p.deadline) + '">⏳ <b>' + left(Date.parse(p.deadline) - Date.now()) + '</b> 남음</span>' : '진행 중') : '마감됨') + '</small></span>' +
-      '<em class="' + (mine ? 'done' : open ? 'todo' : '') + '">' + (mine ? (notice ? '확인함' : '참여함') : open ? (notice ? '새 공지' : '참여하기') : '결과 보기') + '</em></button>';
-  }).join('') + '</div></section>';
+  const all = (S.polls || []).slice().sort((a, b) => (pollOpen(b) - pollOpen(a)) || (a.created < b.created ? 1 : -1));
+  if (!all.length) return '';
+  // 아직 안 한 것만 위에 · 참여함/확인함/마감은 접어두기 (안 한 것처럼 보이지 않게)
+  const todo = all.filter((p) => pollOpen(p) && !myPV(p)), past = all.filter((p) => todo.indexOf(p) < 0).slice(0, 8);
+  const item = (p) => { const mine = myPV(p), open = pollOpen(p), notice = !(p.options || []).length && !p.allowAdd;
+    return '<button class="pitem' + (open && !mine ? ' glow' : ' past') + '" data-poll="' + esc(p.id) + '"><span><b>' + esc(p.title) + (isNewPoll(p) ? NEWB : '') + '</b><small>' + (open ? (p.deadline ? '<span class="pcd" data-cd="' + Date.parse(p.deadline) + '">⏳ <b>' + left(Date.parse(p.deadline) - Date.now()) + '</b> 남음</span>' : '진행 중') : '마감됨') + '</small></span>' +
+      '<em class="' + (mine ? 'done' : open ? 'todo' : '') + '">' + (mine ? (notice ? '확인함' : '참여함') : open ? (notice ? '새 공지' : '참여하기') : '결과 보기') + '</em></button>'; };
+  return '<section class="card"><h2>투표 · 공지</h2><div class="plist">' + (todo.length ? todo.map(item).join('') : '<div class="pnone">✅ 남은 투표·공지가 없어요</div>') +
+    (past.length ? '<button class="pmore" id="pmore">' + (S.pastOpen ? '접기 ▲' : '참여한 · 지난 투표 ' + past.length + '개 보기 ▼') + '</button>' + (S.pastOpen ? past.map(item).join('') : '') : '') + '</div></section>';
 }
 function openPoll(pid) {
   markSeen(pid);
@@ -771,7 +774,9 @@ function openPoll(pid) {
         if (!k) { k = [...crypto.getRandomValues(new Uint8Array(16))].map((x) => x.toString(16).padStart(2, '0')).join(''); b.set(CD('anonmark', p.id + '__' + S.uid), { pid: p.id, uid: S.uid, key: k }); }
         b.set(CD('anonvotes', p.id + '__' + k), { pid: p.id, picks: v.picks, add: v.add, at: v.at }); await b.commit(); S.ah[p.id] = k;
       }
-      else await setDoc(CD('pollvotes', p.id + '__' + S.me.mid), v); toast(notice ? '확인했어요' : '투표했어요 🗳'); $('#sheet').hidden = true; }
+      else await setDoc(CD('pollvotes', p.id + '__' + S.me.mid), v);
+      if (S.demo) { if (p.anon) S.avotes = (S.avotes || []).filter((x) => x.id !== p.id + '__' + S.ah[p.id]).concat([{ id: p.id + '__' + S.ah[p.id], pid: p.id, picks: v.picks, add: v.add, at: v.at }]); else S.pvotes = (S.pvotes || []).filter((x) => x.id !== p.id + '__' + S.me.mid).concat([Object.assign({ id: p.id + '__' + S.me.mid }, v)]); render(); }
+      toast(notice ? '확인했어요' : '투표했어요 🗳'); $('#sheet').hidden = true; }
     catch (e) { toast('저장 실패: ' + e.message); logErr('저장 실패: ' + e.message, e.stack); }
   };
   draw();
