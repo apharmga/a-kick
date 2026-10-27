@@ -105,7 +105,7 @@ function deny(u, msg) {
 }
 function pinGate(hash) {
   $('#app').innerHTML = '<div class="center"><div class="logo" style="font-size:26px">' + esc(S.club.name) + '</div><div class="muted">관리자 전용 페이지</div>' +
-    '<label class="f" style="width:240px">관리자 비밀번호<input id="pin" class="pinbox" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off"></label>' +
+    '<label class="f" style="width:240px">관리자 비밀번호<input id="pin" class="pinbox pinmask" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off"></label>' +
     '<div class="muted">' + (hash ? '숫자 4자리를 입력하면 바로 들어가요' : '처음 비밀번호는 0000이에요 · 설정에서 바꿀 수 있어요') + '</div>' +
     '<button class="btn ghost" id="pinlost">비밀번호를 잊었어요</button><a class="muted" href="./?c=' + CID + '">회원 화면으로 돌아가기</a></div>';
   const inp = $('#pin'); inp.focus();
@@ -188,7 +188,7 @@ function renderSetup() {
   if (W.step === 4) body = '<h2>회원을 넣어주세요</h2><div class="wl">내 이름 (관리자도 회원으로 참여)</div><input class="win" id="wme" placeholder="예: 홍길동" value="' + esc(W.me) + '">' +
     '<div class="wl">다른 회원 이름 (한 줄에 한 명 · 나중에 추가해도 돼요)</div><textarea class="win" id="wn" rows="6" placeholder="김철수&#10;이영희&#10;박민수">' + esc(W.names) + '</textarea>' +
     '<div class="muted">회원은 나중에 링크로 가입 신청 → 승인으로 들어와요. 여기 이름을 넣어두면 승인할 때 자동으로 연결돼요.</div>' +
-    '<div class="wl">관리자 비밀번호 (숫자 4자리)</div><input class="win" id="wpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="회원은 모르는 숫자로" value="' + esc(W.pin) + '">' +
+    '<div class="wl">관리자 비밀번호 (숫자 4자리)</div><input class="win pinmask" id="wpin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password" placeholder="회원은 모르는 숫자로" value="' + esc(W.pin) + '">' +
     '<div class="muted">관리자 화면에 들어갈 때 써요. 잊어도 구글 계정으로 다시 정할 수 있어요.</div>';
   $('#app').innerHTML = '<div class="wiz"><div class="wtop"><b>' + esc(S.club.name) + '</b><span>팀 설정 ' + W.step + ' / 4</span></div>' +
     '<div class="wbar">' + steps.map((t, i) => '<i class="' + (i < W.step ? 'on' : '') + '"></i>').join('') + '</div>' + body +
@@ -617,7 +617,7 @@ function triIcs(g) {
     'DTSTART;TZID=Asia/Seoul:' + d + 'T' + hm(s0), 'DTEND;TZID=Asia/Seoul:' + d + 'T' + hm(e0), 'SUMMARY:' + sum]
     .concat(...alarms.map(([tr, desc]) => ['BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + desc, 'TRIGGER:' + tr, 'END:VALARM']), ['END:VEVENT']).join('\r\n');
   const ev = [].concat(...P.rows.map((r) => [
-    evt(r.i + 1, r.s, r.e, '⚽ ' + (r.i + 1) + '판 ' + TEAMC[r.a] + ':' + TEAMC[r.b] + ' (' + TEAMC[r.off] + ' 휴식)', [['PT0S', (r.i + 1) + '판 시작 ' + TEAMC[r.a] + ':' + TEAMC[r.b]]]),
+    evt(r.i + 1, r.s, r.e, '⚽ ' + (r.i + 1) + '판 ' + TEAMC[r.a] + ':' + TEAMC[r.b] + ' (' + TEAMC[r.off] + ' 휴식)', (r.i ? [['-PT1M', (r.i + 1) + '판 1분 전 · 준비해요 ' + TEAMC[r.a] + ':' + TEAMC[r.b]]] : []).concat([['PT0S', (r.i + 1) + '판 시작 ' + TEAMC[r.a] + ':' + TEAMC[r.b]]])),
     evt((r.i + 1) + 'end', r.e, r.e, '🔔 ' + (r.i + 1) + '판 종료 · 휴식', [['PT0S', (r.i + 1) + '판 종료 · 휴식']])]));
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AnQuA//A-KICK//KO', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:A-KICK 3파전',
     'BEGIN:VTIMEZONE', 'TZID:Asia/Seoul', 'BEGIN:STANDARD', 'DTSTART:19700101T000000', 'TZOFFSETFROM:+0900', 'TZOFFSETTO:+0900', 'TZNAME:KST', 'END:STANDARD', 'END:VTIMEZONE']
@@ -626,7 +626,7 @@ function triIcs(g) {
 function triCal(g) {
   const url = URL.createObjectURL(new Blob([triIcs(g)], { type: 'text/calendar;charset=utf-8' })), a = document.createElement('a');
   a.href = url; a.download = 'A-KICK_' + g.date + '_3파전.ics'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
-  toast('캘린더 파일을 받았어요 · 열어서 [모두 추가]를 누르면 판마다 시작·종료 시각에 알림이 와요', 6000);
+  toast('캘린더 파일을 받았어요 · 열어서 [모두 추가]를 누르면 판 시작·종료 정시, 그리고 2판부터는 시작 1분 전에도 알림이 와요', 6000);
 }
 function triCopy(g) {
   const t = triOf(g), P = C.triPlan(t);
@@ -1420,7 +1420,7 @@ function openSettingsReal() {
     grp('회비 · 게스트', ['fee', 'guestFee', 'nextMonthDay', 'dueDay']) + grp('구장 · 경기 인원', ['rentPerGame', 'oneOff', 'cap', 'perSide', 'maxSide', 'time', 'place']) + grp('안내 문구 · 기타', ['statFrom', 'account', 'openChat', 'reserve']) +
     '<div class="sgrp"><div class="g-lbl2">경기 날씨 지역 · 지금: <b id="wxcur">' + esc((S.cfg.wxLoc || {}).name || '대구 (기본)') + '</b></div><div class="refin"><input id="wxq" maxlength="40" placeholder="구장 주소 (예: 대구 북구 도남동)"><button class="btn" id="wxs">찾기</button><button class="btn" id="wxme">📍 지금 내 위치</button></div><div class="muted">구장에 있을 때 [지금 내 위치]를 누르면 가장 정확해요</div><div id="wxr" class="wxr"></div></div>' +
     themeHTML() + '<div class="sgrp" id="refbox"><div class="g-lbl2">추천</div><div class="muted">불러오는 중...</div></div>' +
-    '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
+    '<div class="sgrp"><div class="g-lbl2">관리자 비밀번호 바꾸기 (처음 0000)</div><label class="f">새 비밀번호 숫자 4자리 (바꿀 때만 입력)<input id="newpin" type="text" class="pinmask" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label></div>' +
     '<div class="muted" style="margin-top:8px">A-KICK ' + C.VERSION + ' · <a href="privacy.html" target="_blank">개인정보처리방침</a> · <a href="terms.html" target="_blank">이용약관</a> · <button class="lnkb" id="devfb">💌 앱 개발자에게 건의</button> · <button class="lnkb" id="dona">☕ 후원</button></div>' +
     '<div class="mfoot"><button class="btn" id="bk">백업 내려받기</button><button class="btn ghost" id="lo">로그아웃</button><span style="flex:1"></span><button class="btn" id="cx">닫기</button><button class="btn pri" id="sv">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = () => { C.applyTheme(S.club.theme); closeModal(); };

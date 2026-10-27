@@ -458,3 +458,4 @@ body.pickdrag{cursor:grabbing}
 /* 폰 확대 방지: 3파전 표는 화면 폭에 맞추고, 입력칸 글씨 16px(아이폰은 16px 미만 입력칸을 누르면 화면을 자동 확대함) */
 .ttab,.sttab{min-width:0}
 @media(max-width:640px){input,select,textarea,label.f input,label.f select{font-size:16px!important}.pinbox{font-size:28px!important}}
+.pinmask{-webkit-text-security:disc;text-security:disc}
