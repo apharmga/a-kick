@@ -602,15 +602,14 @@ function matchPanel(g) {
   return '<div class="panel pad"><div class="ph"><div class="g-lbl2">🏆 3파전 기록 · ' + M.length + '판</div><button class="btn sm pri" id="madd3">+ 판 결과 넣기</button></div>' +
     '<table class="sttab"><thead><tr><th>순위</th><th>팀</th><th>판</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승점</th></tr></thead><tbody>' +
     R.map((r, i) => '<tr><td>' + (i + 1) + '</td><td><b class="tn t' + r.t + '">' + TEAMC[r.t] + '팀</b></td><td>' + r.p + '</td><td>' + r.w + '</td><td>' + r.d + '</td><td>' + r.l + '</td><td>' + (r.gf - r.ga > 0 ? '+' : '') + (r.gf - r.ga) + '</td><td><b>' + r.pts + '</b></td></tr>').join('') + '</tbody></table>' +
-    (M.length ? '<div class="mlist">' + M.map((m, i) => '<div class="mrow"><span>' + (i + 1) + '판</span><b class="tn t' + m.a + '">' + TEAMC[m.a] + '</b><strong>' + m.sa + ' : ' + m.sb + '</strong><b class="tn t' + m.b + '">' + TEAMC[m.b] + '</b><button class="x" data-mdel="' + i + '" aria-label="' + (i + 1) + '판 지우기">✕</button></div>').join('') + '</div>' : '<div class="muted" style="margin-top:8px">경기 중에 판이 끝날 때마다 결과를 넣어주세요. 승 3점 · 무 1점으로 순위가 바로 계산돼요.</div>') + '</div>';
+    (M.length ? '<div class="mlist">' + M.map((m, i) => '<div class="mrow"><span>' + (i + 1) + '판</span><b class="tn t' + m.a + '">' + TEAMC[m.a] + '</b><strong>' + m.sa + ' : ' + m.sb + '</strong><b class="tn t' + m.b + '">' + TEAMC[m.b] + '</b><button class="x" data-mdel="' + i + '" aria-label="' + (i + 1) + '판 지우기">✕</button></div>').join('') + '</div>' : '<div class="muted" style="margin-top:8px">순서는 A:B → B:C → C:A 고정 (3의 배수 판이면 모든 팀이 똑같이 뛰고 쉬어요). 판이 끝날 때마다 결과를 넣으면 승 3점 · 무 1점으로 순위가 바로 계산돼요.</div>') + '</div>';
 }
 function addMatch(g) {
   const M = g.matches || [], last = M[M.length - 1];
-  let a = 0, b = 1;
-  if (last) { const win = last.sa > last.sb ? last.a : last.sb > last.sa ? last.b : last.a; a = win; b = [0, 1, 2].find((x) => x !== last.a && x !== last.b); }   // 이긴 팀(비기면 먼저 뛴 팀) 남고 쉬던 팀 입장
+  const [a, b] = [[0, 1], [1, 2], [2, 0]][M.length % 3];   // 고정 순서 A:B → B:C → C:A (결과 상관없이 모든 팀이 2판 뛰고 1판 쉼)
   const sel = (id, v) => '<select id="' + id + '">' + TEAMC.map((t, i) => '<option value="' + i + '"' + (i === v ? ' selected' : '') + '>' + t + '팀</option>').join('') + '</select>';
   modal('<h2>' + (M.length + 1) + '판 결과</h2><div class="mform"><div>' + sel('ma', a) + '<input id="sa" type="number" min="0" max="30" inputmode="numeric" value="0"></div><span>:</span><div><input id="sb" type="number" min="0" max="30" inputmode="numeric" value="0">' + sel('mb', b) + '</div></div>' +
-    '<div class="muted">진 팀이 나가고 쉬던 팀이 들어오는 순서로 다음 판 팀을 미리 골라둬요.</div><div class="mfoot"><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">저장</button></div>', (m) => {
+    '<div class="muted">고정 순서(A:B → B:C → C:A)로 다음 판 팀을 미리 골라둬요. 실제와 다르면 바꿔서 넣으세요.</div><div class="mfoot"><span style="flex:1"></span><button class="btn" id="cx">취소</button><button class="btn pri" id="ok">저장</button></div>', (m) => {
     m.querySelector('#cx').onclick = closeModal;
     m.querySelector('#ok').onclick = async () => {
       const x = { a: +m.querySelector('#ma').value, b: +m.querySelector('#mb').value, sa: Math.max(0, +m.querySelector('#sa').value || 0), sb: Math.max(0, +m.querySelector('#sb').value || 0) };

@@ -814,7 +814,7 @@ function triCard(g, teams, myTeam) {
   const M = g.matches || [];
   return '<section class="card"><div class="h2row"><h2>팀 편성 · 3파전</h2>' + (myTeam >= 0 ? '<span class="myteam t' + myTeam + '">나는 ' + TC[myTeam] + '팀</span>' : '') + '</div>' +
     '<div class="tri">' + teams.map((t, i) => '<div class="tcol t' + i + (i === myTeam ? ' mine' : '') + '"><b class="tn t' + i + '">' + TC[i] + '팀 <small>' + t.length + '명</small></b><ul>' + t.map((n) => '<li class="' + (n === S.me.name ? 'me' : '') + '">' + ((profOf(n) || {}).num ? '<em>' + profOf(n).num + '</em>' : '') + esc(n) + '</li>').join('') + '</ul></div>').join('') + '</div>' +
-    '<div class="trule">한 판: 정해진 시간 또는 먼저 골 · 진 팀 나가고 쉬던 팀 입장</div>' +
+    '<div class="trule">순서 고정: A:B → B:C → C:A 반복 · 모든 팀이 2판 뛰고 1판 쉬어요 · 승 3점 · 무 1점</div>' +
     (M.length ? '<h3 class="h3s">오늘의 3파전 순위</h3>' + triTable(M) : '<p class="muted" style="margin-top:8px">경기가 시작되면 판 결과와 순위가 여기에 떠요.</p>') + '</section>';
 }
 function lastRecHTML() {
