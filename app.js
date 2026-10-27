@@ -587,11 +587,11 @@ function teamHTML() {
   const sum = (t) => t.reduce((a, n) => a + scoreOf(n), 0);
   const label = (t, i) => '<div class="tlabel t' + i + '"><b>' + TEAMC[i] + '팀 ' + t.length + '명</b><span>합 ' + sum(t) + '</span></div>';
   if (T.length >= 3) return head + warn + '<div class="tri">' + T.map((t, i) => '<div class="tcol t' + i + '">' + label(t, i) + '<div class="tplist">' + t.map((n) => '<button class="tp' + (S.pick === n ? ' sel' : '') + '" data-pick="' + esc(n) + '">' + (numOf(n) ? '<em>' + numOf(n) + '</em>' : '') + esc(n) + '</button>').join('') + '</div></div>').join('') + '</div>' +
-    '<div class="muted" style="margin:8px 0 14px">선수를 누르고 다른 팀 선수를 누르면 <b>서로 자리 바꾸기</b></div>' + matchPanel(g) + scoreList(players);
+    '<div class="muted" style="margin:8px 0 14px">선수를 <b>꾹 눌러 끌어다</b> 다른 팀 선수 위에 놓으면 서로 바뀌어요 · 한 번씩 눌러서 바꿔도 돼요</div>' + matchPanel(g) + scoreList(players);
   const pitch = '<div class="pitchwrap"><div class="tlabels">' + label(T[0], 0) + label(T[1], 1) + '</div><div class="pitch"><span class="pl-mid"></span><span class="pl-circle"></span><span class="pl-boxL"></span><span class="pl-boxR"></span>' +
     pitchSide(T[0], 'L', 0, g.id) + pitchSide(T[1], 'R', 1, g.id) + '</div>' +
     (T[2] ? '<div class="tlabel t2" style="margin-top:10px"><b>C팀 ' + T[2].length + '명 (대기)</b><span>' + esc(T[2].join(', ')) + '</span></div>' : '') +
-    '<div class="muted" style="margin-top:8px">동그라미 숫자 = 실력 점수 · 선수를 누르고 상대 팀 선수를 누르면 <b>서로 자리 바꾸기</b> · 점수는 아래에서 고쳐요</div></div>';
+    '<div class="muted" style="margin-top:8px">동그라미 숫자 = 실력 점수 · 선수를 <b>꾹 눌러 끌어다</b> 상대 팀 선수 위에 놓거나, 차례로 눌러 <b>서로 자리 바꾸기</b> · 점수는 아래에서 고쳐요</div></div>';
   return head + warn + pitch + scoreList(players);
 }
 function triTxt(g) { const M = (S.games.find((x) => x.id === g.id) || {}).matches || []; if (!M.length) return '3파전'; const r = C.standings(3, M)[0]; return '3파전 ' + M.length + '판 · 1위 ' + TEAMC[r.t] + '팀 (승점 ' + r.pts + ')'; }
@@ -657,18 +657,58 @@ function bindTeam() {
     copy('⚽ ' + md(g.date) + '(' + C.dayName(g.date) + ') ' + g.time + ' 팀 편성 (' + playersOf(g).length + '명)\n\n' +
       T.map((t, i) => (i === 0 ? '🟠' : i === 1 ? '🔵' : '🟢') + ' ' + TEAMC[i] + '팀 (' + t.length + '명)\n' + t.join(', ')).join('\n\n') + '\n\n즐겁게 차요! 다치지 않게 조심하세요 🙌');
   };
+  const swap = async (a, n) => {
+    const ia = g.teams.findIndex((t) => t.indexOf(a) >= 0), ib = g.teams.findIndex((t) => t.indexOf(n) >= 0);
+    if (ia < 0 || ib < 0 || ia === ib) return false;
+    g.teams[ia][g.teams[ia].indexOf(a)] = n; g.teams[ib][g.teams[ib].indexOf(n)] = a; S.pick = null;
+    render(); await putGame(g); toast(a + ' ↔ ' + n + ' 자리 바꿈'); return true;
+  };
   document.querySelectorAll('[data-pick]').forEach((b) => (b.onclick = async () => {
+    if (dragDone) return;
     const n = b.dataset.pick;
     if (!S.pick) { S.pick = n; return render(); }
     if (S.pick === n) { S.pick = null; return render(); }
-    const a = S.pick, ia = g.teams.findIndex((t) => t.indexOf(a) >= 0), ib = g.teams.findIndex((t) => t.indexOf(n) >= 0);
-    if (ia === ib) { S.pick = n; return render(); }
-    g.teams[ia][g.teams[ia].indexOf(a)] = n; g.teams[ib][g.teams[ib].indexOf(n)] = a; S.pick = null;
-    render(); await putGame(g); toast(a + ' ↔ ' + n + ' 자리 바꿈');
+    if (!(await swap(S.pick, n))) { S.pick = n; render(); }
   }));
+  bindDrag(swap);
   document.querySelectorAll('[data-sc]').forEach((b) => (b.onclick = async () => { scores()[b.dataset.sc] = +b.dataset.v; render(); await putSkills(); }));
 }
 
+/** 꾹 눌러서 끌어다 놓기: 0.3초 누르면 선수가 손가락을 따라오고, 다른 팀 선수 위에서 떼면 서로 바뀜 */
+let dragDone = false;
+function bindDrag(swap) {
+  const els = document.querySelectorAll('[data-pick]'); if (!els.length) return;
+  let st = null, tm = null, ghost = null, over = null;
+  const end = () => { clearTimeout(tm); tm = null; if (ghost) ghost.remove(); ghost = null; if (over) over.classList.remove('dropto'); over = null; if (st && st.el) st.el.classList.remove('dragging'); document.body.classList.remove('pickdrag'); st = null; };
+  const at = (x, y) => { const e = document.elementFromPoint(x, y); return e && e.closest('[data-pick]'); };
+  els.forEach((el) => {
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button > 0) return;
+      st = { el, x: e.clientX, y: e.clientY, on: false, id: e.pointerId };
+      tm = setTimeout(() => {
+        if (!st) return; st.on = true; dragDone = true; el.classList.add('dragging'); document.body.classList.add('pickdrag');
+        ghost = el.cloneNode(true); ghost.className = el.className.replace('dragging', '') + ' ghost'; ghost.removeAttribute('style');
+        const r = el.getBoundingClientRect(); ghost.style.width = r.width + 'px'; document.body.appendChild(ghost);
+        ghost.style.left = st.x + 'px'; ghost.style.top = st.y + 'px';
+        if (navigator.vibrate) navigator.vibrate(15);
+      }, 300);
+    });
+  });
+  const move = (e) => {
+    if (!st) return;
+    if (!st.on) { if (Math.abs(e.clientX - st.x) > 8 || Math.abs(e.clientY - st.y) > 8) end(); return; }
+    ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px';
+    const t = at(e.clientX, e.clientY), ok = t && t !== st.el ? t : null;
+    if (over !== ok) { if (over) over.classList.remove('dropto'); over = ok; if (over) over.classList.add('dropto'); }
+  };
+  const up = (e) => {
+    if (!st) return; const was = st.on, from = st.el.dataset.pick, t = was ? at(e.clientX, e.clientY) : null; end();
+    if (was) { setTimeout(() => (dragDone = false), 50); if (t && t.dataset.pick !== from) swap(from, t.dataset.pick); }
+  };
+  document.onpointermove = move; document.onpointerup = up; document.onpointercancel = () => { end(); dragDone = false; };
+  if (!window.__dragTouch) { window.__dragTouch = 1; document.addEventListener('touchmove', (e) => { if (document.body.classList.contains('pickdrag')) e.preventDefault(); }, { passive: false }); }
+}
 function editDeadline(gid) {
   const g = S.games.find((x) => x.id === gid), def = C.addDays(g.date, -1) + 'T22:00';
   modal('<h2>' + md(g.date) + ' 경기 · 투표 마감</h2><div class="row"><label class="f">마감 날짜<input id="dlv" type="date" value="' + esc((g.deadline || def).substr(0, 10)) + '"></label><label class="f">마감 시간' + timeSel('dlt', (g.deadline || def).substr(11, 5)) + '</label></div><div class="muted">마감이 지나면 회원 화면의 투표 버튼이 잠겨요. 비우면 경기 시작까지 투표할 수 있어요.</div>' +
