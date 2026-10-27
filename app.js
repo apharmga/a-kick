@@ -1,6 +1,21 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, doc, getDocs, getDoc, setDoc, deleteDoc, writeBatch, onSnapshot, addDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, collection, doc, getDocs as _getDocs, getDoc as _getDoc, setDoc as _setDoc, deleteDoc as _deleteDoc, writeBatch as _writeBatch, onSnapshot as _onSnapshot, addDoc as _addDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { demoAdmin } from './demo.js';
+/* 관리자 체험 (admin.html?demo=1): 서버 대신 메모리 속 샘플 데이터를 읽고 씀 · 새로고침하면 처음 상태로 */
+const DEMO = new URLSearchParams(location.search).get('demo') === '1';
+const MEM = DEMO ? demoAdmin() : null;
+const snapOf = (path) => ({ id: path.split('/').pop(), exists: () => !!MEM[path], data: () => (MEM[path] ? JSON.parse(JSON.stringify(MEM[path])) : undefined) });
+const qOf = (ref) => { const docs = ref.type === 'collection' ? Object.keys(MEM).filter((k) => k.indexOf(ref.path + '/') === 0 && k.slice(ref.path.length + 1).indexOf('/') < 0).map(snapOf) : [];
+  return { docs, empty: !docs.length, size: docs.length, forEach: (f) => docs.forEach(f) }; };
+const memSet = (ref, d, o) => { MEM[ref.path] = o && o.merge ? Object.assign({}, MEM[ref.path] || {}, JSON.parse(JSON.stringify(d))) : JSON.parse(JSON.stringify(d)); };
+const getDoc = (r) => (DEMO ? Promise.resolve(snapOf(r.path)) : _getDoc(r));
+const getDocs = (q) => (DEMO ? Promise.resolve(qOf(q)) : _getDocs(q));
+const setDoc = (r, d, o) => (DEMO ? (memSet(r, d, o), Promise.resolve()) : _setDoc(r, d, o));
+const deleteDoc = (r) => (DEMO ? (delete MEM[r.path], Promise.resolve()) : _deleteDoc(r));
+const addDoc = (c, d) => (DEMO ? (MEM[c.path + '/x' + Date.now()] = d, Promise.resolve()) : _addDoc(c, d));
+const writeBatch = (x) => (DEMO ? (() => { const ops = []; return { set: (r, d, o) => ops.push(() => memSet(r, d, o)), update: (r, d) => ops.push(() => memSet(r, d, { merge: true })), delete: (r) => ops.push(() => delete MEM[r.path]), commit: () => (ops.forEach((f) => f()), Promise.resolve()) }; })() : _writeBatch(x));
+const onSnapshot = (r, cb, ...rest) => { if (!DEMO) return _onSnapshot(r, cb, ...rest); setTimeout(() => cb(r.type === 'document' ? snapOf(r.path) : qOf(r)), 0); return () => {}; };
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBZps4AWzRrf07yzSuIgydRO_Dn2qGrx9E',
@@ -22,12 +37,13 @@ function logErr(msg, stack) {
 }
 window.addEventListener('error', (e) => logErr(e.message, e.error && e.error.stack));
 window.addEventListener('unhandledrejection', (e) => logErr(e.reason && (e.reason.message || e.reason), e.reason && e.reason.stack));
-const CID = new URLSearchParams(location.search).get('c') || '';
+const CID = DEMO ? 'demo' : new URLSearchParams(location.search).get('c') || '';
 const D = (...p) => doc(db, 'clubs', CID, ...p);
 const CL = (n) => collection(db, 'clubs', CID, n);
 
 const S = { cfg: null, members: [], games: [], txs: [], skills: {}, votes: {}, view: 'week', week: monday(C.ymd(new Date())) };
-const MEMBER_URL = new URL('./?c=' + CID, location.href).href;
+const MHOME = DEMO ? './?demo=1' : './?c=' + CID;
+const MEMBER_URL = new URL(DEMO ? './?demo=1' : './?c=' + CID, location.href).href;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const won = (n) => C.comma(n);
@@ -67,7 +83,9 @@ async function batchPut(list) {
 /* ---------------- 로그인 → 내 팀 확인 → 관리자 비밀번호 ---------------- */
 const PIN_DEFAULT = 'd491e185da5e647a77d68eeaf393cd35';   // 0000
 async function pinHash(pin) { return C.md5('a-futsal:' + pin); }
+if (DEMO) setTimeout(() => { S.club = MEM['clubs/demo']; S.uid = 'demo'; S.unlocked = true; document.title = '체험FC 관리자 · A-KICK'; C.applyTheme(null); loadAll(); }, 0);
 onAuthStateChanged(auth, async (u) => {
+  if (DEMO) return;
   if (!u) { location.href = './' + (CID ? '?c=' + CID : ''); return; }
   if (!CID) { location.href = './'; return; }
   try {
@@ -281,12 +299,12 @@ const IC = {
 function render() {
   const v = S.view, ym = payYM(), list = C.membersFor(S.members, ym), paid = C.duesPaid(S.txs, ym);
   const tab = (k, l) => '<button class="tab' + (v === k ? ' on' : '') + '" data-v="' + k + '">' + l + '</button>';
-  const nav = '<header class="bar"><div class="bar-in"><a class="logo" href="./?c=' + CID + '" title="홈으로">' + esc(S.club.name) + '<small>관리자</small></a><nav class="tabs" aria-label="메뉴">' + tab('week', '이번 주') + tab('members', '회원 · 회비' + ((S.reqs || []).length ? ' <em class="badge">' + S.reqs.length + '</em>' : '')) + tab('ledger', '장부') + tab('stats', '경기기록') + tab('polls', '투표 · 건의' + (newSugs() ? ' <em class="badge">' + newSugs() + '</em>' : '')) + '</nav>' +
+  const nav = '<header class="bar"><div class="bar-in"><a class="logo" href="' + MHOME + '" title="홈으로">' + esc(S.club.name) + '<small>관리자</small></a><nav class="tabs" aria-label="메뉴">' + tab('week', '이번 주') + tab('members', '회원 · 회비' + ((S.reqs || []).length ? ' <em class="badge">' + S.reqs.length + '</em>' : '')) + tab('ledger', '장부') + tab('stats', '경기기록') + tab('polls', '투표 · 건의' + (newSugs() ? ' <em class="badge">' + newSugs() + '</em>' : '')) + '</nav>' +
     '<div class="stats"><div class="stat"><span>통장 잔액</span><b>' + won(C.balance(S.txs)) + '<em>원</em></b></div><div class="stat"><span>' + mon(ym) + ' 회비</span><b>' + list.filter((m) => paid[m.name]).length + '<em> / ' + list.length + '명</em></b></div></div>' +
     '<label class="btn pri up">' + IC.up + '<span>거래내역 엑셀 넣기</span><input type="file" accept=".xlsx,.xls,.csv" id="up" hidden></label>' +
-    '<a class="btn" href="./?c=' + CID + '">' + IC.home + ' 홈</a><button class="iconbtn" id="gear" aria-label="설정">' + IC.gear + '</button></div></header>';
+    '<a class="btn" href="' + MHOME + '">' + IC.home + ' 홈</a><button class="iconbtn" id="gear" aria-label="설정">' + IC.gear + '</button></div></header>';
   const body = v === 'week' ? weekHTML() : v === 'members' ? membersHTML() : v === 'team' ? teamHTML() : v === 'stats' ? statsHTML() : v === 'polls' ? pollsHTML() : ledgerHTML();
-  $('#app').innerHTML = nav + '<main class="wrap">' + body + '</main>';
+  $('#app').innerHTML = (DEMO ? '<div class="demob"><span>👀 <b>총무 화면 체험</b> · 새로고침하면 처음으로 돌아가요</span><a href="./">나가기</a></div>' : '') + nav + '<main class="wrap">' + body + '</main>';
   document.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { S.view = b.dataset.v; render(); }));
   $('#up').onchange = (e) => e.target.files[0] && importBank(e.target.files[0]);
   $('#gear').onclick = openSettings;

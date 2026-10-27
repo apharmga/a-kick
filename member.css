@@ -429,3 +429,4 @@ body.noscroll{overflow:hidden}
 .pmore{display:block;width:100%;margin-top:6px;padding:9px;border:0;border-radius:10px;background:#f1f5f9;color:#475569;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
 .pitem.past{opacity:.75}
 .about{display:block;margin:10px auto 0;font-size:13px;color:#475569;text-align:center}
+.demoa{display:flex;gap:6px;flex:none}.demoa a{padding:5px 10px;border-radius:999px;border:1.5px solid #78350f;color:#78350f;font-size:12px;font-weight:700;text-decoration:none}

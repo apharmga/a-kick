@@ -531,7 +531,7 @@ function render() {
     tab('dues', '회비', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>') +
     tab('bank', '통장', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/></svg>') +
     tab('rec', '경기기록', '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>') + '</nav>');
-  if (S.demo) { $('#app').insertAdjacentHTML('afterbegin', '<div class="demob"><span>👀 <b>체험 팀</b> · 눌러봐도 저장되지 않아요</span><button id="demox">나가기</button></div>'); $('#demox').onclick = exitDemo; }
+  if (S.demo) { $('#app').insertAdjacentHTML('afterbegin', '<div class="demob"><span>👀 <b>체험 팀</b> · 눌러봐도 저장되지 않아요</span><span class="demoa"><a href="admin.html?demo=1">총무 화면 체험</a><button id="demox">나가기</button></span></div>'); $('#demox').onclick = exitDemo; }
   document.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.t; if (S.tab === 'week' && teamKey()) markSeen(teamKey()); render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.go; render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-vote]').forEach((b) => (b.onclick = () => vote(b.dataset.vote)));
