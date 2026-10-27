@@ -1,5 +1,6 @@
 {
-  "name": "A-KICK 온라인 라커룸",
+  "id": "/a-kick/",
+  "name": "A-KICK 에이킥 - 축구·풋살 모임 관리",
   "short_name": "A-KICK",
   "description": "축구·풋살 모임 참석 투표, 팀 편성, 회비·장부",
   "start_url": "./",
@@ -9,7 +10,23 @@
   "theme_color": "#1E3A8A",
   "lang": "ko",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "orientation": "portrait",
+  "categories": [
+    "sports",
+    "productivity",
+    "social"
   ]
 }
