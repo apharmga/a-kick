@@ -1,7 +1,8 @@
-/* A-COACH: 관리자(총무) 도우미
+/* 킥키: 관리자(총무) 도우미 (헤드셋 낀 축구공 캐릭터)
    - 사용법 질문 → 앱 안의 도움말에서 찾아 답하고, 해당 화면으로 바로 이동
    - "미납자 누구야?" 같은 질문 → 지금 팀 데이터로 바로 계산해서 답 (밖으로 보내지 않음) */
 let X = null, open = false, log = [];
+const ICON = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="54" r="36" fill="#fff"/><path d="M14 54 Q14 14 50 14 Q86 14 86 54" stroke="#FFD23F" stroke-width="8" fill="none"/><rect x="6" y="46" width="14" height="22" rx="6" fill="#FFD23F"/><rect x="80" y="46" width="14" height="22" rx="6" fill="#FFD23F"/><polygon points="50,30 58,36 55,45 45,45 42,36" fill="#14306B"/><circle cx="40" cy="58" r="5.5" fill="#14306B"/><circle cx="60" cy="58" r="5.5" fill="#14306B"/><path d="M42 69 Q50 75 58 69" stroke="#14306B" stroke-width="5" fill="none" stroke-linecap="round"/></svg>';
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nz = (s) => String(s || '').toLowerCase().replace(/\s+/g, '');
 
@@ -76,12 +77,12 @@ function toggle(on) {
   open = on === undefined ? !open : on;
   const p = document.getElementById('coachp'); p.hidden = !open;
   document.getElementById('coachb').setAttribute('aria-expanded', open);
-  if (open) { if (!log.length) { log.push({ a: '안녕하세요, 총무님! 저는 <b>A-COACH</b>예요 🧢<br>앱 쓰는 법이나 우리 팀 회비·경기 상황을 물어보세요.', chips: STARTERS }); } draw(); setTimeout(() => p.querySelector('input').focus(), 50); }
+  if (open) { if (!log.length) { log.push({ a: '안녕하세요, 총무님! 저는 도우미 <b>킥키</b>예요 ⚽<br>앱 쓰는 법이나 우리 팀 회비·경기 상황을 물어보세요.', chips: STARTERS }); } draw(); setTimeout(() => p.querySelector('input').focus(), 50); }
 }
 export function mountCoach(ctx) {
   X = ctx; if (document.getElementById('coachb')) return;
-  document.body.insertAdjacentHTML('beforeend', '<button id="coachb" class="coachb" aria-label="A-COACH 도우미 열기" aria-expanded="false"><span>AC</span><em>도우미</em></button>' +
-    '<section id="coachp" class="coachp" hidden aria-label="A-COACH 도우미"><header><b>A-COACH</b><small>총무 도우미' + (ctx.demo ? ' · 체험 중' : '') + '</small><button class="cx" aria-label="닫기">✕</button></header>' +
+  document.body.insertAdjacentHTML('beforeend', '<button id="coachb" class="coachb" aria-label="도우미 킥키 열기" aria-expanded="false">' + ICON + '<em>킥키</em></button>' +
+    '<section id="coachp" class="coachp" hidden aria-label="도우미 킥키"><header>' + ICON + '<b>킥키</b><small>총무 도우미' + (ctx.demo ? ' · 체험 중' : '') + '</small><button class="cx" aria-label="닫기">✕</button></header>' +
     '<div class="cb" aria-live="polite"></div><form class="cf"><input maxlength="100" placeholder="예: 미납자 누구야? / 팀 짜는 법" aria-label="질문"><button>보내기</button></form></section>');
   document.getElementById('coachb').onclick = () => toggle();
   document.querySelector('#coachp .cx').onclick = () => toggle(false);
