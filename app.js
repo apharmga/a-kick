@@ -603,11 +603,29 @@ const TCI = ['🟠', '🔵', '🟢'];
 function triTimeHTML(g) {
   const t = triOf(g), P = C.triPlan(t), T = (g.teams || []).map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0));
   const num = (k, l, v, mn, mx) => '<label class="f">' + l + '<input type="number" data-tri="' + k + '" min="' + mn + '" max="' + mx + '" inputmode="numeric" value="' + v + '"></label>';
-  return '<div class="panel pad"><div class="ph"><div class="g-lbl2">⏱ 3파전 진행 방식 · ' + T.map((x) => x.length).join('/') + '명</div><button class="btn sm" id="ttcp">' + IC.copy + ' 타임테이블 복사</button></div>' +
+  return '<div class="panel pad"><div class="ph"><div class="g-lbl2">⏱ 3파전 진행 방식 · ' + T.map((x) => x.length).join('/') + '명</div><span><button class="btn sm" id="ttcal">⌚ 알람 받기</button> <button class="btn sm" id="ttcp">' + IC.copy + ' 타임테이블 복사</button></span></div>' +
     '<div class="trow4">' + num('min', '한 판 (분)', P.min, 3, 40) + num('rest', '판 사이 휴식 (분)', P.rest, 0, 20) + num('n', '총 판 수', P.n, 1, 30) + '<label class="f">시작 시간<input type="time" data-tri="start" value="' + esc(t.start) + '"></label></div>' +
     '<div class="tpre">빠른 선택 <button class="btn xs" data-tpre="10,3,9">10분 × 9판</button><button class="btn xs" data-tpre="15,6,6">15분 × 6판</button><button class="btn xs" data-tpre="12,4,6">12분 × 6판</button><button class="btn xs" data-tpre="8,2,12">8분 × 12판</button></div>' +
     '<div class="tsum ' + (P.fair ? 'ok' : 'warn') + '">' + (P.fair ? '✅ 공평해요 · 모든 팀이 ' + P.play[0] + '판(' + P.play[0] * P.min + '분) 뛰고 ' + (P.n - P.play[0]) + '판 쉬어요' : '⚠️ 판 수가 3의 배수가 아니라 팀마다 뛰는 판 수가 달라요 (' + P.play.map((x, i) => TEAMC[i] + ' ' + x + '판').join(' · ') + ')') + ' · ' + esc(t.start) + ' 시작 → <b>' + P.end + ' 끝</b> (총 ' + P.total + '분)</div>' +
     '<table class="ttab"><thead><tr><th>판</th><th>시간</th><th>경기</th><th>쉬는 팀</th></tr></thead><tbody>' + P.rows.map((r) => '<tr><td>' + (r.i + 1) + '판</td><td>' + r.s + ' – ' + r.e + '</td><td><b class="tn t' + r.a + '">' + TEAMC[r.a] + '</b> : <b class="tn t' + r.b + '">' + TEAMC[r.b] + '</b></td><td><span class="tn t' + r.off + '">' + TEAMC[r.off] + '</span></td></tr>').join('') + '</tbody></table></div>';
+}
+/** 3파전 타임테이블 → 캘린더 파일(.ics): 판 시작·종료 1분 전·종료 시각에 알림 (아이폰 캘린더 → 애플워치로 진동 알림) */
+function triIcs(g) {
+  const t = triOf(g), P = C.triPlan(t), d = g.date.replace(/-/g, ''), hm = (x) => x.replace(':', '') + '00', now = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+  const ev = P.rows.map((r) => ['BEGIN:VEVENT', 'UID:akick-' + g.id + '-' + (r.i + 1) + '@apharmga.github.io', 'DTSTAMP:' + now,
+    'DTSTART;TZID=Asia/Seoul:' + d + 'T' + hm(r.s), 'DTEND;TZID=Asia/Seoul:' + d + 'T' + hm(r.e),
+    'SUMMARY:⚽ ' + (r.i + 1) + '판 ' + TEAMC[r.a] + ':' + TEAMC[r.b] + ' (' + TEAMC[r.off] + ' 휴식)',
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + (r.i + 1) + '판 시작 ' + TEAMC[r.a] + ':' + TEAMC[r.b], 'TRIGGER:PT0S', 'END:VALARM',
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + (r.i + 1) + '판 1분 남음', 'TRIGGER;RELATED=END:-PT1M', 'END:VALARM',
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + (r.i + 1) + '판 종료', 'TRIGGER;RELATED=END:PT0S', 'END:VALARM', 'END:VEVENT'].join('\r\n'));
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AnQuA//A-KICK//KO', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:A-KICK 3파전',
+    'BEGIN:VTIMEZONE', 'TZID:Asia/Seoul', 'BEGIN:STANDARD', 'DTSTART:19700101T000000', 'TZOFFSETFROM:+0900', 'TZOFFSETTO:+0900', 'TZNAME:KST', 'END:STANDARD', 'END:VTIMEZONE']
+    .concat(ev, ['END:VCALENDAR']).join('\r\n');
+}
+function triCal(g) {
+  const url = URL.createObjectURL(new Blob([triIcs(g)], { type: 'text/calendar;charset=utf-8' })), a = document.createElement('a');
+  a.href = url; a.download = 'A-KICK_' + g.date + '_3파전.ics'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('캘린더 파일을 받았어요 · 열어서 [모두 추가]를 누르면 판마다 시작·1분 전·종료 알림이 와요', 6000);
 }
 function triCopy(g) {
   const t = triOf(g), P = C.triPlan(t);
@@ -649,6 +667,7 @@ function bindTeam() {
   document.querySelectorAll('[data-tri]').forEach((el) => (el.onchange = () => { const k = el.dataset.tri; saveTri({ [k]: k === 'start' ? el.value : Math.max(+el.min, Math.min(+el.max, +el.value || 0)) }); }));
   document.querySelectorAll('[data-tpre]').forEach((b) => (b.onclick = () => { const [mi, re, n] = b.dataset.tpre.split(',').map(Number); saveTri({ min: mi, rest: re, n }); }));
   const tc = $('#ttcp'); if (tc) tc.onclick = () => copy(triCopy(g));
+  const tcal = $('#ttcal'); if (tcal) tcal.onclick = () => triCal(g);
   document.querySelectorAll('[data-mdel]').forEach((b) => (b.onclick = async () => { const i = +b.dataset.mdel; if (!confirm((i + 1) + '판 기록을 지울까요?')) return; g.matches = g.matches.filter((_, j) => j !== i); render(); await putGame(g); }));
   ['#mk', '#mk2', '#mk3'].forEach((id) => { const b = $(id); if (b) b.onclick = mk; });
   const pb = $('#pubT'); if (pb) pb.onclick = async () => { g.teamsPublic = !g.teamsPublic; render(); await putGame(g); toast(g.teamsPublic ? '회원 화면에 팀이 보여요' : '회원 화면에서 팀을 숨겼어요'); };
