@@ -452,6 +452,6 @@ button.pill{cursor:pointer;border:0;font:inherit}
 [data-pick]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 [data-pick].dragging{opacity:.35}
 [data-pick].dropto{outline:3px solid #FFD23F;outline-offset:2px;background:#FFF8DB}
-.ghost{position:fixed;z-index:100;pointer-events:none;transform:translate(-50%,-130%) scale(1.06);box-shadow:0 12px 28px rgba(15,23,42,.3);background:#fff;border-color:#1E3A8A}
-.tok.ghost{transform:translate(-50%,-130%) scale(1.15)}
+.dragghost{position:fixed;z-index:100;pointer-events:none;transform:translate(-50%,-130%) scale(1.06);box-shadow:0 12px 28px rgba(15,23,42,.3);background:#fff;border-color:#1E3A8A}
+.tok.dragghost{transform:translate(-50%,-130%) scale(1.15)}
 body.pickdrag{cursor:grabbing}

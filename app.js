@@ -688,7 +688,7 @@ function bindDrag(swap) {
       st = { el, x: e.clientX, y: e.clientY, on: false, id: e.pointerId };
       tm = setTimeout(() => {
         if (!st) return; st.on = true; dragDone = true; el.classList.add('dragging'); document.body.classList.add('pickdrag');
-        ghost = el.cloneNode(true); ghost.className = el.className.replace('dragging', '') + ' ghost'; ghost.removeAttribute('style');
+        ghost = el.cloneNode(true); ghost.className = el.className.replace('dragging', '') + ' dragghost'; ghost.removeAttribute('style');
         const r = el.getBoundingClientRect(); ghost.style.width = r.width + 'px'; document.body.appendChild(ghost);
         ghost.style.left = st.x + 'px'; ghost.style.top = st.y + 'px';
         if (navigator.vibrate) navigator.vibrate(15);
