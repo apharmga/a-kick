@@ -471,3 +471,10 @@ body.noscroll{overflow:hidden}
 .hero{padding-top:calc(20px + env(safe-area-inset-top))}
 .login{padding-top:calc(24px + env(safe-area-inset-top))}
 .demob{padding-top:calc(8px + env(safe-area-inset-top))}
+/* 하이라이트 댓글: 키보드가 떠 있는 동안 영상을 줄여 댓글이 보이게 */
+.vov{top:0;bottom:auto;height:100dvh;will-change:transform}
+.vov.kb .vplay{aspect-ratio:auto;height:22vh;min-height:110px}
+.vov.kb .vhint{display:none}
+.vin textarea{overscroll-behavior:contain}
+.wxr{border:0;background:none;color:var(--navy);font:inherit;font-weight:800;text-decoration:underline;padding:4px 2px;cursor:pointer}
+.wxr:disabled{color:var(--sub);text-decoration:none}

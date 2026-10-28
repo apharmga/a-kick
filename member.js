@@ -235,6 +235,7 @@ function closeVideo(fromPop) {
   if (VV.unsub) VV.unsub(); VV.unsub = null;
   try { VV.player && VV.player.destroy(); } catch (e) {}
   if (VV.id) markSeen(VV.id);
+  if (VV.vvOff) VV.vvOff(); VV.vvOff = null;
   VV.player = null; VV.id = ''; ov.remove(); document.body.classList.remove('noscroll'); render();
   if (!fromPop && history.state && history.state.vov) history.back();
 }
@@ -248,14 +249,24 @@ async function openVideo(id) {
   ov.innerHTML = '<div class="vtop"><button class="vx" id="vx" aria-label="닫기">‹</button><div><b>' + esc(v.title || '하이라이트') + '</b><small>' + (v.date ? md(v.date) + ' (' + day(v.date) + ') 경기' : '') + '</small></div></div>' +
     '<div class="vplay"><div id="ytp"></div></div>' +
     '<div class="vbody"><div class="vhint">댓글에 <b>1:23</b>처럼 시간을 쓰면, 누를 때 그 장면으로 이동해요</div><div id="vcl" class="vcl"><div class="muted">댓글 불러오는 중...</div></div></div>' +
-    '<div class="vrep" id="vrep" hidden></div><div class="vin"><button id="vnow" class="vnow">⏱ 지금 시간</button><textarea id="vtxt" rows="1" maxlength="500" placeholder="댓글 쓰기 (예: 2:15 이 골 미쳤다)"></textarea><button id="vsend" class="vsend">등록</button></div>';
+    '<div class="vrep" id="vrep" hidden></div><div class="vin"><button id="vnow" class="vnow">⏱ 지금 시간</button><textarea id="vtxt" rows="1" maxlength="500" placeholder="댓글 쓰기"></textarea><button id="vsend" class="vsend">등록</button></div>';
   document.body.appendChild(ov); document.body.classList.add('noscroll');
   $('#vx').onclick = () => closeVideo();
   const ta = $('#vtxt');
+  // 아이폰: 키보드가 올라오면 화면 전체가 밀려 올라가 영상·제목이 사라지고 닫은 뒤에도 틀어짐
+  // → 보이는 영역(visualViewport)에 창을 딱 맞추고, 키보드가 떠 있는 동안엔 영상을 작게
+  const vv = window.visualViewport, y0 = window.scrollY;
+  if (vv) {
+    const H0 = vv.height;
+    const fit = () => { ov.style.height = vv.height + 'px'; ov.style.transform = 'translateY(' + vv.offsetTop + 'px)'; ov.classList.toggle('kb', H0 - vv.height > 120); };
+    vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); fit();
+    VV.vvOff = () => { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); };
+  }
+  ta.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== ta) window.scrollTo(0, y0); }, 80));
   VV.reply = null;
   const setReply = (c) => {                            // 답글 대상 (대댓글은 한 단계: 답글에 답글을 달아도 같은 댓글 아래로)
     VV.reply = c; const bar = $('#vrep');
-    if (!c) { bar.hidden = true; ta.placeholder = '댓글 쓰기 (예: 2:15 이 골 미쳤다)'; return; }
+    if (!c) { bar.hidden = true; ta.placeholder = '댓글 쓰기'; return; }
     bar.hidden = false; bar.innerHTML = '↪ <b>' + esc(c.name) + '</b>님에게 답글 <button id="vrx" aria-label="답글 취소">✕</button>';
     $('#vrx').onclick = () => setReply(null); ta.placeholder = '답글 쓰기'; ta.focus();
   };
@@ -574,6 +585,7 @@ function render() {
   document.querySelectorAll('[data-gadd]').forEach((b) => (b.onclick = () => openGoal(b.dataset.gadd)));
   document.querySelectorAll('[data-wk]').forEach((b) => (b.onclick = () => loadWorkout(b.dataset.wk)));
   document.querySelectorAll('[data-talarm]').forEach((b) => (b.onclick = () => myTriAlarms(b.dataset.talarm)));
+  const wr = $('#wxr'); if (wr) wr.onclick = wxManual;
   document.querySelectorAll('[data-gdel]').forEach((b) => (b.onclick = async () => { if (confirm('이 골 기록을 지울까요?')) await deleteDoc(CD('goals', b.dataset.gdel)).catch((e) => toast('삭제 실패: ' + e.message)); }));
   document.querySelectorAll('[data-sort]').forEach((h) => (h.onclick = () => { const [tb, k] = h.dataset.sort.split(':'), st = S.sort[tb] || {}; S.sort[tb] = st.k === k ? { k, d: ((st.d || 0) + 1) % 3 } : { k, d: 1 }; render(); }));
   document.querySelectorAll('[data-poll]').forEach((b) => (b.onclick = () => openPoll(b.dataset.poll)));
@@ -1352,21 +1364,34 @@ function wxWatch(g) {
   S.wxSub = onSnapshot(doc(db, 'clubs', S.cid, 'wx', g.id), (d) => { S.wx = d.exists() ? d.data() : null; wxRefresh(g); if (S.tab === 'home' || S.tab === 'week') render(); }, () => {});
 }
 let wxBusy = false;
-async function wxRefresh(g) {
+async function wxRefresh(g, force) {
   const loc = S.pub.wxLoc || { lat: 35.8714, lon: 128.6014 }, days = (Date.parse(g.date) - Date.now()) / 864e5;
-  if (wxBusy || days > 15 || days < -1 || (S.wx && S.wx.date === g.date && S.wx.time === (g.time || '') && Date.now() - S.wx.at < WX_TTL)) return;
-  wxBusy = true;
-  try { const w = await window.Core.fetchWx(loc.lat, loc.lon, g.date, g.time); await setDoc(doc(db, 'clubs', S.cid, 'wx', g.id), Object.assign(w, { gid: g.id, date: g.date, time: g.time || '', at: Date.now() })); }
+  if (wxBusy || days > 15 || days < -1 || (!force && S.wx && S.wx.date === g.date && S.wx.time === (g.time || '') && Date.now() - S.wx.at < WX_TTL)) return false;
+  wxBusy = true; let ok = false;
+  try { const w = await window.Core.fetchWx(loc.lat, loc.lon, g.date, g.time); await setDoc(doc(db, 'clubs', S.cid, 'wx', g.id), Object.assign(w, { gid: g.id, date: g.date, time: g.time || '', at: Date.now() })); ok = true; }
   catch (e) { /* 날씨 서버가 잠깐 안 되면 다음에 다시 */ }
-  wxBusy = false;
+  wxBusy = false; return ok;
 }
+/** 회원이 직접 새로고침: 팀 전체가 같은 예보를 나눠 쓰므로, 10분 안에 누가 받았으면 그걸 그대로 보여줌 (저장 횟수 절약) */
+const WX_MIN = 10 * 60e3;
+async function wxManual() {
+  const g = game(); if (!g) return;
+  if (S.demo) return toast(DEMO_MSG);
+  const ago = S.wx && S.wx.date === g.date ? Date.now() - S.wx.at : Infinity;
+  if (ago < WX_MIN) return toast('이미 최신 예보예요 (' + Math.max(1, Math.round(ago / 60e3)) + '분 전에 받음)');
+  const b = $('#wxr'); if (b) { b.disabled = true; b.textContent = '받는 중...'; }
+  const ok = await wxRefresh(g, true);
+  toast(ok ? '🌤️ 최신 예보로 바꿨어요' : '지금은 날씨를 받을 수 없어요. 잠시 뒤 다시 눌러주세요');
+  if (!ok && b) { b.disabled = false; b.textContent = '↻ 새로고침'; }
+}
+function wxAt(t) { const d = new Date(t), m = Math.round((Date.now() - t) / 60e3); return m < 60 ? (m < 1 ? '방금' : m + '분 전') : d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); }
 function wxLine(g) { try { return wxLine0(g); } catch (e) { logErr('날씨 표시 실패: ' + e.message, e.stack); return ''; } }
 function wxLine0(g) {
   const w = S.wx; if (!g) return '';
   if (!w || w.date !== g.date) return (Date.parse(g.date) - Date.now()) / 864e5 > 15 ? '<div class="wx wx-soft">🌤️ 날씨는 경기 15일 전부터 나와요</div>' : '';
   const [ic, lb] = window.Core.wxLabel(w.code), mx = w.mx != null ? w.mx : w.pr, pv = window.Core.playable(mx, w.st || w.code >= 95);
   return '<div class="wx wx-' + pv.lv + '"><span class="wi">' + ic + '</span><div class="wmain"><div class="w1"><b>' + w.t + '°</b><span>' + lb + '</span></div><div class="w2"><span>강수확률 <b>' + w.pop + '%</b></span><span>강수량 <b>' + (mx > 0 ? mx + 'mm/시간' : '비 없음') + '</b></span></div></div>' +
-    '<em><b>' + pv.text.split(/ · | \(/)[0] + '</b><i>' + (pv.text.split(/ · | \(/)[1] || '').replace(')', '') + '</i>' + '</em><small>경기 ' + (g.time || '').substr(0, 5) + '부터 2시간 · ' + new Date(w.at).getHours() + '시 업데이트</small></div>';
+    '<em><b>' + pv.text.split(/ · | \(/)[0] + '</b><i>' + (pv.text.split(/ · | \(/)[1] || '').replace(')', '') + '</i>' + '</em><small>경기 ' + (g.time || '').substr(0, 5) + '부터 2시간 · ' + wxAt(w.at) + ' 업데이트 <button class="wxr" id="wxr">↻ 새로고침</button></small></div>';
 }
 
 /* ---------------- 앱 개발자에게 건의 · 후원 ---------------- */
