@@ -1,0 +1,18 @@
+{
+  "appId": "com.anqua.akick",
+  "appName": "A-KICK",
+  "webDir": "www",
+  "server": {
+    "url": "https://apharmga.github.io/a-kick/",
+    "allowNavigation": ["apharmga.github.io", "*.firebaseapp.com", "*.googleapis.com", "api.open-meteo.com"]
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#1E3A8A",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 800, "backgroundColor": "#1E3A8A", "showSpinner": false },
+    "LocalNotifications": { "iconColor": "#1E3A8A" }
+  }
+}

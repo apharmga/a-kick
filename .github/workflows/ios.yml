@@ -1,0 +1,34 @@
+name: iOS build
+
+on:
+  push:
+    branches: [ios]
+  workflow_dispatch:
+
+jobs:
+  simulator:
+    name: 시뮬레이터 빌드 (서명 없음)
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Xcode 버전
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app || true
+          xcodebuild -version
+      - name: 패키지 설치 + Capacitor 동기화
+        run: |
+          npm ci
+          npx cap sync ios
+      - name: 빌드
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+            AKICK_GOOGLE_CLIENT_ID="${{ vars.AKICK_GOOGLE_CLIENT_ID }}" \
+            AKICK_GOOGLE_URL_SCHEME="${{ vars.AKICK_GOOGLE_URL_SCHEME }}" \
+            build | tail -80
+          test -d build/Build/Products/Debug-iphonesimulator/App.app && echo "BUILD OK"
