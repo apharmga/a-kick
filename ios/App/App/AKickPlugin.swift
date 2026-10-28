@@ -2,6 +2,7 @@ import UIKit
 import Capacitor
 import AuthenticationServices
 import CryptoKit
+import WidgetKit
 
 /// 앱 시작 화면. 기본 Capacitor 화면에 A-KICK 전용 플러그인을 붙인다.
 class MainViewController: CAPBridgeViewController {
@@ -21,7 +22,8 @@ public class AKickPlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationController
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "info", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "appleSignIn", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "googleSignIn", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "googleSignIn", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setWidget", returnType: CAPPluginReturnPromise)
     ]
 
     private var appleCall: CAPPluginCall?
@@ -36,6 +38,15 @@ public class AKickPlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationController
             "build": b.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
             "google": !googleClientId().isEmpty
         ])
+    }
+
+    // MARK: 홈 화면 위젯 (다음 경기)
+    static let appGroup = "group.com.anqua.akick"
+    @objc func setWidget(_ call: CAPPluginCall) {
+        let json = call.getString("json") ?? "{}"
+        UserDefaults(suiteName: AKickPlugin.appGroup)?.set(json, forKey: "next")
+        if #available(iOS 14.0, *) { WidgetCenter.shared.reloadAllTimelines() }
+        call.resolve()
     }
 
     // MARK: Apple 로그인

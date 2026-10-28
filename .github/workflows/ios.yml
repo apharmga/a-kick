@@ -19,17 +19,19 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode_16.4.app || true
           xcodebuild -version
-      - name: 패키지 설치 + Capacitor 동기화
+      - name: 패키지 설치 + Capacitor 동기화 + 위젯 타깃
         run: |
           npm ci
           npx cap sync ios
+          gem list -i xcodeproj >/dev/null || sudo gem install xcodeproj --no-document
+          ruby scripts/add_widget.rb
       - name: 빌드
         run: |
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
             build | tail -80
-          test -d build/Build/Products/Debug-iphonesimulator/App.app && echo "BUILD OK"
+          test -d build/Build/Products/Debug-iphonesimulator/App.app/PlugIns/AKickWidget.appex && echo "BUILD OK (+widget)"
 
   testflight:
     name: TestFlight 업로드 (애플 개발자 결제 후)
@@ -54,10 +56,12 @@ jobs:
           node-version: 22
       - name: Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.4.app || true
-      - name: 패키지 설치 + Capacitor 동기화
+      - name: 패키지 설치 + Capacitor 동기화 + 위젯 타깃
         run: |
           npm ci
           npx cap sync ios
+          gem list -i xcodeproj >/dev/null || sudo gem install xcodeproj --no-document
+          ruby scripts/add_widget.rb
       - name: API 키 파일
         run: |
           mkdir -p ~/private_keys
