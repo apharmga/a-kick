@@ -483,3 +483,4 @@ html:has(body.noscroll),body.noscroll{background:#0B1220}
 body.noscroll .tabs,body.noscroll .demob{visibility:hidden}
 .vov.kb .vtop{padding:6px 12px}.vov.kb .vtop small{display:none}.vov.kb .vx{width:32px;height:32px;font-size:20px}
 .vov.kb .vplay{height:18vh;min-height:96px}
+body.noscroll #app{visibility:hidden}
