@@ -170,14 +170,15 @@
     51: ['🌦️', '이슬비'], 53: ['🌦️', '이슬비'], 55: ['🌦️', '이슬비'], 56: ['🌧️', '어는 비'], 57: ['🌧️', '어는 비'], 61: ['🌧️', '비'], 63: ['🌧️', '비'], 65: ['🌧️', '강한 비'],
     66: ['🌧️', '어는 비'], 67: ['🌧️', '어는 비'], 71: ['🌨️', '눈'], 73: ['🌨️', '눈'], 75: ['❄️', '많은 눈'], 77: ['🌨️', '싸락눈'], 80: ['🌦️', '소나기'], 81: ['🌧️', '소나기'], 82: ['⛈️', '강한 소나기'],
     85: ['🌨️', '눈 소나기'], 86: ['❄️', '눈 소나기'], 95: ['⛈️', '뇌우'], 96: ['⛈️', '뇌우'], 99: ['⛈️', '뇌우'] };
-  /** 시간당 강수량 → 풋살 가능 여부 (인조잔디 기준) */
-  function playable(mm, storm) {
-    if (storm) return { lv: 'bad', text: '⛈️ 풋살 어려움 (천둥·번개)' };
-    if (mm >= 7) return { lv: 'bad', text: '🔴 풋살 어려움 (강한 비)' };
+  /** 시간당 강수량 → 경기 가능 여부 (인조잔디 기준). sport: 'soccer'면 '축구', 아니면 '풋살' */
+  function playable(mm, storm, sport) {
+    var k = sport === 'soccer' ? '축구' : '풋살';
+    if (storm) return { lv: 'bad', text: '⛈️ ' + k + ' 어려움 (천둥·번개)' };
+    if (mm >= 7) return { lv: 'bad', text: '🔴 ' + k + ' 어려움 (강한 비)' };
     if (mm >= 3) return { lv: 'warn', text: '🟡 진행 판단 필요 (비 꽤 옴)' };
-    if (mm >= 1) return { lv: 'ok', text: '🟢 풋살 가능 · 미끄럼 주의' };
-    if (mm > 0) return { lv: 'ok', text: '🟢 풋살 가능 · 약한 비' };
-    return { lv: 'ok', text: '🟢 풋살 가능 · 비 없음' };
+    if (mm >= 1) return { lv: 'ok', text: '🟢 ' + k + ' 가능 · 미끄럼 주의' };
+    if (mm > 0) return { lv: 'ok', text: '🟢 ' + k + ' 가능 · 약한 비' };
+    return { lv: 'ok', text: '🟢 ' + k + ' 가능 · 비 없음' };
   }
   function wxLabel(code) { return WX[code] || ['🌡️', '날씨']; }
   /** 경기 날짜·시간의 날씨 (16일 이내만 예보가 있음) */
@@ -576,7 +577,7 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.80';
+  var VERSION = 'v0.81';
   var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, triPlan: triPlan, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,

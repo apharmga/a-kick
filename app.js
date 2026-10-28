@@ -778,7 +778,7 @@ function pubData() {
   let bal = 0;
   const txs = S.txs.map((x) => { bal = !x.manual && x.bal ? x.bal : bal + (x.kind === '입금' ? x.amt : -x.amt); return { dt: x.dt.substr(0, 16).replace(/\./g, '-'), io: x.kind === '입금' ? 1 : 0, amt: x.amt, who: x.desc, what: x.state === '확인필요' ? '관리자 확인 중' : partLabel(x), off: x.state === '무시' ? 1 : 0, bal, pend: x.manual ? 1 : 0 }; }).slice(-1500);
   const played = S.games.filter((g) => g.date <= t && g.date >= statFrom() && !g.postponed).slice(-200).map((g) => { const pl = playersOf(g); return { id: g.id, date: g.date, players: pl, teams: g.teams ? g.teams.map((x) => x.filter((n) => pl.indexOf(n) >= 0).join('|')) : [], matches: g.matches || [] }; });
-  return { updatedAt: new Date().toISOString(), xpAdj: S.cfg.xpAdj || {}, wxLoc: S.cfg.wxLoc || null, club: S.club.name, perSide: perSide(), maxSide: maxSide(), txs, played, statFrom: statFrom(), place: S.cfg.place || '', members: act.map((m) => ({ id: m.id, name: m.name })), games, records, ledger,
+  return { updatedAt: new Date().toISOString(), xpAdj: S.cfg.xpAdj || {}, wxLoc: S.cfg.wxLoc || null, club: S.club.name, sport: S.cfg.sport || '', perSide: perSide(), maxSide: maxSide(), txs, played, statFrom: statFrom(), place: S.cfg.place || '', members: act.map((m) => ({ id: m.id, name: m.name })), games, records, ledger,
            dues: { ym, fee: S.cfg.fee, dueDay: S.cfg.dueDay || 30, account: S.cfg.account || '', paid: list.filter((m) => paid[m.name]).map((m) => m.name), unpaid: list.filter((m) => !paid[m.name]).map((m) => m.name) } };
 }
 async function publish() {
