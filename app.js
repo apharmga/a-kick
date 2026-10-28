@@ -485,7 +485,7 @@ function bindWeek() {
 }
 /* 종목·인원 설정 (풋살 기본 5~6명, 축구는 설정에서 11명) */
 const perSide = () => S.cfg.perSide || 5, maxSide = () => Math.max(perSide(), S.cfg.maxSide || perSide() + 1), minN = () => perSide() * 2;
-function sideTxt(total) { if (total < minN()) return (minN() - total) + '명 더 필요'; const k = Math.min(Math.floor(total / 2), maxSide()); return k + '대' + k + ' 가능'; }
+function sideTxt(total) { return C.sideLabel(total, perSide(), maxSide()); }
 function newGameAsk(date) {
   if (S.cfg.dow != null) { const d = new Date(C.addDays(date, -6) + 'T00:00:00'); d.setDate(d.getDate() + ((S.cfg.dow - d.getDay() + 7) % 7)); date = C.ymd(d); }
   modal('<h2>경기 만들기</h2><div class="row"><label class="f">날짜<input id="nd" type="date" value="' + esc(date) + '"></label><label class="f">시간' + timeSel('nt', S.cfg.time || '16:00') + '</label></div>' +
@@ -593,7 +593,7 @@ function teamHTML() {
     pitchSide(T[0], 'L', 0, g.id) + pitchSide(T[1], 'R', 1, g.id) + '</div>' +
     (T[2] ? '<div class="tlabel t2" style="margin-top:10px"><b>C팀 ' + T[2].length + '명 (대기)</b><span>' + esc(T[2].join(', ')) + '</span></div>' : '') +
     '<div class="muted" style="margin-top:8px">동그라미 숫자 = 실력 점수 · 선수를 <b>꾹 눌러 끌어다</b> 상대 팀 선수 위에 놓거나, 차례로 눌러 <b>서로 자리 바꾸기</b> · 점수는 아래에서 고쳐요</div></div>';
-  return head + warn + pitch + scoreList(players);
+  return head + warn + pitch + (needRot(T) ? rotHTML(g, T) : '') + scoreList(players);
 }
 function triTxt(g) { const M = (S.games.find((x) => x.id === g.id) || {}).matches || []; if (!M.length) return '3파전'; const r = C.standings(3, M)[0]; return '3파전 ' + M.length + '판 · 1위 ' + TEAMC[r.t] + '팀 (승점 ' + r.pts + ')'; }
 const nTeamsOf = (g) => g.nTeams || (g.teams && g.teams.length >= 3 ? 3 : playersOf(g).length >= perSide() * 3 ? 3 : 2);
@@ -646,6 +646,53 @@ function triCopy(g) {
   const t = triOf(g), P = C.triPlan(t);
   return '⚽ ' + md(g.date) + '(' + C.dayName(g.date) + ') 3파전 타임테이블 (' + P.min + '분 × ' + P.n + '판)\n' + P.rows.map((r) => r.s + ' ' + (r.i + 1) + '판 ' + TCI[r.a] + TEAMC[r.a] + ' : ' + TCI[r.b] + TEAMC[r.b] + ' (' + TCI[r.off] + TEAMC[r.off] + ' 휴식)').join('\n') + '\n' + P.end + ' 종료\n- 판 사이 ' + P.rest + '분 휴식' + (P.fair ? ' · 모든 팀 ' + P.play[0] + '판씩 동일' : '') + '\n- 승 3점 · 무 1점 · ' + P.n + '판 후 1위 결정';
 }
+/* ---------- 2팀 교대(로테이션): 한 팀이 구장 최대 인원(maxSide)보다 많을 때 구간마다 순서대로 쉼 ---------- */
+const needRot = (T) => T.length === 2 && Math.max(T[0].length, T[1].length) > maxSide();
+const rotTeams = (g) => (g.teams || []).slice(0, 2).map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0));
+const rotOf = (g) => Object.assign({ min: 15, rest: 2, n: C.rotN(rotTeams(g), maxSide()), early: 0, start: g.time || S.cfg.time || '16:00' }, g.rot || {});
+function rotHTML(g, T) {
+  const t = rotOf(g), P = C.rotPlan(T, maxSide(), t), F = maxSide();
+  const num = (k, l, v, mn, mx) => '<label class="f">' + l + '<input type="number" data-rot="' + k + '" min="' + mn + '" max="' + mx + '" inputmode="numeric" value="' + v + '"></label>';
+  const offTxt = (o) => o.length ? o.map(esc).join(', ') : '<span class="muted">-</span>';
+  return '<div class="panel pad"><div class="ph"><div class="g-lbl2">🔁 ' + F + '대' + F + ' 교대 타임테이블 · ' + T.map((x) => x.length).join('/') + '명</div><span><button class="btn sm" id="rtcal">⌚ 알람 받기</button> <button class="btn sm" id="rtcp">' + IC.copy + ' 타임테이블 복사</button></span></div>' +
+    '<div class="muted" style="margin-bottom:8px">한 팀에 ' + F + '명까지만 뛰어서, 남는 사람이 <b>구간마다 순서대로 쉬어요.</b> 쉬는 순서는 팀 명단 순서예요.</div>' +
+    '<div class="trow4">' + num('min', '한 구간 (분)', P.min, 3, 40) + num('rest', '교대 시간 (분)', P.rest, 0, 10) + num('n', '구간 수', P.n, 1, 30) + num('early', '마지막 구간 일찍 끝내기 (분)', P.early, 0, 10) + '<label class="f">시작 시간<input type="time" data-rot="start" value="' + esc(t.start) + '"></label></div>' +
+    '<div class="tsum ' + (P.fair ? 'ok' : 'warn') + '">' + (P.fair ? '✅ 공평해요 · 쉬는 사람은 모두 같은 횟수(' + P.min + '분씩)만 쉬어요' : '⚠️ 구간 수 때문에 쉬는 횟수가 사람마다 달라요 · 구간 수를 ' + C.rotN(T, F) + '로 하면 공평해요') + ' · ' + esc(t.start) + ' 시작 → <b>' + P.end + ' 끝</b></div>' +
+    '<table class="ttab"><thead><tr><th>구간</th><th>시간</th><th>A팀 휴식</th><th>B팀 휴식</th></tr></thead><tbody>' +
+    P.rows.map((r) => '<tr><td>' + (r.i + 1) + '구간</td><td>' + r.s + ' – ' + r.e + '</td><td>' + offTxt(r.off[0]) + '</td><td>' + offTxt(r.off[1]) + '</td></tr>').join('') + '</tbody></table></div>';
+}
+function rotCopy(g) {
+  const T = rotTeams(g), P = C.rotPlan(T, maxSide(), rotOf(g)), F = maxSide();
+  return '⚽ ' + md(g.date) + '(' + C.dayName(g.date) + ') ' + F + '대' + F + ' 교대 타임테이블\n(한 팀 ' + F + '명씩 뛰고, 남는 사람은 구간마다 돌아가며 쉬어요)\n\n' +
+    P.rows.map((r) => (r.i + 1) + '구간 ' + r.s + '~' + r.e + '\n  🟠A팀 휴식: ' + (r.off[0].join(', ') || '없음') + '\n  🔵B팀 휴식: ' + (r.off[1].join(', ') || '없음')).join('\n') + '\n\n' + P.end + ' 종료 · 교대 시간 ' + P.rest + '분';
+}
+function rotAlarmList(g) {
+  const T = rotTeams(g), P = C.rotPlan(T, maxSide(), rotOf(g)), at = (hm) => new Date(g.date + 'T' + hm + ':00+09:00'), L = [];
+  const who = (r) => ['A ' + (r.off[0].join(', ') || '없음'), 'B ' + (r.off[1].join(', ') || '없음')].join(' · ');
+  P.rows.forEach((r) => {
+    if (r.i) L.push({ at: new Date(at(r.s).getTime() - 60000), s: r.s, title: '⏱ 1분 뒤 ' + (r.i + 1) + '구간 · 교대 준비', body: '쉴 사람: ' + who(r) });
+    L.push({ at: at(r.s), s: r.s, title: '⚽ ' + (r.i + 1) + '구간 시작', body: '휴식: ' + who(r) });
+  });
+  const last = P.rows[P.rows.length - 1];
+  L.push({ at: at(last.e), s: last.e, title: '🔔 경기 끝', body: '수고했어요!' });
+  return L;
+}
+function rotCal(g) {
+  const L = rotAlarmList(g);
+  if (IOS_APP) return scheduleAlarms(g.id + ':rot', L).then((n) => toast(n ? '알림 ' + n + '개를 등록했어요 · 애플워치에도 울려요' : '이미 지난 경기라 등록할 알림이 없어요', 5000)).catch((e) => toast(e.message || '알림 등록 실패', 6000));
+  const T = rotTeams(g), P = C.rotPlan(T, maxSide(), rotOf(g)), d = g.date.replace(/-/g, ''), now = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z', hm = (x) => x.replace(':', '') + '00';
+  const who = (r) => 'A ' + (r.off[0].join(', ') || '없음') + ' · B ' + (r.off[1].join(', ') || '없음');
+  const evt = (uid, s0, e0, sum, alarms) => ['BEGIN:VEVENT', 'UID:akick-' + g.id + '-rot-' + uid + '@apharmga.github.io', 'DTSTAMP:' + now, 'DTSTART;TZID=Asia/Seoul:' + d + 'T' + hm(s0), 'DTEND;TZID=Asia/Seoul:' + d + 'T' + hm(e0), 'SUMMARY:' + sum]
+    .concat(...alarms.map(([tr, desc]) => ['BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + desc, 'TRIGGER:' + tr, 'END:VALARM']), ['END:VEVENT']).join('\r\n');
+  // 구간마다 일정 1개: 시작 정시 알림 + (2구간부터) 1분 전 알림, 마지막에 '경기 끝' 일정
+  const ev = P.rows.map((r) => evt(r.i + 1, r.s, r.e, '⚽ ' + (r.i + 1) + '구간 · 휴식 ' + who(r), (r.i ? [['-PT1M', '1분 뒤 ' + (r.i + 1) + '구간 · 쉴 사람 ' + who(r)]] : []).concat([['PT0S', (r.i + 1) + '구간 시작 · 휴식 ' + who(r)]])));
+  const last = P.rows[P.rows.length - 1]; ev.push(evt('end', last.e, last.e, '🔔 경기 끝', [['PT0S', '경기 끝 · 수고했어요']]));
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AnQuA//A-KICK//KO', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:A-KICK 교대',
+    'BEGIN:VTIMEZONE', 'TZID:Asia/Seoul', 'BEGIN:STANDARD', 'DTSTART:19700101T000000', 'TZOFFSETFROM:+0900', 'TZOFFSETTO:+0900', 'TZNAME:KST', 'END:STANDARD', 'END:VTIMEZONE'].concat(ev, ['END:VCALENDAR']).join('\r\n');
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' })), a = document.createElement('a');
+  a.href = url; a.download = 'A-KICK_' + g.date + '_교대.ics'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('캘린더 파일을 받았어요 · 열어서 [모두 추가]를 누르면 구간 시작마다, 2구간부터는 1분 전에도 알림이 와요', 6000);
+}
 function matchPanel(g) {
   const M = g.matches || [], R = C.standings(3, M);
   return triTimeHTML(g) + '<div class="panel pad"><div class="ph"><div class="g-lbl2">🏆 3파전 기록 · ' + M.length + '판</div><button class="btn sm pri" id="madd3">+ 판 결과 넣기</button></div>' +
@@ -683,6 +730,10 @@ function bindTeam() {
   document.querySelectorAll('[data-tpre]').forEach((b) => (b.onclick = () => { const [mi, re, n] = b.dataset.tpre.split(',').map(Number); saveTri({ min: mi, rest: re, n }); }));
   const tc = $('#ttcp'); if (tc) tc.onclick = () => copy(triCopy(g));
   const tcal = $('#ttcal'); if (tcal) tcal.onclick = () => triCal(g);
+  const saveRot = async (patch) => { g.rot = Object.assign(rotOf(g), patch); render(); await putGame(g); };
+  document.querySelectorAll('[data-rot]').forEach((el) => (el.onchange = () => { const k = el.dataset.rot; saveRot({ [k]: k === 'start' ? el.value : Math.max(+el.min, Math.min(+el.max, +el.value || 0)) }); }));
+  const rc = $('#rtcp'); if (rc) rc.onclick = () => copy(rotCopy(g));
+  const rcal = $('#rtcal'); if (rcal) rcal.onclick = () => rotCal(g);
   document.querySelectorAll('[data-mdel]').forEach((b) => (b.onclick = async () => { const i = +b.dataset.mdel; if (!confirm((i + 1) + '판 기록을 지울까요?')) return; g.matches = g.matches.filter((_, j) => j !== i); render(); await putGame(g); }));
   ['#mk', '#mk2', '#mk3'].forEach((id) => { const b = $(id); if (b) b.onclick = mk; });
   const pb = $('#pubT'); if (pb) pb.onclick = async () => { g.teamsPublic = !g.teamsPublic; render(); await putGame(g); toast(g.teamsPublic ? '회원 화면에 팀이 보여요' : '회원 화면에서 팀을 숨겼어요'); };
@@ -762,7 +813,7 @@ function pubData() {
   const games = S.games.filter((g) => g.date >= t).slice(0, 2).map((g) => {
     const a = attOf(g);
     return { id: g.id, date: g.date, postponed: !!g.postponed, time: g.time || '', cap: g.cap || S.cfg.cap, deadline: g.deadline || '', attend: a,
-             guests: C.guestNames(S.txs, g.id, a), teams: g.teamsPublic && g.teams ? g.teams.map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0).join('|')) : [], matches: g.teamsPublic && g.matches ? g.matches : [], tri: g.teamsPublic && g.teams && g.teams.length >= 3 ? triOf(g) : null };
+             guests: C.guestNames(S.txs, g.id, a), teams: g.teamsPublic && g.teams ? g.teams.map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0).join('|')) : [], matches: g.teamsPublic && g.matches ? g.matches : [], tri: g.teamsPublic && g.teams && g.teams.length >= 3 ? triOf(g) : null, rot: g.teamsPublic && g.teams && g.teams.length === 2 && needRot(rotTeams(g)) ? rotOf(g) : null };
   });
   const past = S.games.filter((g) => g.date < t && !g.postponed);
   const records = {};

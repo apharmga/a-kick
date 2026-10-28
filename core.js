@@ -512,6 +512,32 @@
     var total = n * min + (n - 1) * rest - early;
     return { rows: R, min: min, rest: rest, n: n, early: early, end: hm(m0 + total), total: total, play: play, fair: n % 3 === 0 };
   }
+  /** 2팀 교대(로테이션): 한 팀이 F명(구장 최대 인원)보다 많으면 구간마다 순서대로 쉼
+   *  teams [[이름…],[이름…]] · F 한 팀 최대 인원 · t {min, rest, n, early, start} → 구간별 쉬는 사람 */
+  function rotPlan(teams, F, t) {
+    var P = triPlan(t), bench = teams.map(function (x) { return Math.max(0, x.length - F); });
+    var rows = P.rows.map(function (r) {
+      return { i: r.i, s: r.s, e: r.e, len: r.len, off: teams.map(function (x, ti) { var o = []; for (var j = 0; j < bench[ti]; j++) o.push(x[(r.i * bench[ti] + j) % x.length]); return o; }) };
+    });
+    var cnt = teams.map(function (x, ti) { var c = {}; x.forEach(function (nm) { c[nm] = 0; }); rows.forEach(function (r) { r.off[ti].forEach(function (nm) { c[nm]++; }); }); return c; });
+    var fair = cnt.every(function (c) { var v = Object.keys(c).map(function (k) { return c[k]; }); return !v.length || Math.max.apply(null, v) === Math.min.apply(null, v); });
+    return { rows: rows, min: P.min, rest: P.rest, n: P.n, early: P.early, end: P.end, total: P.total, bench: bench, count: cnt, fair: fair };
+  }
+  /** 교대가 모두에게 공평해지는 구간 수 (팀 7명·1명 휴식 → 7구간) */
+  function rotN(teams, F) {
+    var g = function (a, b) { return b ? g(b, a % b) : a; }, l = 1;
+    teams.forEach(function (x) { var b = x.length - F; if (b > 0) { var k = x.length / g(x.length, b); l = l * k / g(l, k); } });
+    return l > 1 && l <= 12 ? l : Math.max.apply(null, teams.map(function (x) { return x.length; }));
+  }
+  /** 인원 → '6대6 가능 · 교대 2명 · 3파전 가능' 같은 안내 */
+  function sideLabel(total, perSide, maxSide) {
+    var p = perSide || 5, mx = maxSide || p + 1;
+    if (total < p * 2) return (p * 2 - total) + '명 더 필요';
+    var k = Math.min(Math.floor(total / 2), mx), extra = total - k * 2, out = k + '대' + k + ' 가능';
+    if (extra > 0 && k === mx) out += ' · 교대 ' + extra + '명';
+    if (mx <= 6 && total >= p * 3) out += ' · 3파전 가능';
+    return out;
+  }
   /** 3파전 순위: matches [{a,b,sa,sb}] (a·b = 팀 번호 0·1·2) → 승점(승3·무1) · 골득실 · 다득점 순 */
   function standings(n, matches) {
     var R = []; for (var i = 0; i < n; i++) R.push({ t: i, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 });
@@ -577,8 +603,8 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.81';
-  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, triPlan: triPlan, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
+  var VERSION = 'v0.82';
+  var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, triPlan: triPlan, rotPlan: rotPlan, rotN: rotN, sideLabel: sideLabel, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
     balance: balance, book: book, nearestGame: nearestGame, nextGameAfter: nextGameAfter, gamesInMonth: gamesInMonth,

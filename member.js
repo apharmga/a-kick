@@ -585,6 +585,7 @@ function render() {
   document.querySelectorAll('[data-gadd]').forEach((b) => (b.onclick = () => openGoal(b.dataset.gadd)));
   document.querySelectorAll('[data-wk]').forEach((b) => (b.onclick = () => loadWorkout(b.dataset.wk)));
   document.querySelectorAll('[data-talarm]').forEach((b) => (b.onclick = () => myTriAlarms(b.dataset.talarm)));
+  document.querySelectorAll('[data-ralarm]').forEach((b) => (b.onclick = () => myRotAlarms(b.dataset.ralarm)));
   const wr = $('#wxr'); if (wr) wr.onclick = wxManual;
   document.querySelectorAll('[data-gdel]').forEach((b) => (b.onclick = async () => { if (confirm('이 골 기록을 지울까요?')) await deleteDoc(CD('goals', b.dataset.gdel)).catch((e) => toast('삭제 실패: ' + e.message)); }));
   document.querySelectorAll('[data-sort]').forEach((h) => (h.onclick = () => { const [tb, k] = h.dataset.sort.split(':'), st = S.sort[tb] || {}; S.sort[tb] = st.k === k ? { k, d: ((st.d || 0) + 1) % 3 } : { k, d: 1 }; render(); }));
@@ -645,7 +646,7 @@ async function vote(v) {
 }
 
 const minN = () => (S.pub.perSide || 5) * 2;
-function sideTxt(total) { const p = S.pub.perSide || 5, mx = S.pub.maxSide || p + 1; if (total < p * 2) return (p * 2 - total) + '명 더 필요'; const k = Math.min(Math.floor(total / 2), mx); return k + '대' + k + ' 가능'; }
+function sideTxt(total) { return window.Core.sideLabel(total, S.pub.perSide || 5, S.pub.maxSide); }
 const FORM = { 3: [[8, 50], [30, 30], [30, 70]], 4: [[8, 50], [22, 50], [38, 28], [38, 72]], 5: [[8, 50], [20, 50], [31, 22], [31, 78], [43, 50]],
   6: [[8, 50], [19, 28], [19, 72], [30, 50], [43, 25], [43, 75]], 7: [[8, 50], [19, 28], [19, 72], [30, 22], [30, 78], [43, 36], [43, 64]],
   8: [[6, 50], [17, 22], [17, 50], [17, 78], [30, 25], [30, 50], [30, 75], [43, 50]],
@@ -707,7 +708,7 @@ function weekHTML() {
     (teams.length >= 3 ? triCard(g, teams, myTeam) : teams.length >= 2 ? '<section class="card"><div class="h2row"><h2>팀 편성</h2>' + (myTeam >= 0 ? '<span class="myteam t' + myTeam + '">나는 ' + 'ABC'[myTeam] + '팀</span>' : '') + '</div>' +
       '<div class="tl"><b class="tb">B팀 ' + teams[1].length + '명</b></div><div class="vpitch"><span class="vm"></span><span class="vc"></span><span class="vbT"></span><span class="vbB"></span>' +
       side(teams[1], false, 'b', g.id + ':1') + side(teams[0], true, 'a', g.id + ':0') + '</div><div class="tl"><b class="ta">A팀 ' + teams[0].length + '명</b></div>' +
-      (teams[2] ? '<div class="muted">C팀 (대기): ' + esc(teams[2].join(', ')) + '</div>' : '') + '</section>'
+      (teams[2] ? '<div class="muted">C팀 (대기): ' + esc(teams[2].join(', ')) + '</div>' : '') + rotCard(g, teams, myTeam) + '</section>'
       : '<section class="card soft"><h2>팀 편성</h2><p class="muted">관리자가 팀을 짜면 여기에 경기장 그림으로 보여요.</p></section>') + lastRecHTML() + weekTxHTML() +
     '<p class="muted center-t">이름을 잘못 골랐다면 관리자에게 연결 해제를 부탁하세요.</p><div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button></div></main>';
 }
@@ -873,6 +874,29 @@ function triTime(g, my) {
   return '<h3 class="h3s">⏱ 타임테이블 · ' + P.min + '분 × ' + P.n + '판</h3><div class="trule">' + (my >= 0 ? '나는 <b>' + TC[my] + '팀</b> · ' + mine + '판 뛰고 ' + (P.n - mine) + '판 쉬어요 · ' : '') + '판 사이 ' + P.rest + '분 휴식 · ' + P.end + ' 종료</div>' +
     '<table class="ttab"><tbody>' + P.rows.map((r) => { const me = my === r.a || my === r.b, off = my === r.off;
       return '<tr class="' + (me ? 'play' : off ? 'rest' : '') + '"><td>' + (r.i + 1) + '판</td><td>' + r.s + '</td><td><b class="tn t' + r.a + '">' + TC[r.a] + '</b> : <b class="tn t' + r.b + '">' + TC[r.b] + '</b></td><td>' + (my < 0 ? '<small>' + TC[r.off] + ' 휴식</small>' : me ? '<em class="tp1">경기</em>' : '<em class="tp0">휴식</em>') + '</td></tr>'; }).join('') + '</tbody></table>';
+}
+/** 2팀 교대 타임테이블 (한 팀이 구장 최대 인원보다 많을 때) · 내가 쉬는 구간 강조 */
+function rotPlanOf(g, teams) { const F = S.pub.maxSide || (S.pub.perSide || 5) + 1; return window.Core.rotPlan(teams.slice(0, 2), F, g.rot); }
+function rotCard(g, teams, my) {
+  if (!g.rot || teams.length !== 2) return '';
+  const P = rotPlanOf(g, teams), F = S.pub.maxSide || 6, mine = P.rows.filter((r) => r.off.some((o) => o.indexOf(S.me.name) >= 0)).map((r) => r.i + 1);
+  return '<h3 class="h3s">🔁 교대 타임테이블 · 한 팀 ' + F + '명씩</h3><div class="trule">' + (my >= 0 ? (mine.length ? '나는 <b>' + mine.join(', ') + '구간</b>에 쉬어요 · ' : '나는 <b>계속 뛰어요</b> · ') : '') + '남는 사람이 구간마다 돌아가며 쉬어요 · ' + P.end + ' 끝</div>' +
+    '<table class="ttab"><tbody>' + P.rows.map((r) => { const me = r.off.some((o) => o.indexOf(S.me.name) >= 0);
+      return '<tr class="' + (me ? 'myrest' : '') + '"><td>' + (r.i + 1) + '구간</td><td>' + r.s + '</td><td><small>A 휴식</small> ' + (esc(r.off[0].join(', ')) || '-') + '</td><td><small>B 휴식</small> ' + (esc(r.off[1].join(', ')) || '-') + '</td></tr>'; }).join('') + '</tbody></table>' +
+    (IOS_APP && !S.demo ? '<button class="addg wkbtn" data-ralarm="' + esc(g.id) + '">⌚ 교대 알림 받기 (구간 시작·1분 전)</button>' : '');
+}
+async function myRotAlarms(gid) {
+  const g = (S.pub.games || []).find((x) => x.id === gid); if (!g || !g.rot) return;
+  const teams = (g.teams || []).map((x) => x.split('|')), P = rotPlanOf(g, teams), at = (hm) => new Date(g.date + 'T' + hm + ':00+09:00'), L = [];
+  P.rows.forEach((r) => {
+    const me = r.off.some((o) => o.indexOf(S.me.name) >= 0), who = 'A ' + (r.off[0].join(', ') || '없음') + ' · B ' + (r.off[1].join(', ') || '없음');
+    if (r.i) L.push({ at: new Date(at(r.s).getTime() - 60000), title: '⏱ 1분 뒤 ' + (r.i + 1) + '구간' + (me ? ' · 내가 쉴 차례' : ''), body: '쉴 사람: ' + who });
+    L.push({ at: at(r.s), title: '⚽ ' + (r.i + 1) + '구간 시작' + (me ? ' · 나는 휴식' : ''), body: '휴식: ' + who });
+  });
+  L.push({ at: at(P.rows[P.rows.length - 1].e), title: '🔔 경기 끝', body: '수고했어요!' });
+  tap();
+  try { const n = await scheduleAlarms(g.id + ':rot', L); if (n) achFlag('push'); toast(n ? '알림 ' + n + '개를 등록했어요 · 애플워치에도 울려요' : '이미 지난 경기라 등록할 알림이 없어요', 5000); }
+  catch (e) { toast(e.message || '알림 등록 실패', 6000); }
 }
 /** 아이폰 앱: 내 팀 기준 3파전 알림 (판 시작 · 2판부터 1분 전 · 판 종료) */
 async function myTriAlarms(gid) {
