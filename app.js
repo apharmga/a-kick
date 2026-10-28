@@ -370,8 +370,8 @@ function weekHTML() {
     const head = '<section class="panel txpanel"><div class="tbhead"><span class="g-lbl2">' + md(tg.date) + ' 팀 편성' + (T.length >= 3 ? ' (3파전)' : '') + ' · ' + (tg.teamsPublic ? '회원 공개 중' : '회원 비공개') + '</span><button class="btn sm" data-team="' + tg.id + '">' + (T.length >= 3 ? '고치기 · 판 기록' : '고치기') + '</button></div>';
     teamBox = head + (T.length >= 3
       ? '<div class="tri sm">' + T.map((t, i) => '<div class="tcol t' + i + '"><div class="tlabel t' + i + '"><b>' + TEAMC[i] + '팀 ' + t.length + '명</b></div><div class="muted">' + esc(t.join(', ')) + '</div></div>').join('') + '</div>'
-      : '<div class="tlabels"><div class="tlabel t0"><b>A팀 ' + T[0].length + '명</b></div><div class="tlabel t1"><b>B팀 ' + T[1].length + '명</b></div></div>' +
-        '<div class="pitch sm"><span class="pl-mid"></span><span class="pl-circle"></span><span class="pl-boxL"></span><span class="pl-boxR"></span>' + pitchSide(T[0], 'L', 0, tg.id, true) + pitchSide(T[1], 'R', 1, tg.id, true) + '</div>') + '</section>';
+      : '<div class="tlabels"><div class="tlabel t0"><b>A팀 ' + tCnt(T[0].length) + '</b></div><div class="tlabel t1"><b>B팀 ' + tCnt(T[1].length) + '</b></div></div>' +
+        '<div class="pitch sm"><span class="pl-mid"></span><span class="pl-circle"></span><span class="pl-boxL"></span><span class="pl-boxR"></span>' + pitchSide(T[0], 'L', 0, tg.id, true) + pitchSide(T[1], 'R', 1, tg.id, true) + '</div>' + rotNote(T)) + '</section>';
   }
   const side = wg.map(gameHTML).join('') + '<button class="newgame" data-newgame="' + days[6] + '">+ 이번 주 경기 만들기</button>';
   const ym = payYM(), list = C.membersFor(S.members, ym), paid = C.duesPaid(S.txs, ym);
@@ -586,13 +586,13 @@ function teamHTML() {
   if (!st) return head + '<div class="panel pad center2"><div>참석 <b>' + players.length + '명</b> · 실력 점수가 비슷하게, 일행은 같은 팀으로 짜요.</div><button class="btn pri" id="mk3" style="min-height:48px;padding:0 28px">팀 짜기</button></div>' + scoreList(players);
   const T = st.teams.map((t) => t.filter((n) => players.indexOf(n) >= 0));
   const sum = (t) => t.reduce((a, n) => a + scoreOf(n), 0);
-  const label = (t, i) => '<div class="tlabel t' + i + '"><b>' + TEAMC[i] + '팀 ' + t.length + '명</b><span>합 ' + sum(t) + '</span></div>';
+  const label = (t, i) => '<div class="tlabel t' + i + '"><b>' + TEAMC[i] + '팀 ' + (T.length === 2 ? tCnt(t.length) : t.length + '명') + '</b><span>합 ' + sum(t) + '</span></div>';
   if (T.length >= 3) return head + warn + '<div class="tri">' + T.map((t, i) => '<div class="tcol t' + i + '">' + label(t, i) + '<div class="tplist">' + t.map((n) => '<button class="tp' + (S.pick === n ? ' sel' : '') + '" data-pick="' + esc(n) + '">' + (numOf(n) ? '<em>' + numOf(n) + '</em>' : '') + esc(n) + '</button>').join('') + '</div></div>').join('') + '</div>' +
     '<div class="muted" style="margin:8px 0 14px">선수를 <b>꾹 눌러 끌어다</b> 다른 팀 선수 위에 놓으면 서로 바뀌어요 · 한 번씩 눌러서 바꿔도 돼요</div>' + matchPanel(g) + scoreList(players);
   const pitch = '<div class="pitchwrap"><div class="tlabels">' + label(T[0], 0) + label(T[1], 1) + '</div><div class="pitch"><span class="pl-mid"></span><span class="pl-circle"></span><span class="pl-boxL"></span><span class="pl-boxR"></span>' +
     pitchSide(T[0], 'L', 0, g.id) + pitchSide(T[1], 'R', 1, g.id) + '</div>' +
     (T[2] ? '<div class="tlabel t2" style="margin-top:10px"><b>C팀 ' + T[2].length + '명 (대기)</b><span>' + esc(T[2].join(', ')) + '</span></div>' : '') +
-    '<div class="muted" style="margin-top:8px">동그라미 숫자 = 실력 점수 · 선수를 <b>꾹 눌러 끌어다</b> 상대 팀 선수 위에 놓거나, 차례로 눌러 <b>서로 자리 바꾸기</b> · 점수는 아래에서 고쳐요</div></div>';
+    rotNote(T) + '<div class="muted" style="margin-top:8px">동그라미 숫자 = 실력 점수 · 선수를 <b>꾹 눌러 끌어다</b> 상대 팀 선수 위에 놓거나, 차례로 눌러 <b>서로 자리 바꾸기</b> · 점수는 아래에서 고쳐요</div></div>';
   return head + warn + pitch + (needRot(T) ? rotHTML(g, T) : '') + scoreList(players);
 }
 function triTxt(g) { const M = (S.games.find((x) => x.id === g.id) || {}).matches || []; if (!M.length) return '3파전'; const r = C.standings(3, M)[0]; return '3파전 ' + M.length + '판 · 1위 ' + TEAMC[r.t] + '팀 (승점 ' + r.pts + ')'; }
@@ -647,6 +647,8 @@ function triCopy(g) {
   return '⚽ ' + md(g.date) + '(' + C.dayName(g.date) + ') 3파전 타임테이블 (' + P.min + '분 × ' + P.n + '판)\n' + P.rows.map((r) => r.s + ' ' + (r.i + 1) + '판 ' + TCI[r.a] + TEAMC[r.a] + ' : ' + TCI[r.b] + TEAMC[r.b] + ' (' + TCI[r.off] + TEAMC[r.off] + ' 휴식)').join('\n') + '\n' + P.end + ' 종료\n- 판 사이 ' + P.rest + '분 휴식' + (P.fair ? ' · 모든 팀 ' + P.play[0] + '판씩 동일' : '') + '\n- 승 3점 · 무 1점 · ' + P.n + '판 후 1위 결정';
 }
 /* ---------- 2팀 교대(로테이션): 한 팀이 구장 최대 인원(maxSide)보다 많을 때 구간마다 순서대로 쉼 ---------- */
+const tCnt = (n) => n > maxSide() ? n + '명 <em class="rotb">🔁 ' + maxSide() + '명 뛰고 ' + (n - maxSide()) + '명 교대</em>' : n + '명';
+const rotNote = (T) => needRot(T) ? '<div class="rotnote">🔁 한 팀 ' + maxSide() + '명만 뛰고, 남는 사람은 구간마다 돌아가며 쉬어요 · 그림은 팀 전체 명단이에요</div>' : '';
 const needRot = (T) => T.length === 2 && Math.max(T[0].length, T[1].length) > maxSide();
 const rotTeams = (g) => (g.teams || []).slice(0, 2).map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0));
 const rotOf = (g) => Object.assign({ min: 15, rest: 2, n: C.rotN(rotTeams(g), maxSide()), early: 0, start: g.time || S.cfg.time || '16:00' }, g.rot || {});

@@ -459,3 +459,5 @@ body.pickdrag{cursor:grabbing}
 .ttab,.sttab{min-width:0}
 @media(max-width:640px){input,select,textarea,label.f input,label.f select{font-size:16px!important}.pinbox{font-size:28px!important}}
 .pinmask{-webkit-text-security:disc;text-security:disc}
+.rotb{font-style:normal;font-weight:700;font-size:12px;margin-left:6px;padding:2px 8px;border-radius:999px;background:#FFF4E5;color:#9A3412;white-space:nowrap}
+.rotnote{margin-top:8px;padding:8px 12px;border-radius:10px;background:#FFF4E5;color:#9A3412;font-size:13px;font-weight:600}

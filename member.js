@@ -706,8 +706,8 @@ function weekHTML() {
     '<div class="cnt"><span>지금 <b>' + total + '명</b> · 회원 ' + att.length + ' + 게스트 ' + (g.guests || []).length + '</span><em class="' + (total >= minN() ? 'ok' : 'low') + '">' + status + '</em></div>' +
     '<div class="names">' + att.map((n) => '<span class="' + (n === S.me.name ? 'me' : '') + '">' + lvPill(lvOfName(n)) + esc(n) + '</span>').join('') + ((g.guests || []).length ? '<span class="g">게스트 ' + g.guests.length + '명</span>' : '') + '</div></section>' +
     (teams.length >= 3 ? triCard(g, teams, myTeam) : teams.length >= 2 ? '<section class="card"><div class="h2row"><h2>팀 편성</h2>' + (myTeam >= 0 ? '<span class="myteam t' + myTeam + '">나는 ' + 'ABC'[myTeam] + '팀</span>' : '') + '</div>' +
-      '<div class="tl"><b class="tb">B팀 ' + teams[1].length + '명</b></div><div class="vpitch"><span class="vm"></span><span class="vc"></span><span class="vbT"></span><span class="vbB"></span>' +
-      side(teams[1], false, 'b', g.id + ':1') + side(teams[0], true, 'a', g.id + ':0') + '</div><div class="tl"><b class="ta">A팀 ' + teams[0].length + '명</b></div>' +
+      '<div class="tl"><b class="tb">B팀 ' + mCnt(g, teams[1].length) + '</b></div><div class="vpitch"><span class="vm"></span><span class="vc"></span><span class="vbT"></span><span class="vbB"></span>' +
+      side(teams[1], false, 'b', g.id + ':1') + side(teams[0], true, 'a', g.id + ':0') + '</div><div class="tl"><b class="ta">A팀 ' + mCnt(g, teams[0].length) + '</b></div>' +
       (teams[2] ? '<div class="muted">C팀 (대기): ' + esc(teams[2].join(', ')) + '</div>' : '') + rotCard(g, teams, myTeam) + '</section>'
       : '<section class="card soft"><h2>팀 편성</h2><p class="muted">관리자가 팀을 짜면 여기에 경기장 그림으로 보여요.</p></section>') + lastRecHTML() + weekTxHTML() +
     '<p class="muted center-t">이름을 잘못 골랐다면 관리자에게 연결 해제를 부탁하세요.</p><div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button></div></main>';
@@ -876,6 +876,8 @@ function triTime(g, my) {
       return '<tr class="' + (me ? 'play' : off ? 'rest' : '') + '"><td>' + (r.i + 1) + '판</td><td>' + r.s + '</td><td><b class="tn t' + r.a + '">' + TC[r.a] + '</b> : <b class="tn t' + r.b + '">' + TC[r.b] + '</b></td><td>' + (my < 0 ? '<small>' + TC[r.off] + ' 휴식</small>' : me ? '<em class="tp1">경기</em>' : '<em class="tp0">휴식</em>') + '</td></tr>'; }).join('') + '</tbody></table>';
 }
 /** 2팀 교대 타임테이블 (한 팀이 구장 최대 인원보다 많을 때) · 내가 쉬는 구간 강조 */
+const mF = () => S.pub.maxSide || (S.pub.perSide || 5) + 1;
+const mCnt = (g, n) => g.rot && n > mF() ? n + '명 <em class="rotb">🔁 ' + mF() + '명 뛰고 ' + (n - mF()) + '명 교대</em>' : n + '명';
 function rotPlanOf(g, teams) { const F = S.pub.maxSide || (S.pub.perSide || 5) + 1; return window.Core.rotPlan(teams.slice(0, 2), F, g.rot); }
 function rotCard(g, teams, my) {
   if (!g.rot || teams.length !== 2) return '';
