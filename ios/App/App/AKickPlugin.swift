@@ -62,7 +62,8 @@ public class AKickPlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationController
             return
         }
         let name = [cred.fullName?.familyName, cred.fullName?.givenName].compactMap { $0 }.joined()
-        call.resolve(["idToken": token, "rawNonce": appleNonce, "email": cred.email ?? "", "name": name])
+        let code = cred.authorizationCode.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        call.resolve(["idToken": token, "rawNonce": appleNonce, "authorizationCode": code, "email": cred.email ?? "", "name": name])
     }
 
     public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {

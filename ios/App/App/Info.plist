@@ -79,6 +79,8 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>관리자가 [지금 내 위치]를 누르면 그 자리를 구장 위치로 저장해 경기 날씨를 알려드려요. 회원 위치는 쓰지 않아요.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>경기 시간에 애플워치로 기록한 운동(소모 칼로리·거리)을 불러와 내 경기 기록에 남기기 위해 사용합니다.</string>
 	<key>NSHealthUpdateUsageDescription</key>
