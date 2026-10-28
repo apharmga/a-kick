@@ -32,3 +32,57 @@ jobs:
             AKICK_GOOGLE_URL_SCHEME="${{ vars.AKICK_GOOGLE_URL_SCHEME }}" \
             build | tail -80
           test -d build/Build/Products/Debug-iphonesimulator/App.app && echo "BUILD OK"
+
+  testflight:
+    name: TestFlight 업로드 (애플 개발자 결제 후)
+    if: github.event_name == 'workflow_dispatch'
+    needs: simulator
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - name: 설정 확인
+        run: |
+          for v in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 TEAM_ID; do
+            if [ -z "${!v}" ]; then echo "::error::GitHub 비밀값 $v 가 없어요 (애플 개발자 결제 후 등록)"; exit 1; fi
+          done
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app || true
+      - name: 패키지 설치 + Capacitor 동기화
+        run: |
+          npm ci
+          npx cap sync ios
+      - name: API 키 파일
+        run: |
+          mkdir -p ~/private_keys
+          printf '%s' "$ASC_KEY_P8" > ~/private_keys/AuthKey_$ASC_KEY_ID.p8
+      - name: 아카이브 (자동 서명)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/App.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_$ASC_KEY_ID.p8 \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            AKICK_GOOGLE_CLIENT_ID="${{ vars.AKICK_GOOGLE_CLIENT_ID }}" \
+            AKICK_GOOGLE_URL_SCHEME="${{ vars.AKICK_GOOGLE_URL_SCHEME }}" \
+            archive | tail -60
+      - name: App Store Connect로 업로드
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :method string app-store-connect" \
+            -c "Add :destination string upload" -c "Add :teamID string $TEAM_ID" \
+            -c "Add :signingStyle string automatic" -c "Add :manageAppVersionAndBuildNumber bool false" build/ExportOptions.plist
+          xcodebuild -exportArchive -archivePath build/App.xcarchive -exportPath build/export \
+            -exportOptionsPlist build/ExportOptions.plist -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_$ASC_KEY_ID.p8 \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" | tail -40
+          echo "업로드 완료 · 10~30분 뒤 TestFlight에 빌드 ${{ github.run_number }} 가 나타나요"
