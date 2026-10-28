@@ -28,8 +28,6 @@ jobs:
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
-            AKICK_GOOGLE_CLIENT_ID="${{ vars.AKICK_GOOGLE_CLIENT_ID }}" \
-            AKICK_GOOGLE_URL_SCHEME="${{ vars.AKICK_GOOGLE_URL_SCHEME }}" \
             build | tail -80
           test -d build/Build/Products/Debug-iphonesimulator/App.app && echo "BUILD OK"
 
@@ -73,8 +71,6 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            AKICK_GOOGLE_CLIENT_ID="${{ vars.AKICK_GOOGLE_CLIENT_ID }}" \
-            AKICK_GOOGLE_URL_SCHEME="${{ vars.AKICK_GOOGLE_URL_SCHEME }}" \
             archive | tail -60
       - name: App Store Connect로 업로드
         run: |
