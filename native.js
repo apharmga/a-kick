@@ -96,3 +96,12 @@ export async function workoutFor(start, end) {
 
 /** 가벼운 진동 (버튼 누름 등) */
 export function tap() { if (IOS_APP) call('Haptics', 'impact', { style: 'LIGHT' }).catch(() => {}); }
+
+/* ---------- 홈 화면 위젯 ---------- */
+/** 다음 경기 정보를 위젯에 넘김 (같은 내용이면 다시 안 보냄) */
+let lastW = '';
+export function setWidget(d) {
+  if (!IOS_APP) return;
+  const j = JSON.stringify(d || {}); if (j === lastW) return; lastW = j;
+  call('AKick', 'setWidget', { json: j }).catch(() => {});
+}

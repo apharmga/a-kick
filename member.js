@@ -2,7 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, deleteUser } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, doc, getDoc as _getDoc, setDoc as _setDoc, deleteDoc as _deleteDoc, writeBatch as _writeBatch, onSnapshot as _onSnapshot, query, where, getDocs as _getDocs, addDoc as _addDoc, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { demoData } from './demo.js';
-import { IOS_APP, STORE_APP, nativeSignIn, signInButtons, providerOf, workoutFor, tap, revokeApple } from './native.js';
+import { IOS_APP, STORE_APP, nativeSignIn, signInButtons, providerOf, workoutFor, tap, revokeApple, scheduleAlarms, setWidget } from './native.js';
 /* 체험 팀(로그인 없이 둘러보기): 서버를 읽지도 쓰지도 않음. 누른 건 화면에만 반영되고 저장 안 됨 */
 const DEMO_MSG = '체험 팀이라 저장되지 않아요 · 내 팀을 만들면 진짜로 저장돼요';
 let tapAt = 0; addEventListener('pointerdown', () => (tapAt = Date.now()), true);
@@ -573,6 +573,7 @@ function render() {
   const ch = $('#change'); if (ch) ch.onclick = async () => { S.me = null; render(); };
   document.querySelectorAll('[data-gadd]').forEach((b) => (b.onclick = () => openGoal(b.dataset.gadd)));
   document.querySelectorAll('[data-wk]').forEach((b) => (b.onclick = () => loadWorkout(b.dataset.wk)));
+  document.querySelectorAll('[data-talarm]').forEach((b) => (b.onclick = () => myTriAlarms(b.dataset.talarm)));
   document.querySelectorAll('[data-gdel]').forEach((b) => (b.onclick = async () => { if (confirm('이 골 기록을 지울까요?')) await deleteDoc(CD('goals', b.dataset.gdel)).catch((e) => toast('삭제 실패: ' + e.message)); }));
   document.querySelectorAll('[data-sort]').forEach((h) => (h.onclick = () => { const [tb, k] = h.dataset.sort.split(':'), st = S.sort[tb] || {}; S.sort[tb] = st.k === k ? { k, d: ((st.d || 0) + 1) % 3 } : { k, d: 1 }; render(); }));
   document.querySelectorAll('[data-poll]').forEach((b) => (b.onclick = () => openPoll(b.dataset.poll)));
@@ -700,6 +701,7 @@ function weekHTML() {
 }
 function myStat() { return window.Core.statTable(played(), S.goals || [], '', [S.me.name]).find((x) => x.name === S.me.name); }
 function homeHTML() {
+  if (IOS_APP && !S.demo) widgetSync();
   const g = game(), d = S.pub.dues, txs = S.pub.txs || [], bal = txs.length ? txs[txs.length - 1].bal : 0;
   const r = (S.pub.records || {})[S.me.name] || { total: 0, came: 0 }, rate = r.total ? Math.round(r.came / r.total * 100) : 0;
   const paid = d.paid.indexOf(S.me.name) >= 0, due = paid || d.unpaid.indexOf(S.me.name) >= 0;
@@ -728,6 +730,14 @@ function homeHTML() {
     '<button class="sugbtn" id="sug">💬 우리 팀 총무에게 건의하기</button>' +
     (S.owner ? '<a class="bigbtn" href="admin.html?c=' + esc(S.cid) + '">관리자 페이지</a>' : '') +
     '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button>' + (IOS_APP ? '' : '<button class="link" id="ntf">🔔 알림</button>') + '</div><div class="links"><button class="link" id="dev">💌 앱 개발자에게 건의</button>' + (STORE_APP ? '' : '<button class="link" id="dona">☕ A-KICK 후원</button>') + '</div><div class="links"><a class="link" href="privacy.html">개인정보처리방침</a><a class="link" href="terms.html">이용약관</a></div></main>';
+}
+/** 아이폰 홈 화면 위젯: 다음 경기 · 참석 인원 · 내 응답 */
+function widgetSync() {
+  const g = game();
+  if (!g) return setWidget({ club: clubName(), none: 1 });
+  const att = attendOf(g), mine = S.votes[S.me.name], amIn = att.indexOf(S.me.name) >= 0;
+  setWidget({ club: clubName(), cid: S.cid, date: g.date, time: String(g.time || '').substr(0, 5), place: S.pub.place || '',
+    count: att.length + (g.guests || []).length, mine: amIn ? '참석' : mine && mine.v === '불참' ? '불참' : '미응답' });
 }
 function duesHTML() {
   const d = S.pub.dues, paid = d.paid.indexOf(S.me.name) >= 0, due = paid || d.unpaid.indexOf(S.me.name) >= 0;
@@ -852,11 +862,26 @@ function triTime(g, my) {
     '<table class="ttab"><tbody>' + P.rows.map((r) => { const me = my === r.a || my === r.b, off = my === r.off;
       return '<tr class="' + (me ? 'play' : off ? 'rest' : '') + '"><td>' + (r.i + 1) + '판</td><td>' + r.s + '</td><td><b class="tn t' + r.a + '">' + TC[r.a] + '</b> : <b class="tn t' + r.b + '">' + TC[r.b] + '</b></td><td>' + (my < 0 ? '<small>' + TC[r.off] + ' 휴식</small>' : me ? '<em class="tp1">경기</em>' : '<em class="tp0">휴식</em>') + '</td></tr>'; }).join('') + '</tbody></table>';
 }
+/** 아이폰 앱: 내 팀 기준 3파전 알림 (판 시작 · 2판부터 1분 전 · 판 종료) */
+async function myTriAlarms(gid) {
+  const g = (S.pub.games || []).find((x) => x.id === gid); if (!g || !g.tri) return;
+  const T = (g.teams || []).map((x) => x.split('|')), my = T.findIndex((t) => t.indexOf(S.me.name) >= 0);
+  const P = window.Core.triPlan(g.tri), at = (hm) => new Date(g.date + 'T' + hm + ':00+09:00'), L = [];
+  P.rows.forEach((r) => {
+    const vs = TC[r.a] + ':' + TC[r.b], me = my === r.a || my === r.b, tag = my < 0 ? '' : me ? ' · 내 팀 출전' : ' · 내 팀 휴식';
+    if (r.i) L.push({ at: new Date(at(r.s).getTime() - 60000), title: '⏱ ' + (r.i + 1) + '판 1분 전' + tag, body: vs + ' (' + TC[r.off] + ' 휴식)' });
+    L.push({ at: at(r.s), title: '⚽ ' + (r.i + 1) + '판 시작' + tag, body: vs + ' (' + TC[r.off] + ' 휴식)' });
+    L.push({ at: at(r.e), title: '🔔 ' + (r.i + 1) + '판 종료', body: r.i + 1 < P.rows.length ? '휴식 · 다음 판 ' + P.rows[r.i + 1].s : '오늘 경기 끝! 수고했어요' });
+  });
+  tap();
+  try { const n = await scheduleAlarms(g.id, L); if (n) achFlag('push'); toast(n ? '알림 ' + n + '개를 등록했어요 · 애플워치에도 울려요' : '이미 지난 경기라 등록할 알림이 없어요', 5000); }
+  catch (e) { toast(e.message || '알림 등록 실패', 6000); }
+}
 function triCard(g, teams, myTeam) {
   const M = g.matches || [];
   return '<section class="card"><div class="h2row"><h2>팀 편성 · 3파전</h2>' + (myTeam >= 0 ? '<span class="myteam t' + myTeam + '">나는 ' + TC[myTeam] + '팀</span>' : '') + '</div>' +
     '<div class="tri">' + teams.map((t, i) => '<div class="tcol t' + i + (i === myTeam ? ' mine' : '') + '"><b class="tn t' + i + '">' + TC[i] + '팀 <small>' + t.length + '명</small></b><ul>' + t.map((n) => '<li class="' + (n === S.me.name ? 'me' : '') + '">' + ((profOf(n) || {}).num ? '<em>' + profOf(n).num + '</em>' : '') + esc(n) + '</li>').join('') + '</ul></div>').join('') + '</div>' +
-    triTime(g, myTeam) +
+    triTime(g, myTeam) + (IOS_APP && !S.demo && g.tri ? '<button class="addg wkbtn" data-talarm="' + esc(g.id) + '">⌚ 3파전 알림 받기 (판 시작·종료)</button>' : '') +
     (M.length ? '<h3 class="h3s">오늘의 3파전 순위</h3>' + triTable(M) : '<p class="muted" style="margin-top:8px">경기가 시작되면 판 결과와 순위가 여기에 떠요.</p>') + '</section>';
 }
 function lastRecHTML() {
@@ -978,6 +1003,7 @@ const ACH = [
   ['ny', '특별', 'S', '🎍', '새해 첫 킥', '1월 1일에 접속', 'ny', 1, 1], ['yr1', '특별', 'G', '🎂', '1주년', '팀 가입 1년', 'yr', 365],
   ['plat', '특별', 'P', '💎', 'A-KICK 플래티넘', '다른 업적 49개 모두 달성', 'got', 49]
 ];
+if (IOS_APP) ACH.forEach((a) => { if (a[0] === 'inst') { a[4] = '앱 설치'; a[5] = 'A-KICK 앱으로 접속'; } if (a[0] === 'push') { a[5] = '3파전 경기 알림 받기'; } });
 let A = null, achSaveT = null, achT = null;
 const achRef = () => doc(db, 'ach', S.uid);
 function achSave() { clearTimeout(achSaveT); achSaveT = setTimeout(() => setDoc(achRef(), A).catch((e) => logErr('업적 저장 실패: ' + e.message)), 800); }
