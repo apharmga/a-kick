@@ -3,6 +3,7 @@ import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPop
 import { getFirestore, collection, doc, getDocs as _getDocs, getDoc as _getDoc, setDoc as _setDoc, deleteDoc as _deleteDoc, writeBatch as _writeBatch, onSnapshot as _onSnapshot, addDoc as _addDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { demoAdmin } from './demo.js';
 import { mountCoach } from './coach.js';
+import { IOS_APP, nativeSignIn, providerOf, scheduleAlarms } from './native.js';
 /* 관리자 체험 (admin.html?demo=1): 서버 대신 메모리 속 샘플 데이터를 읽고 씀 · 새로고침하면 처음 상태로 */
 const DEMO = new URLSearchParams(location.search).get('demo') === '1';
 const MEM = DEMO ? demoAdmin() : null;
@@ -120,7 +121,7 @@ function pinGate(hash) {
   };
   // 잊었을 때: 팀을 만든 구글 계정으로 한 번 더 로그인하면 새 비밀번호를 정할 수 있음
   $('#pinlost').onclick = async () => {
-    try { const r = await signInWithPopup(auth, new GoogleAuthProvider()); if (r.user.uid !== S.club.owner) return toast('팀을 만든 구글 계정으로 로그인해 주세요'); }
+    try { const r = IOS_APP ? await nativeSignIn(auth, providerOf(auth.currentUser)) : await signInWithPopup(auth, new GoogleAuthProvider()); if (!r) return toast('확인을 취소했어요'); if (r.user.uid !== S.club.owner) return toast('팀을 만든 계정으로 로그인해 주세요'); }
     catch (e) { return toast('확인을 취소했어요'); }
     const np = prompt('새 관리자 비밀번호 (숫자 4자리)') || '';
     if (!/^\d{4}$/.test(np)) return toast('숫자 4자리로 해주세요');
@@ -624,9 +625,22 @@ function triIcs(g) {
     .concat(ev, ['END:VCALENDAR']).join('\r\n');
 }
 function triCal(g) {
+  if (IOS_APP) return triAlarms(g);
   const url = URL.createObjectURL(new Blob([triIcs(g)], { type: 'text/calendar;charset=utf-8' })), a = document.createElement('a');
   a.href = url; a.download = 'A-KICK_' + g.date + '_3파전.ics'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
   toast('캘린더 파일을 받았어요 · 열어서 [모두 추가]를 누르면 판 시작·종료 정시, 그리고 2판부터는 시작 1분 전에도 알림이 와요', 6000);
+}
+/** 아이폰 앱: 캘린더 파일 대신 앱 알림으로 바로 등록 (판 시작 · 2판부터 1분 전 · 판 종료) */
+async function triAlarms(g) {
+  const P = C.triPlan(triOf(g)), at = (hm) => new Date(g.date + 'T' + hm + ':00+09:00'), L = [];
+  P.rows.forEach((r) => {
+    const vs = TEAMC[r.a] + ':' + TEAMC[r.b];
+    if (r.i) L.push({ at: new Date(at(r.s).getTime() - 60000), title: '⏱ ' + (r.i + 1) + '판 1분 전', body: '준비해요 · ' + vs + ' (' + TEAMC[r.off] + ' 휴식)' });
+    L.push({ at: at(r.s), title: '⚽ ' + (r.i + 1) + '판 시작', body: vs + ' (' + TEAMC[r.off] + ' 휴식)' });
+    L.push({ at: at(r.e), title: '🔔 ' + (r.i + 1) + '판 종료', body: r.i + 1 < P.rows.length ? '휴식 · 다음 판 ' + P.rows[r.i + 1].s : '오늘 경기 끝! 수고했어요' });
+  });
+  try { const n = await scheduleAlarms(g.id, L); toast(n ? '알림 ' + n + '개를 등록했어요 · 애플워치에도 그대로 울려요' : '이미 지난 경기라 등록할 알림이 없어요', 5000); }
+  catch (e) { toast(e.message || '알림 등록 실패', 6000); }
 }
 function triCopy(g) {
   const t = triOf(g), P = C.triPlan(t);

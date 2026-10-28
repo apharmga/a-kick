@@ -2,6 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, deleteUser } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, doc, getDoc as _getDoc, setDoc as _setDoc, deleteDoc as _deleteDoc, writeBatch as _writeBatch, onSnapshot as _onSnapshot, query, where, getDocs as _getDocs, addDoc as _addDoc, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { demoData } from './demo.js';
+import { IOS_APP, nativeSignIn, signInButtons, providerOf, workoutFor, tap } from './native.js';
 /* 체험 팀(로그인 없이 둘러보기): 서버를 읽지도 쓰지도 않음. 누른 건 화면에만 반영되고 저장 안 됨 */
 const DEMO_MSG = '체험 팀이라 저장되지 않아요 · 내 팀을 만들면 진짜로 저장돼요';
 let tapAt = 0; addEventListener('pointerdown', () => (tapAt = Date.now()), true);
@@ -87,8 +88,17 @@ function renderLogin() {
         '<small>처음이면 로그인 → 이름 쓰고 가입 신청 → 관리자 승인 후 입장</small>') + DEMO_BTN + '<a class="about" href="about.html">A-KICK 소개 보기 ›</a>' + LEGAL + '</div>');
   bindDemoBtn();
   const i = $('#in'); if (i) i.onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => toast(e.code === 'auth/popup-closed-by-user' ? '로그인을 취소했어요' : '로그인 실패: ' + e.message));
+  if (IOS_APP && i) iosLogin(i);
   const x = $('#ext'); if (x) x.onclick = openOutside;
   const c = $('#cpl'); if (c) c.onclick = () => copy(location.href, '링크를 복사했어요. 사파리·크롬 주소창에 붙여넣으세요');
+}
+
+/** 아이폰 앱: 구글 팝업 대신 Apple·Google 네이티브 로그인 버튼 */
+async function iosLogin(btn) {
+  const box = document.createElement('div'); box.className = 'iosin'; box.innerHTML = await signInButtons(); btn.replaceWith(box);
+  const gb = box.querySelector('#in-google'); if (gb) gb.innerHTML = btn.innerHTML.replace('시작하기', '계속하기');
+  const go = (w) => async () => { tap(); try { await nativeSignIn(auth, w); } catch (e) { toast('로그인 실패: ' + (e.message || e)); } };
+  box.querySelectorAll('#in-apple,#in-google').forEach((b) => (b.onclick = go(b.id === 'in-apple' ? 'apple' : 'google')));
 }
 
 /* ---------------- 체험 팀 둘러보기 ---------------- */
@@ -394,7 +404,7 @@ function openLeave() {
       const rf = await getDocs(query(collection(db, 'refs'), where('uid', '==', S.uid))).catch(() => null); if (rf) for (const d of rf.docs) await deleteDoc(d.ref).catch(() => {});
       try { await deleteUser(auth.currentUser); }
       catch (e) {                                     // 오래전에 로그인했으면 한 번 더 로그인해야 지워짐
-        try { await signInWithPopup(auth, new GoogleAuthProvider()); await deleteUser(auth.currentUser); }
+        try { if (IOS_APP) { if (!(await nativeSignIn(auth, providerOf(auth.currentUser)))) throw new Error('canceled'); } else await signInWithPopup(auth, new GoogleAuthProvider()); await deleteUser(auth.currentUser); }
         catch (e2) { toast('기록은 지웠지만 로그인 정보 삭제는 실패했어요. 다시 로그인 후 한 번 더 해주세요', 7000); return; }
       }
       try { sessionStorage.setItem('akick_msg', '계정을 삭제했어요. 그동안 고마웠어요'); } catch (e) {} await signOut(auth).catch(() => {}); location.replace('./');
@@ -557,6 +567,7 @@ function render() {
   const acc = $('#acc'); if (acc) acc.onclick = () => copy(accNo(), '계좌번호를 복사했어요');
   const ch = $('#change'); if (ch) ch.onclick = async () => { S.me = null; render(); };
   document.querySelectorAll('[data-gadd]').forEach((b) => (b.onclick = () => openGoal(b.dataset.gadd)));
+  document.querySelectorAll('[data-wk]').forEach((b) => (b.onclick = () => loadWorkout(b.dataset.wk)));
   document.querySelectorAll('[data-gdel]').forEach((b) => (b.onclick = async () => { if (confirm('이 골 기록을 지울까요?')) await deleteDoc(CD('goals', b.dataset.gdel)).catch((e) => toast('삭제 실패: ' + e.message)); }));
   document.querySelectorAll('[data-sort]').forEach((h) => (h.onclick = () => { const [tb, k] = h.dataset.sort.split(':'), st = S.sort[tb] || {}; S.sort[tb] = st.k === k ? { k, d: ((st.d || 0) + 1) % 3 } : { k, d: 1 }; render(); }));
   document.querySelectorAll('[data-poll]').forEach((b) => (b.onclick = () => openPoll(b.dataset.poll)));
@@ -846,7 +857,26 @@ function triCard(g, teams, myTeam) {
 function lastRecHTML() {
   const t = ymd(new Date()), g = played().filter((x) => x.date <= t).slice(-1)[0];
   if (!g || (Date.now() - Date.parse(g.date)) / 864e5 > 7) return '';
-  return '<section class="card"><div class="h2row"><h2>경기 기록</h2><button class="more inl" data-go="rec">전체 경기기록 ›</button></div>' + gameRec(g) + '</section>';
+  return '<section class="card"><div class="h2row"><h2>경기 기록</h2><button class="more inl" data-go="rec">전체 경기기록 ›</button></div>' + gameRec(g) + wkHTML(g) + '</section>';
+}
+/** 아이폰 앱: 애플워치로 기록한 이 경기 운동(칼로리·거리) — 나만 보이는 개인 기록 */
+function wkHTML(g) {
+  if (!IOS_APP || S.demo) return '';
+  const w = A && A.kcal && A.kcal[g.id];
+  return w ? '<div class="wk"><span>⌚ 내 운동</span><b>' + w.kcal + ' kcal</b>' + (w.km ? '<b>' + w.km + ' km</b>' : '') + '<b>' + w.min + '분</b><button class="lnk" data-wk="' + esc(g.id) + '">다시 불러오기</button></div>'
+    : '<button class="addg wkbtn" data-wk="' + esc(g.id) + '">⌚ 애플워치 운동 기록 불러오기</button>';
+}
+async function loadWorkout(gid) {
+  const g = played().find((x) => x.id === gid); if (!g) return;
+  tap();
+  const t = String(g.time || '16:00').substr(0, 5), s = new Date(g.date + 'T' + t + ':00+09:00'), e = new Date(s.getTime() + 2 * 3600e3);
+  try {
+    const w = await workoutFor(s, e);
+    if (!w) return toast('이 경기 시간에 기록된 운동이 없어요 · 워치에서 운동(축구)을 켜고 뛰면 여기서 불러올 수 있어요', 6000);
+    if (!A) await achLoad();
+    A.kcal = A.kcal || {}; A.kcal[gid] = { kcal: w.kcal, km: w.km, min: w.min, at: Date.now() }; achSave();
+    toast('🔥 ' + w.kcal + 'kcal 불러왔어요'); render();
+  } catch (e) { toast('건강 앱에서 불러오지 못했어요: ' + (e.message || e), 6000); }
 }
 function gameRec(g) {
   const gs = (S.goals || []).filter((x) => x.gid === g.id), T = (g.teams || []).map((x) => x.split('|')).filter((x) => x[0]);
