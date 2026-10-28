@@ -2,7 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, deleteUser } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, doc, getDoc as _getDoc, setDoc as _setDoc, deleteDoc as _deleteDoc, writeBatch as _writeBatch, onSnapshot as _onSnapshot, query, where, getDocs as _getDocs, addDoc as _addDoc, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { demoData } from './demo.js';
-import { IOS_APP, nativeSignIn, signInButtons, providerOf, workoutFor, tap } from './native.js';
+import { IOS_APP, STORE_APP, nativeSignIn, signInButtons, providerOf, workoutFor, tap, revokeApple } from './native.js';
 /* 체험 팀(로그인 없이 둘러보기): 서버를 읽지도 쓰지도 않음. 누른 건 화면에만 반영되고 저장 안 됨 */
 const DEMO_MSG = '체험 팀이라 저장되지 않아요 · 내 팀을 만들면 진짜로 저장돼요';
 let tapAt = 0; addEventListener('pointerdown', () => (tapAt = Date.now()), true);
@@ -56,7 +56,7 @@ let installEv = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEv = e; if (S.tab === 'home' && S.pub) render(); });
 function installCard() {
   let off = false; try { off = localStorage.getItem('akick_noinstall') === '1'; } catch (e) {}
-  if (STANDALONE || off || INAPP || (!installEv && !IS_IOS)) return '';
+  if (STANDALONE || IOS_APP || off || INAPP || (!installEv && !IS_IOS)) return '';
   return '<section class="card inst"><b>📲 홈 화면에 추가하면 앱처럼 열려요</b>' +
     (installEv ? '<button class="bigbtn" id="inst">홈 화면에 추가</button>' : '<p class="muted">사파리 아래쪽 <b>공유 버튼(⬆)</b> → <b>홈 화면에 추가</b>를 눌러주세요.</p>') +
     '<button class="link" id="noinst">다시 보지 않기</button></section>';
@@ -402,6 +402,11 @@ function openLeave() {
       for (const c of cids) await wipeMine(c);
       await deleteDoc(doc(db, 'me', S.uid)).catch(() => {}); await deleteDoc(doc(db, 'ach', S.uid)).catch(() => {});
       const rf = await getDocs(query(collection(db, 'refs'), where('uid', '==', S.uid))).catch(() => null); if (rf) for (const d of rf.docs) await deleteDoc(d.ref).catch(() => {});
+      if (IOS_APP && providerOf(auth.currentUser) === 'apple') {    // Apple 로그인은 탈퇴 때 Apple 연결도 끊어야 함 (애플 규정)
+        const r = await nativeSignIn(auth, 'apple').catch(() => null);
+        if (!r) { toast('Apple 확인을 취소해서 계정 삭제를 멈췄어요. 기록은 이미 지워졌어요', 6000); return; }
+        await revokeApple(auth, r);
+      }
       try { await deleteUser(auth.currentUser); }
       catch (e) {                                     // 오래전에 로그인했으면 한 번 더 로그인해야 지워짐
         try { if (IOS_APP) { if (!(await nativeSignIn(auth, providerOf(auth.currentUser)))) throw new Error('canceled'); } else await signInWithPopup(auth, new GoogleAuthProvider()); await deleteUser(auth.currentUser); }
@@ -722,7 +727,7 @@ function homeHTML() {
       '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what + (t.pend ? ' · 통장 확인 전' : '')) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b></span></div>').join('') + '</div></section>' : '') +
     '<button class="sugbtn" id="sug">💬 우리 팀 총무에게 건의하기</button>' +
     (S.owner ? '<a class="bigbtn" href="admin.html?c=' + esc(S.cid) + '">관리자 페이지</a>' : '') +
-    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button><button class="link" id="ntf">🔔 알림</button></div><div class="links"><button class="link" id="dev">💌 앱 개발자에게 건의</button><button class="link" id="dona">☕ A-KICK 후원</button></div><div class="links"><a class="link" href="privacy.html">개인정보처리방침</a><a class="link" href="terms.html">이용약관</a></div></main>';
+    '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button>' + (IOS_APP ? '' : '<button class="link" id="ntf">🔔 알림</button>') + '</div><div class="links"><button class="link" id="dev">💌 앱 개발자에게 건의</button>' + (STORE_APP ? '' : '<button class="link" id="dona">☕ A-KICK 후원</button>') + '</div><div class="links"><a class="link" href="privacy.html">개인정보처리방침</a><a class="link" href="terms.html">이용약관</a></div></main>';
 }
 function duesHTML() {
   const d = S.pub.dues, paid = d.paid.indexOf(S.me.name) >= 0, due = paid || d.unpaid.indexOf(S.me.name) >= 0;
@@ -987,7 +992,7 @@ async function achLoad() {
 function achTick() {
   if (!A) return;
   const now = new Date(), t = ymd(now), y = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
-  if (STANDALONE) achFlag('inst');
+  if (STANDALONE || IOS_APP) achFlag('inst');
   if (A.last === t) return;
   A.streak = A.last === y ? (A.streak || 0) + 1 : 1; A.best = Math.max(A.best || 0, A.streak); A.days = (A.days || 0) + 1; A.last = t;
   if (t.substr(5) === '01-01') A.f.ny = 1;

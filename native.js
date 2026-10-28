@@ -1,10 +1,16 @@
 /* A-KICK 아이폰 앱 전용 기능 연결
  * 웹 브라우저·안드로이드(TWA)에서는 IOS_APP이 false라 아무 일도 하지 않는다.
  * 아이폰 앱(Capacitor) 안에서만: Apple/Google 로그인, 경기 알림(로컬 알림), 애플워치 운동(건강 앱) 불러오기. */
-import { GoogleAuthProvider, OAuthProvider, signInWithCredential } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { GoogleAuthProvider, OAuthProvider, signInWithCredential, revokeAccessToken } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const Cap = window.Capacitor;
 export const IOS_APP = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform() && Cap.getPlatform && Cap.getPlatform() === 'ios');
+/** 안드로이드 스토어 앱(TWA): 처음 열 때 referrer가 android-app:// 으로 옴 → 이번 실행 동안 기억 */
+let twa = false;
+try { if (/^android-app:\/\/com\.anqua\.akick/.test(document.referrer)) sessionStorage.setItem('akick_twa', '1'); twa = sessionStorage.getItem('akick_twa') === '1'; } catch (e) {}
+export const TWA_APP = twa;
+/** 스토어에서 받은 앱(아이폰·안드로이드): 스토어 결제 규정상 앱 안 후원 안내는 숨김 */
+export const STORE_APP = IOS_APP || TWA_APP;
 
 function call(plugin, method, opts) {
   const P = Cap && Cap.Plugins && Cap.Plugins[plugin];
@@ -24,7 +30,9 @@ export async function nativeSignIn(auth, which) {
     if (which === 'apple') {
       const r = await call('AKick', 'appleSignIn');
       const cred = new OAuthProvider('apple.com').credential({ idToken: r.idToken, rawNonce: r.rawNonce });
-      return await signInWithCredential(auth, cred);
+      const u = await signInWithCredential(auth, cred);
+      u.appleCode = r.authorizationCode || '';
+      return u;
     }
     const r = await call('AKick', 'googleSignIn');
     return await signInWithCredential(auth, GoogleAuthProvider.credential(r.idToken));
@@ -32,6 +40,12 @@ export async function nativeSignIn(auth, which) {
     if (canceled(e)) return null;
     throw e;
   }
+}
+
+/** 계정 삭제 때 Apple 로그인 연결 끊기 (실패해도 삭제는 계속) */
+export async function revokeApple(auth, userCred) {
+  if (!userCred || !userCred.appleCode) return false;
+  try { await revokeAccessToken(auth, userCred.appleCode); return true; } catch (e) { return false; }
 }
 
 /** 로그인 버튼 HTML (아이폰 앱에서만 사용) */

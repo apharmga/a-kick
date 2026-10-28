@@ -467,3 +467,7 @@ body.noscroll{overflow:hidden}
 .wk{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:10px;padding:10px 12px;border-radius:12px;background:#FFF4E5;font-size:14px}
 .wk span{color:#9A3412;font-weight:800}.wk b{font-variant-numeric:tabular-nums}.wk .lnk{margin-left:auto;font-size:13px;background:none;border:0;color:var(--navy);text-decoration:underline;padding:4px 0}
 .wkbtn{margin-top:8px}
+/* 노치·상태바 영역 (아이폰 앱, 홈 화면 앱) */
+.hero{padding-top:calc(20px + env(safe-area-inset-top))}
+.login{padding-top:calc(24px + env(safe-area-inset-top))}
+.demob{padding-top:calc(8px + env(safe-area-inset-top))}
