@@ -478,3 +478,8 @@ body.noscroll{overflow:hidden}
 .vin textarea{overscroll-behavior:contain}
 .wxr{border:0;background:none;color:var(--navy);font:inherit;font-weight:800;text-decoration:underline;padding:4px 2px;cursor:pointer}
 .wxr:disabled{color:var(--sub);text-decoration:none}
+/* 하이라이트 창이 열려 있는 동안 뒤 화면(아래 탭바 등)이 사파리 반투명 바 사이로 비치지 않게 */
+html:has(body.noscroll),body.noscroll{background:#0B1220}
+body.noscroll .tabs,body.noscroll .demob{visibility:hidden}
+.vov.kb .vtop{padding:6px 12px}.vov.kb .vtop small{display:none}.vov.kb .vx{width:32px;height:32px;font-size:20px}
+.vov.kb .vplay{height:18vh;min-height:96px}
