@@ -1513,45 +1513,59 @@ function bindLedger() {
   }));
 }
 
-/** 월 정산 원형그래프 이미지 (카톡에 붙여넣기용) */
+/** 월 정산 원형그래프 이미지 (카톡에 붙여넣기용) — 지금 팀 테마 색을 그대로 씀 */
 function settleCanvas(ym) {
   const x = C.book(S.txs, S.games, ym), end = S.txs.filter((t) => C.ymOf(t.dt) <= ym), bal = end.length ? C.balance(end) : 0;
   const inc = x.fee + x.guest + x.etcIn, out = x.field + x.etcOut;
-  const W = 900, H = 1060, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-  const c = cv.getContext('2d'), F = (w, px) => w + ' ' + px + 'px "Pretendard","Noto Sans KR","Apple SD Gothic Neo",sans-serif';
-  c.fillStyle = '#F4F6FA'; c.fillRect(0, 0, W, H);
-  c.fillStyle = '#14306B'; c.fillRect(0, 0, W, 150);
-  c.fillStyle = '#fff'; c.font = F(900, 46); c.fillText('📒 ' + mon(ym) + ' 모임통장 정산', 50, 92);
-  c.font = F(500, 24); c.fillStyle = '#C9D4F0'; c.fillText(S.club.name || '', 52, 130);
-  const donut = (cx, title, total, sign, items) => {
-    const cy = 420, R = 150, r = 92;
-    c.fillStyle = '#fff'; roundRect(c, cx - 210, 185, 420, 615, 28); c.fill();
-    c.fillStyle = '#101828'; c.font = F(800, 30); c.textAlign = 'center'; c.fillText(title, cx, 238);
-    const sum = items.reduce((a, it) => a + it[1], 0);
-    let a0 = -Math.PI / 2;
-    if (!sum) { c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.arc(cx, cy, r, 0, Math.PI * 2, true); c.fillStyle = '#E4E7EC'; c.fill(); }
-    items.filter((it) => it[1] > 0).forEach((it) => {
-      const a1 = a0 + (it[1] / sum) * Math.PI * 2;
-      c.beginPath(); c.arc(cx, cy, R, a0, a1); c.arc(cx, cy, r, a1, a0, true); c.closePath(); c.fillStyle = it[2]; c.fill();
-      c.strokeStyle = '#fff'; c.lineWidth = 3; c.stroke(); a0 = a1;
-    });
-    c.fillStyle = '#667085'; c.font = F(600, 22); c.fillText('합계', cx, cy - 12);
-    c.fillStyle = '#101828'; c.font = F(900, 34); c.fillText(sign + won(total), cx, cy + 30);
-    c.textAlign = 'left';
+  const cs = getComputedStyle(document.documentElement), V = (k, d) => (cs.getPropertyValue(k) || '').trim() || d;
+  const ink = V('--navy', '#1E3A8A'), acc = V('--acc', '#60A5FA'), onH = V('--on-hdr', '#FFFFFF');
+  const gc = (V('--grad', ink).match(/#[0-9a-fA-F]{3,6}/g) || [ink]); while (gc.length < 3) gc.push(gc[gc.length - 1]);
+  const W = 1080, H = 1350, P = 60, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const c = cv.getContext('2d'), FF = 'Pretendard,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif';
+  const font = (w, px) => (c.font = w + ' ' + px + 'px ' + FF);
+  const txt = (t, x0, y0, col, al) => { c.fillStyle = col; c.textAlign = al || 'left'; c.fillText(t, x0, y0); c.textAlign = 'left'; };
+  const card = (x0, y0, w, h) => { c.save(); c.shadowColor = 'rgba(16,24,40,.08)'; c.shadowBlur = 40; c.shadowOffsetY = 12; c.fillStyle = '#FFFFFF'; roundRect(c, x0, y0, w, h, 36); c.fill(); c.restore(); };
+  // 배경: 팀 테마 그라데이션 위쪽 → 아래로 옅게
+  const bg = c.createLinearGradient(0, 0, W, H); bg.addColorStop(0, gc[0]); bg.addColorStop(0.5, gc[1]); bg.addColorStop(1, gc[2]);
+  c.fillStyle = bg; c.fillRect(0, 0, W, H);
+  const fade = c.createLinearGradient(0, 300, 0, H); fade.addColorStop(0, 'rgba(255,255,255,0)'); fade.addColorStop(0.35, 'rgba(255,255,255,.82)'); fade.addColorStop(1, 'rgba(255,255,255,.92)');
+  c.fillStyle = fade; c.fillRect(0, 0, W, H);
+  // 머리말
+  font(700, 26); c.globalAlpha = 0.75; txt((S.club.name || '') + '  ·  모임통장 정산', P, 104, onH); c.globalAlpha = 1;
+  font(800, 76); txt(ym.substr(0, 4) + '년 ' + mon(ym), P, 196, onH);
+  // 핵심 카드: 남은 돈 + 들어온/나간/잔액
+  card(P, 250, W - P * 2, 320);
+  font(600, 28); txt('이번 달 남은 돈', P + 48, 322, '#667085');
+  font(800, 84); txt((x.net >= 0 ? '+' : '−') + won(Math.abs(x.net)) + '원', P + 44, 420, x.net >= 0 ? ink : '#D92D20');
+  c.fillStyle = '#EEF0F4'; c.fillRect(P + 48, 456, W - P * 2 - 96, 2);
+  const cols = [['들어온 돈', '+' + won(inc)], ['나간 돈', '−' + won(out)], ['월말 잔액', won(bal)]], cw = (W - P * 2 - 96) / 3;
+  cols.forEach((k, i) => { const x0 = P + 48 + cw * i; font(600, 23); txt(k[0], x0, 510, '#98A2B3'); font(800, 32); txt(k[1] + '원', x0, 554, '#101828'); });
+  // 원형그래프 카드
+  card(P, 610, W - P * 2, 610);
+  const ring = (cx, cy, title, total, items) => {
+    const R = 118, lw = 38, sum = items.reduce((a, it) => a + it[1], 0);
+    font(700, 30); txt(title, cx, 682, '#101828', 'center');
+    c.lineWidth = lw; c.lineCap = 'butt';
+    c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.strokeStyle = '#F2F4F7'; c.stroke();
+    let a0 = -Math.PI / 2; const gap = items.filter((it) => it[1] > 0).length > 1 ? 0.035 : 0;
+    items.filter((it) => it[1] > 0).forEach((it) => { const a1 = a0 + (it[1] / sum) * Math.PI * 2; c.beginPath(); c.arc(cx, cy, R, a0 + gap, a1 - gap); c.strokeStyle = it[2]; c.stroke(); a0 = a1; });
+    font(600, 22); txt('합계', cx, cy - 10, '#98A2B3', 'center');
+    font(800, 36); txt(won(total), cx, cy + 32, '#101828', 'center');
     items.forEach((it, i) => {
-      const y = 612 + i * 70;
-      c.fillStyle = it[2]; roundRect(c, cx - 170, y - 20, 24, 24, 6); c.fill();
-      c.fillStyle = '#344054'; c.font = F(700, 25); c.fillText(it[0], cx - 134, y);
-      c.fillStyle = '#101828'; c.font = F(800, 27); c.fillText(won(it[1]) + '원' + (sum ? '  (' + Math.round(it[1] / sum * 100) + '%)' : ''), cx - 134, y + 36);
+      const y0 = 1058 + i * 54, L = cx - 190, Rr = cx + 190;
+      c.fillStyle = it[2]; c.beginPath(); c.arc(L + 9, y0 - 9, 9, 0, Math.PI * 2); c.fill();
+      font(600, 25); txt(it[0], L + 30, y0, '#475467');
+      font(800, 26); txt(won(it[1]), Rr - 62, y0, '#101828', 'right');
+      font(600, 22); txt(sum ? Math.round(it[1] / sum * 100) + '%' : '-', Rr, y0, '#98A2B3', 'right');
     });
   };
-  donut(235, '💰 들어온 돈', inc, '+', [['회비', x.fee, '#1F4FB8'], ['게스트비 (' + x.guestN + '명)', x.guest, '#F79009']].concat(x.etcIn ? [['기타', x.etcIn, '#12B76A']] : []));
-  donut(665, '💸 나간 돈', out, '−', [['구장비', x.field, '#E5484D']].concat(x.etcOut ? [['기타', x.etcOut, '#98A2B3']] : []));
-  c.fillStyle = '#fff'; roundRect(c, 25, 815, 850, 200, 28); c.fill();
-  c.font = F(700, 28); c.fillStyle = '#344054'; c.fillText('📊 ' + mon(ym) + ' 남은 돈', 65, 890);
-  c.textAlign = 'right'; c.font = F(900, 40); c.fillStyle = x.net >= 0 ? '#067647' : '#B42318'; c.fillText((x.net >= 0 ? '+' : '') + won(x.net) + '원', 835, 893);
-  c.textAlign = 'left'; c.font = F(700, 28); c.fillStyle = '#344054'; c.fillText('🏦 월말 통장 잔액', 65, 965);
-  c.textAlign = 'right'; c.font = F(900, 40); c.fillStyle = '#14306B'; c.fillText(won(bal) + '원', 835, 968); c.textAlign = 'left';
+  const mid = W / 2;
+  c.fillStyle = '#EEF0F4'; c.fillRect(mid - 1, 660, 2, 510);
+  ring(P + (mid - P) / 2, 852, '들어온 돈', inc, [['회비', x.fee, ink], ['게스트비 ' + x.guestN + '명', x.guest, acc]].concat(x.etcIn ? [['기타', x.etcIn, C.mix ? C.mix(ink, '#FFFFFF', 0.55) : '#98A2B3']] : []));
+  ring(mid + (mid - P) / 2, 852, '나간 돈', out, [['구장비', x.field, '#F0705A']].concat(x.etcOut ? [['기타', x.etcOut, '#C4CAD4']] : []));
+  // 꼬리말
+  font(500, 22); txt('거래내역 원본이 궁금하면 총무에게 말씀해주세요', P, 1284, '#98A2B3');
+  font(800, 24); txt('A-KICK', W - P, 1284, ink, 'right');
   return cv;
 }
 function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
