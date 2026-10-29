@@ -367,6 +367,12 @@
       });
       if (okAll && multi.length) hit = multi;
     }
+    if (!hit && key.length >= 4) {                       // '정진호원현정' 처럼 이름을 붙여 쓴 경우 → 아는 이름들로 쪼개지면 그 사람들
+      var keys = Object.keys(ctx.alias).filter(function (k) { return k.length >= 2; });
+      var split = function (r) { if (!r) return []; for (var i = 0; i < keys.length; i++) if (r.indexOf(keys[i]) === 0) { var rest = split(r.substr(keys[i].length)); if (rest) return [keys[i]].concat(rest); } return null; };
+      var parts = split(key);
+      if (parts && parts.length >= 2) { var mm = []; parts.forEach(function (k) { ctx.alias[k].forEach(function (m) { if (mm.indexOf(m) < 0) mm.push(m); }); }); hit = mm; }
+    }
     if (!hit) {                                         // '서유준 용병' → 서유준 대납 후보
       var first = t.desc.split(/[\s(]/)[0];
       if (first && first !== t.desc && ctx.alias[first]) { hit = ctx.alias[first]; partial = true; }
@@ -603,7 +609,7 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.87';
+  var VERSION = 'v0.88';
   var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, triPlan: triPlan, rotPlan: rotPlan, rotN: rotN, sideLabel: sideLabel, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
