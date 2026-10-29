@@ -167,7 +167,7 @@ textarea{min-height:220px}
 .drop{position:fixed;inset:0;background:rgba(30,58,138,.88);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;z-index:25}
 
 /* 팀 편성 */
-.g-btns{display:grid;grid-template-columns:1.4fr 1fr;gap:6px}
+.g-btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}.g-btns .g-btn{grid-column:1/-1}
 .g-btn2{background:#fff;border-color:#C9D4F0;color:var(--navy)}
 .t-title{font-size:17px}
 .pad{padding:16px 18px}

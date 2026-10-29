@@ -420,7 +420,7 @@ function gameHTML(g) {
     '<div class="g-sec"><div class="g-lbl">게스트 ' + guests.length + '명 <small>입금 기준</small></div><div class="chips">' +
     (guests.length ? guests.map((n) => '<span class="gchip">' + esc(n) + '</span>').join('') : '<span class="g-none">아직 없음</span>') + '</div>' +
     (pullSrc(g) ? '<button class="pullg" data-pull="' + g.id + '">↩ ' + md(pullSrc(g).date) + ' 경기 게스트 ' + guestParts(pullSrc(g).id).filter((x) => !x.p.self).reduce((a, x) => a + (x.p.cnt || 1), 0) + '명 불러오기 (우천·연기)</button>' : '') + '</div>' +
-    '<div class="g-btns"><button class="btn g-btn" data-team="' + g.id + '">⚽ 팀 편성' + (g.teams ? ' 보기' : '') + '</button><button class="btn g-btn2" data-recruit="' + g.id + '">' + IC.copy + ' 모집글</button></div></div>';
+    '<div class="g-btns"><button class="btn g-btn" data-team="' + g.id + '">⚽ 팀 편성' + (g.teams ? ' 보기' : '') + '</button><button class="btn g-btn2" data-recruit="' + g.id + '">' + IC.copy + ' 모집글</button><button class="btn g-btn2" data-notice="' + g.id + '">📢 경기안내</button></div></div>';
 }
 /* ---- 연기된 경기의 게스트를 새 경기로 불러오기 ---- */
 function guestParts(gid) { const out = []; S.txs.forEach((t) => { if (t.state === '무시') return; (t.parts || []).forEach((p) => { if (p.cls === '게스트비' && p.gid === gid) out.push({ t, p }); }); }); return out; }
@@ -474,6 +474,7 @@ function bindWeek() {
     render(); await putGame(g);
   }));
   document.querySelectorAll('[data-recruit]').forEach((b) => (b.onclick = () => recruitText(b.dataset.recruit)));
+  document.querySelectorAll('[data-notice]').forEach((b) => (b.onclick = () => noticeText(b.dataset.notice)));
   document.querySelectorAll('[data-pull]').forEach((b) => (b.onclick = () => pullGuests(b.dataset.pull)));
   document.querySelectorAll('[data-team]').forEach((b) => (b.onclick = () => { S.gid = b.dataset.team; S.view = 'team'; S.pick = null; render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-newgame]').forEach((b) => (b.onclick = () => newGameAsk(b.dataset.newgame)));
@@ -1151,6 +1152,29 @@ function recruitText(gid) {
   const g = S.games.find((x) => x.id === gid), att = attOf(g), total = att.length + C.guestNames(S.txs, gid, att).length;
   copy('⚽ ' + md(g.date) + '(' + C.dayName(g.date) + ') ' + g.time + ' ' + (S.cfg.place || '') + ' 게스트 ' + Math.max(1, minN() - total) + '명 구해요!\n\n' +
     '✅ 실력 무관 · 초보 환영 · 1인 참가 OK\n✅ 참가비 ' + won(S.cfg.guestFee) + '원\n\n현재 ' + total + '명 확정 🙌' + (S.cfg.openChat ? '\n' + S.cfg.openChat : ''));
+}
+/** 경기안내 문구 (참석 인원 · 날씨 · 팀) — 날씨는 누를 때 새로 받아옴 */
+async function noticeText(gid) {
+  const g = S.games.find((x) => x.id === gid), att = attOf(g), gs = C.guestNames(S.txs, gid, att), total = att.length + gs.length;
+  const sport = S.cfg.sport || (perSide() >= 8 ? 'soccer' : 'futsal');
+  let wx = '🌤 날씨는 경기 15일 전부터 나와요';
+  if ((Date.parse(g.date) - Date.now()) / 864e5 <= 15) {
+    try {
+      const loc = S.cfg.wxLoc || { lat: 35.8714, lon: 128.6014 }, w = await C.fetchWx(loc.lat, loc.lon, g.date, g.time);
+      setDoc(D('wx', g.id), Object.assign({}, w, { gid: g.id, date: g.date, time: g.time || '', at: Date.now() })).catch(() => {});
+      const [ic, lb] = C.wxLabel(w.code), pv = C.playable(w.mx != null ? w.mx : w.pr, w.st || w.code >= 95, sport);
+      wx = ic + ' ' + lb + ' ' + w.t + '℃ · 비 올 확률 ' + w.pop + '% · 바람 ' + w.wind + 'm/s\n   👉 ' + pv.text.replace(/^\S+ /, '');
+    } catch (e) { wx = '🌤 날씨를 못 불러왔어요 (잠시 후 다시)'; }
+  }
+  const T = (g.teams || []).map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0)).filter((x) => x.length);
+  const TC = ['🔵', '🟠', '🟢'];
+  copy('📢 ' + md(g.date) + '(' + C.dayName(g.date) + ') ' + (g.time || '') + ' 경기 안내\n\n' +
+    (S.cfg.place ? '📍 ' + S.cfg.place + '\n' : '') +
+    '👥 ' + total + '명 (회원 ' + att.length + ' · 게스트 ' + gs.length + ')\n   → ' + sideTxt(total) + '\n\n' +
+    wx + '\n' +
+    (T.length >= 2 ? '\n' + T.map((t, i) => TC[i] + ' ' + TEAMC[i] + '팀: ' + t.join(' ')).join('\n') + '\n' : '') +
+    (gs.length && S.cfg.guestFee ? '\n💰 게스트 참가비 ' + won(S.cfg.guestFee) + '원' : '') +
+    (T.length >= 2 ? '' : '\n\n팀 편성은 경기 전에 다시 올릴게요!'));
 }
 function backup() {
   const blob = new Blob([JSON.stringify({ at: new Date().toISOString(), cfg: S.cfg, members: S.members, games: S.games, txs: S.txs, skills: S.skills }, null, 1)], { type: 'application/json' });
