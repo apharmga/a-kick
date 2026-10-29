@@ -1339,7 +1339,7 @@ function ledgerHTML() {
     const b = C.book(S.txs, S.games, ym), end = S.txs.filter((t) => C.ymOf(t.dt) <= ym);
     data.unshift(Object.assign({ ym, end: end.length ? C.balance(end) : null }, b));
   }
-  const rows = sortRows(data, 'ledger').map((b) => '<tr><th scope="row">' + b.ym.replace('-', '. ') + '</th><td>' + won(b.fee) + '</td><td>' + won(b.guest) + '<small>' + b.guestN + '명</small></td><td>' + won(b.etcIn) + '</td><td>' + won(b.field) + '</td><td>' + won(b.etcOut) + '</td><td class="' + (b.net >= 0 ? 'pos' : 'neg') + '"><b>' + (b.net >= 0 ? '+' : '') + won(b.net) + '</b></td><td>' + (b.end == null ? '-' : won(b.end)) + '</td><td><button class="btn xs" data-settle="' + b.ym + '">정산 문구</button></td></tr>');
+  const rows = sortRows(data, 'ledger').map((b) => '<tr><th scope="row">' + b.ym.replace('-', '. ') + '</th><td>' + won(b.fee) + '</td><td>' + won(b.guest) + '<small>' + b.guestN + '명</small></td><td>' + won(b.etcIn) + '</td><td>' + won(b.field) + '</td><td>' + won(b.etcOut) + '</td><td class="' + (b.net >= 0 ? 'pos' : 'neg') + '"><b>' + (b.net >= 0 ? '+' : '') + won(b.net) + '</b></td><td>' + (b.end == null ? '-' : won(b.end)) + '</td><td><button class="btn xs" data-settle="' + b.ym + '">정산 문구</button> <button class="btn xs" data-sgraph="' + b.ym + '">📊 그래프</button></td></tr>');
   const th = (k, l) => sortTh('ledger', k, l);
   return '<div class="pagehead"><h1>장부</h1><span class="muted">회비는 귀속월, 게스트비·구장비는 경기 달 기준 · 통장은 그 달 마지막 거래 기준 · 제목을 누르면 기본 → 내림차순 → 오름차순</span></div>' +
     '<div class="panel tablewrap"><table><thead><tr>' + th('ym', '월') + th('fee', '회비') + th('guest', '게스트비') + th('etcIn', '기타 수입') + th('field', '구장비') + th('etcOut', '기타 지출') + th('net', '그 달 남은 돈') + th('end', '월말 통장') + '<th></th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
@@ -1503,6 +1503,7 @@ function bindStats() {
 }
 
 function bindLedger() {
+  document.querySelectorAll('[data-sgraph]').forEach((b) => (b.onclick = () => settleGraph(b.dataset.sgraph)));
   document.querySelectorAll('[data-settle]').forEach((b) => (b.onclick = () => {
     const ym = b.dataset.settle, x = C.book(S.txs, S.games, ym), end = S.txs.filter((t) => C.ymOf(t.dt) <= ym);
     const inc = x.fee + x.guest + x.etcIn, out = x.field + x.etcOut;
@@ -1512,6 +1513,65 @@ function bindLedger() {
   }));
 }
 
+/** 월 정산 원형그래프 이미지 (카톡에 붙여넣기용) */
+function settleCanvas(ym) {
+  const x = C.book(S.txs, S.games, ym), end = S.txs.filter((t) => C.ymOf(t.dt) <= ym), bal = end.length ? C.balance(end) : 0;
+  const inc = x.fee + x.guest + x.etcIn, out = x.field + x.etcOut;
+  const W = 900, H = 1060, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const c = cv.getContext('2d'), F = (w, px) => w + ' ' + px + 'px "Pretendard","Noto Sans KR","Apple SD Gothic Neo",sans-serif';
+  c.fillStyle = '#F4F6FA'; c.fillRect(0, 0, W, H);
+  c.fillStyle = '#14306B'; c.fillRect(0, 0, W, 150);
+  c.fillStyle = '#fff'; c.font = F(900, 46); c.fillText('📒 ' + mon(ym) + ' 모임통장 정산', 50, 92);
+  c.font = F(500, 24); c.fillStyle = '#C9D4F0'; c.fillText(S.club.name || '', 52, 130);
+  const donut = (cx, title, total, sign, items) => {
+    const cy = 420, R = 150, r = 92;
+    c.fillStyle = '#fff'; roundRect(c, cx - 210, 185, 420, 615, 28); c.fill();
+    c.fillStyle = '#101828'; c.font = F(800, 30); c.textAlign = 'center'; c.fillText(title, cx, 238);
+    const sum = items.reduce((a, it) => a + it[1], 0);
+    let a0 = -Math.PI / 2;
+    if (!sum) { c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.arc(cx, cy, r, 0, Math.PI * 2, true); c.fillStyle = '#E4E7EC'; c.fill(); }
+    items.filter((it) => it[1] > 0).forEach((it) => {
+      const a1 = a0 + (it[1] / sum) * Math.PI * 2;
+      c.beginPath(); c.arc(cx, cy, R, a0, a1); c.arc(cx, cy, r, a1, a0, true); c.closePath(); c.fillStyle = it[2]; c.fill();
+      c.strokeStyle = '#fff'; c.lineWidth = 3; c.stroke(); a0 = a1;
+    });
+    c.fillStyle = '#667085'; c.font = F(600, 22); c.fillText('합계', cx, cy - 12);
+    c.fillStyle = '#101828'; c.font = F(900, 34); c.fillText(sign + won(total), cx, cy + 30);
+    c.textAlign = 'left';
+    items.forEach((it, i) => {
+      const y = 612 + i * 70;
+      c.fillStyle = it[2]; roundRect(c, cx - 170, y - 20, 24, 24, 6); c.fill();
+      c.fillStyle = '#344054'; c.font = F(700, 25); c.fillText(it[0], cx - 134, y);
+      c.fillStyle = '#101828'; c.font = F(800, 27); c.fillText(won(it[1]) + '원' + (sum ? '  (' + Math.round(it[1] / sum * 100) + '%)' : ''), cx - 134, y + 36);
+    });
+  };
+  donut(235, '💰 들어온 돈', inc, '+', [['회비', x.fee, '#1F4FB8'], ['게스트비 (' + x.guestN + '명)', x.guest, '#F79009']].concat(x.etcIn ? [['기타', x.etcIn, '#12B76A']] : []));
+  donut(665, '💸 나간 돈', out, '−', [['구장비', x.field, '#E5484D']].concat(x.etcOut ? [['기타', x.etcOut, '#98A2B3']] : []));
+  c.fillStyle = '#fff'; roundRect(c, 25, 815, 850, 200, 28); c.fill();
+  c.font = F(700, 28); c.fillStyle = '#344054'; c.fillText('📊 ' + mon(ym) + ' 남은 돈', 65, 890);
+  c.textAlign = 'right'; c.font = F(900, 40); c.fillStyle = x.net >= 0 ? '#067647' : '#B42318'; c.fillText((x.net >= 0 ? '+' : '') + won(x.net) + '원', 835, 893);
+  c.textAlign = 'left'; c.font = F(700, 28); c.fillStyle = '#344054'; c.fillText('🏦 월말 통장 잔액', 65, 965);
+  c.textAlign = 'right'; c.font = F(900, 40); c.fillStyle = '#14306B'; c.fillText(won(bal) + '원', 835, 968); c.textAlign = 'left';
+  return cv;
+}
+function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function settleGraph(ym) {
+  const cv = settleCanvas(ym), url = cv.toDataURL('image/png'), name = mon(ym) + ' 정산.png';
+  modal('<h2>📊 ' + mon(ym) + ' 정산 그래프</h2><img src="' + url + '" alt="" style="width:100%;border-radius:12px;display:block;margin:6px 0 12px">' +
+    '<div class="mfoot"><button class="btn" id="gx">닫기</button><span style="flex:1"></span><button class="btn" id="gsv">저장·공유</button><button class="btn pri" id="gcp">이미지 복사</button></div>', (m) => {
+    m.querySelector('#gx').onclick = closeModal;
+    const blobP = new Promise((res) => cv.toBlob(res, 'image/png'));
+    m.querySelector('#gcp').onclick = async () => {
+      try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobP })]); toast('그래프를 복사했어요. 카톡 창에 붙여넣으세요.'); }
+      catch (e) { toast('이 기기에선 복사가 안 돼요 → [저장·공유]를 눌러주세요', 5000); }
+    };
+    m.querySelector('#gsv').onclick = async () => {
+      const f = new File([await blobP], name, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+      const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+    };
+  });
+}
 /* ---- 설정 ---- */
 const CFG = [['fee', '월회비', 'number'], ['guestFee', '게스트비', 'number'], ['rentPerGame', '정기대관 회당 구장비', 'number'], ['oneOff', '일회성 구장비', 'number'],
   ['cap', '기본 정원', 'number'], ['perSide', '한 팀 최소 인원 (풋살 5 · 축구 11)', 'number'], ['maxSide', '한 팀 최대 인원 (풋살 6 · 축구 11)', 'number'], ['time', '경기 시간', 'text'], ['nextMonthDay', '이 날짜부터 들어온 회비는 다음 달분', 'number'], ['dueDay', '회비 마감일', 'number'],
