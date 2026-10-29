@@ -1167,14 +1167,16 @@ async function noticeText(gid) {
     } catch (e) { wx = '🌤 날씨를 못 불러왔어요 (잠시 후 다시)'; }
   }
   const T = (g.teams || []).map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0)).filter((x) => x.length);
-  const TC = ['🔵', '🟠', '🟢'];
-  copy('📢 ' + md(g.date) + '(' + C.dayName(g.date) + ') ' + (g.time || '') + ' 경기 안내\n\n' +
+  const msg = ('📢 ' + md(g.date) + '(' + C.dayName(g.date) + ') ' + (g.time || '') + ' 경기 안내\n\n' +
     (S.cfg.place ? '📍 ' + S.cfg.place + '\n' : '') +
     '👥 ' + total + '명 (회원 ' + att.length + ' · 게스트 ' + gs.length + ')\n   → ' + sideTxt(total) + '\n\n' +
     wx + '\n' +
-    (T.length >= 2 ? '\n' + T.map((t, i) => TC[i] + ' ' + TEAMC[i] + '팀: ' + t.join(' ')).join('\n') + '\n' : '') +
+    (T.length >= 2 ? '\n⚽ 팀 편성은 그림 참고\n' : '') +
     (gs.length && S.cfg.guestFee ? '\n💰 게스트 참가비 ' + won(S.cfg.guestFee) + '원' : '') +
     (T.length >= 2 ? '' : '\n\n팀 편성은 경기 전에 다시 올릴게요!'));
+  if (T.length < 2) return copy(msg);
+  const wxShort = wx.split('\n')[0].replace(/^🌤 /, '');
+  showImg(teamCanvas(g, T, wxShort), '📢 ' + md(g.date) + ' 경기안내', md(g.date).replace('/', '-') + ' 경기안내.png', msg);
 }
 function backup() {
   const blob = new Blob([JSON.stringify({ at: new Date().toISOString(), cfg: S.cfg, members: S.members, games: S.games, txs: S.txs, skills: S.skills }, null, 1)], { type: 'application/json' });
@@ -1569,14 +1571,17 @@ function settleCanvas(ym) {
   return cv;
 }
 function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
-function settleGraph(ym) {
-  const cv = settleCanvas(ym), url = cv.toDataURL('image/png'), name = mon(ym) + ' 정산.png';
-  modal('<h2>📊 ' + mon(ym) + ' 정산 그래프</h2><img src="' + url + '" alt="" style="width:100%;border-radius:12px;display:block;margin:6px 0 12px">' +
-    '<div class="mfoot"><button class="btn" id="gx">닫기</button><span style="flex:1"></span><button class="btn" id="gsv">저장·공유</button><button class="btn pri" id="gcp">이미지 복사</button></div>', (m) => {
+function settleGraph(ym) { showImg(settleCanvas(ym), '📊 ' + mon(ym) + ' 정산 그래프', mon(ym) + ' 정산.png'); }
+/** 그림 미리보기 + 복사·저장 (text가 있으면 [문구 복사]도) */
+function showImg(cv, title, name, text) {
+  const url = cv.toDataURL('image/png');
+  modal('<h2>' + title + '</h2><img src="' + url + '" alt="" style="width:100%;max-height:62vh;object-fit:contain;border-radius:12px;display:block;margin:6px 0 12px">' +
+    '<div class="mfoot"><button class="btn" id="gx">닫기</button><span style="flex:1"></span>' + (text ? '<button class="btn" id="gtx">문구 복사</button>' : '') + '<button class="btn" id="gsv">저장·공유</button><button class="btn pri" id="gcp">이미지 복사</button></div>', (m) => {
     m.querySelector('#gx').onclick = closeModal;
     const blobP = new Promise((res) => cv.toBlob(res, 'image/png'));
+    if (text) m.querySelector('#gtx').onclick = async () => { try { await navigator.clipboard.writeText(text); toast('문구를 복사했어요'); } catch (e) { closeModal(); copy(text); } };
     m.querySelector('#gcp').onclick = async () => {
-      try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobP })]); toast('그래프를 복사했어요. 카톡 창에 붙여넣으세요.'); }
+      try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobP })]); toast('그림을 복사했어요. 카톡 창에 붙여넣으세요.'); }
       catch (e) { toast('이 기기에선 복사가 안 돼요 → [저장·공유]를 눌러주세요', 5000); }
     };
     m.querySelector('#gsv').onclick = async () => {
@@ -1585,6 +1590,61 @@ function settleGraph(ym) {
       const a = document.createElement('a'); a.href = url; a.download = name; a.click();
     };
   });
+}
+/** 경기안내 그림: 세로 경기장에 두 팀 포메이션 (A팀 아래 · B팀 위) */
+function teamCanvas(g, T, wxShort) {
+  const W = 1080, H = 1500, P = 60, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const c = cv.getContext('2d'), FF = 'Pretendard,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif';
+  const font = (w, px) => (c.font = w + ' ' + px + 'px ' + FF);
+  const txt = (t, x0, y0, col, al) => { c.fillStyle = col; c.textAlign = al || 'left'; c.fillText(t, x0, y0); c.textAlign = 'left'; };
+  const cs = getComputedStyle(document.documentElement), V = (k, d) => (cs.getPropertyValue(k) || '').trim() || d;
+  const ink = V('--navy', '#1E3A8A'), onH = V('--on-hdr', '#FFFFFF');
+  const gc = (V('--grad', ink).match(/#[0-9a-fA-F]{3,6}/g) || [ink]); while (gc.length < 3) gc.push(gc[gc.length - 1]);
+  c.fillStyle = V('--bg', '#EEF1F5'); c.fillRect(0, 0, W, H);
+  const bg = c.createLinearGradient(0, 0, W, 300); bg.addColorStop(0, gc[0]); bg.addColorStop(0.5, gc[1]); bg.addColorStop(1, gc[2]);
+  c.fillStyle = bg; roundRect(c, -40, -40, W + 80, 330, 40); c.fill();
+  font(700, 26); c.globalAlpha = 0.75; txt((S.club.name || '') + '  ·  경기 안내' + (S.cfg.place ? '  ·  ' + S.cfg.place : ''), P, 92, onH); c.globalAlpha = 1;
+  font(800, 66); txt(md(g.date) + ' (' + C.dayName(g.date) + ') ' + (g.time || ''), P, 172, onH);
+  if (wxShort) { font(600, 28); c.globalAlpha = 0.9; txt(wxShort, P, 222, onH); c.globalAlpha = 1; }
+  // 경기장
+  const fx = P, fy = 330, fw = W - P * 2, fh = 1030, r = 36;
+  c.save(); roundRect(c, fx, fy, fw, fh, r); c.clip();
+  for (let i = 0; i < 10; i++) { c.fillStyle = i % 2 ? '#1F6B43' : '#227549'; c.fillRect(fx, fy + (fh / 10) * i, fw, fh / 10 + 1); }
+  c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 4;
+  const inset = 26, ix = fx + inset, iy = fy + inset, iw = fw - inset * 2, ih = fh - inset * 2;
+  c.strokeRect(ix, iy, iw, ih);
+  c.beginPath(); c.moveTo(ix, iy + ih / 2); c.lineTo(ix + iw, iy + ih / 2); c.stroke();
+  c.beginPath(); c.arc(W / 2, iy + ih / 2, 110, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.85)'; c.beginPath(); c.arc(W / 2, iy + ih / 2, 7, 0, Math.PI * 2); c.fill();
+  const bw = iw * 0.44, bh = ih * 0.12;
+  c.strokeRect(W / 2 - bw / 2, iy, bw, bh); c.strokeRect(W / 2 - bw / 2, iy + ih - bh, bw, bh);
+  c.restore();
+  // 팀 이름 띠
+  const TCOL = [['#FF8A3D', '#2B1200'], ['#5CB8FF', '#00213D']];
+  const pill = (t, x0, y0, col) => { font(800, 28); const w = c.measureText(t).width + 40; c.fillStyle = col[0]; roundRect(c, x0 - w / 2, y0 - 34, w, 48, 24); c.fill(); txt(t, x0, y0, col[1], 'center'); };
+  // 선수: FORM의 [앞뒤 %, 좌우 %]를 세로 경기장에 (A팀 아래쪽 → 위로 공격, B팀 위쪽)
+  [0, 1].forEach((ti) => {
+    const ord = C.order(T[ti], g.id + ':' + ti), f = FORM[Math.min(11, Math.max(3, ord.length))] || FORM[5];
+    ord.forEach((name, i) => {
+      const pos = f[i] || [46, 10 + ((i - f.length) * 16) % 80];
+      const half = ih / 2, px = ix + iw * (pos[1] / 100), depth = half * (0.08 + Math.max(0, pos[0] - 6) / 37 * 0.7);
+      const py = ti === 0 ? iy + ih - depth : iy + depth;
+      c.save(); c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowOffsetY = 5; c.shadowBlur = 8;
+      c.fillStyle = TCOL[ti][0]; c.beginPath(); c.arc(px, py - 14, 28, 0, Math.PI * 2); c.fill(); c.restore();
+      c.strokeStyle = '#FFFFFF'; c.lineWidth = 4; c.beginPath(); c.arc(px, py - 14, 28, 0, Math.PI * 2); c.stroke();
+      const num = numOf(name) || (i === 0 ? 'GK' : '');
+      if (num) { font(800, String(num).length > 2 ? 18 : 22); txt(String(num), px, py - 6, TCOL[ti][1], 'center'); }
+      font(700, 26); const nm = name.replace(' 일행', '+'), w = c.measureText(nm).width + 22;
+      c.fillStyle = 'rgba(0,0,0,.55)'; roundRect(c, px - w / 2, py + 20, w, 38, 19); c.fill();
+      txt(nm, px, py + 48, '#FFFFFF', 'center');
+    });
+  });
+  pill(TEAMC[1] + '팀 ' + T[1].length + '명', W / 2, fy - 10, TCOL[1]);
+  pill(TEAMC[0] + '팀 ' + T[0].length + '명', W / 2, fy + fh + 50, TCOL[0]);
+  font(600, 24);
+  txt(T[2] && T[2].length ? 'C팀 (대기) ' + T[2].join(', ') : '', P, 1462, '#667085');
+  font(800, 24); txt('A-KICK', W - P, 1462, ink, 'right');
+  return cv;
 }
 /* ---- 설정 ---- */
 const CFG = [['fee', '월회비', 'number'], ['guestFee', '게스트비', 'number'], ['rentPerGame', '정기대관 회당 구장비', 'number'], ['oneOff', '일회성 구장비', 'number'],
