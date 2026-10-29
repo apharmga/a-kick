@@ -487,3 +487,7 @@ body.noscroll #app{visibility:hidden}
 .ttab tr.myrest{background:#FFF4E5}.ttab tr.myrest td{font-weight:800;color:#9A3412}.ttab td small{color:var(--sub);font-weight:600;margin-right:2px}
 .ttab td:first-child{white-space:nowrap}
 .rotb{font-style:normal;font-weight:700;font-size:11px;margin-left:6px;padding:2px 7px;border-radius:999px;background:#FFF4E5;color:#9A3412;white-space:nowrap}
+.vpg{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut,#667085)}
+.vpg button{width:30px;height:30px;border-radius:50%;border:1px solid var(--line,#E4E7EC);background:var(--card,#fff);color:var(--ink);font-size:18px;line-height:1;cursor:pointer}
+.vpg button:disabled{opacity:.3;cursor:default}
+.vday{font-size:13px;font-weight:700;color:var(--mut,#667085);margin:-2px 0 10px}

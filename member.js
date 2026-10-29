@@ -203,14 +203,31 @@ function vidsSorted() { return (S.videos || []).slice().sort((a, b) => (a.date =
 function vidCard(v) {
   return '<button class="vcard" data-vid="' + esc(v.id) + '"><span class="vth"><img src="' + ytThumb(v.yt) + '" alt="" loading="lazy"><i>▶</i></span><span class="vtx"><b>' + esc(v.title || '하이라이트') + (isNewVid(v) ? NEWB : '') + '</b><small>' + (v.date ? md(v.date) + ' 경기' : '') + '</small>' + (newCmts(v) ? '<em class="ncm">💬 새 댓글 ' + newCmts(v) + '</em>' : '') + '</span></button>';
 }
-function vidsHome() {
-  const vs = vidsSorted(); if (!vs.length) return '';
-  const anyNew = vs.some((v) => isNewVid(v) || newCmts(v));
-  return '<section class="card"><div class="h2row"><h2>🎬 하이라이트' + (anyNew ? NEWB : '') + '</h2>' + (vs.length > 3 ? '<button class="more inl" data-go="rec">전체 ›</button>' : '') + '</div><div class="vlist">' + vs.slice(0, 3).map(vidCard).join('') + '</div></section>';
+/** 경기(gid)별로 묶은 하이라이트 — 최신 경기부터 */
+function vidGroups() {
+  const m = new Map();
+  vidsSorted().forEach((v) => { const k = v.gid || v.date || v.id; if (!m.has(k)) m.set(k, { date: v.date, list: [] }); m.get(k).list.push(v); });
+  return [...m.values()].map((g) => (g.list.sort((x, y) => (x.title || '').localeCompare(y.title || '', 'ko', { numeric: true })), g));
 }
-function vidsRec() {
-  const vs = vidsSorted(); if (!vs.length) return '';
-  return '<section class="card"><h2>🎬 하이라이트</h2><div class="vlist">' + vs.map(vidCard).join('') + '</div></section>';
+/** 경기별로 좌우 넘겨보기 (‹ › 버튼 또는 옆으로 밀기) */
+function vidsPage() {
+  const G = vidGroups(); if (!G.length) return '';
+  const i = S.vpg = Math.min(Math.max(S.vpg || 0, 0), G.length - 1), g = G[i];
+  const anyNew = G.some((x) => x.list.some((v) => isNewVid(v) || newCmts(v)));
+  const nav = G.length > 1 ? '<div class="vpg"><button data-vpg="1"' + (i >= G.length - 1 ? ' disabled' : '') + ' aria-label="이전 경기">‹</button><span>' + (G.length - i) + ' / ' + G.length + '</span><button data-vpg="-1"' + (i <= 0 ? ' disabled' : '') + ' aria-label="다음 경기">›</button></div>' : '';
+  return '<section class="card" id="vbox"><div class="h2row"><h2>🎬 하이라이트' + (anyNew ? NEWB : '') + '</h2>' + nav + '</div>' +
+    '<div class="vday">' + (g.date ? md(g.date) + ' (' + day(g.date) + ') 경기' : '') + ' · ' + g.list.length + '편</div><div class="vlist" id="vswipe">' + g.list.map(vidCard).join('') + '</div></section>';
+}
+const vidsHome = vidsPage, vidsRec = vidsPage;
+function bindVids() {
+  const box = $('#vbox'); if (!box) return;
+  const go = (d) => { const n = vidGroups().length, k = (S.vpg || 0) + d; if (k < 0 || k >= n) return; S.vpg = k; box.outerHTML = vidsPage(); bindVids(); };
+  box.querySelectorAll('[data-vpg]').forEach((b) => (b.onclick = () => go(+b.dataset.vpg)));
+  box.querySelectorAll('[data-vid]').forEach((b) => (b.onclick = () => openVideo(b.dataset.vid)));
+  const sw = $('#vswipe'); let x0 = null, y0 = 0;
+  sw.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  sw.addEventListener('touchend', (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? -1 : 1); }, { passive: true });
 }
 let ytReady = null;
 function loadYT() {
@@ -593,6 +610,7 @@ function render() {
   const pm = $('#pmore'); if (pm) pm.onclick = () => { S.pastOpen = !S.pastOpen; render(); };
   const pe = $('#pedit'); if (pe) pe.onclick = openProfile;
   document.querySelectorAll('[data-vid]').forEach((b) => (b.onclick = () => openVideo(b.dataset.vid)));
+  bindVids();
   const sg = $('#sug'); if (sg) sg.onclick = openSuggest;
   const aa = $('#achall'); if (aa) aa.onclick = openAch;
   const lva = $('#lvall'); if (lva) lva.onclick = openLevel;
