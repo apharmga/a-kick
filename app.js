@@ -1680,7 +1680,7 @@ function openSettingsReal() {
       const t = prompt('A-KICK 앱 개발자에게 보낼 건의·오류·원하는 기능을 적어주세요'); if (!t || !t.trim()) return;
       try { await addDoc(collection(db, 'feedback'), { text: t.trim().slice(0, 1000), uid: S.uid, email: (auth.currentUser && auth.currentUser.email) || '', cid: CID, club: S.club.name, name: '관리자', at: Date.now(), ver: C.VERSION }); toast('개발자에게 보냈어요. 고마워요 🙏'); } catch (e) { fail(e); }
     };
-    m.querySelector('#dona').onclick = () => alert('🙏 A-KICK이 팀 운영에 도움이 되셨다면, 원하시는 만큼 후원으로 응원해 주셔도 됩니다.\n🌱 후원은 앱을 계속 다듬고 새 기능을 더하는 데 쓰입니다. 부담 갖지 않으셔도 됩니다. 😊\n\n카카오뱅크 3333-15-3268863 (예금주 장은총)\n\n마음이 닿을 때, 원하시는 만큼 후원해 주시면 감사히 받겠습니다.');
+    m.querySelector('#dona').onclick = () => alert('🙏 A-KICK이 팀 운영에 도움이 되셨다면, 원하시는 만큼 후원으로 응원해 주셔도 됩니다.\n🌱 후원은 앱을 계속 다듬고 새 기능을 더하는 데 쓰입니다.\n\n카카오뱅크 3333-15-3268863 (예금주 장은총)\n\n마음이 닿을 때, 원하시는 만큼 후원해 주시면 감사히 받겠습니다.');
     // 구장 위치: 주소 검색(오픈스트리트맵) · 지금 내 위치 · 위도,경도 직접 입력
     const wxSave = async (name, lat, lon, box) => {
       S.cfg.wxLoc = { name, lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 };

@@ -1472,7 +1472,7 @@ function openDev() {
 const DONA = '카카오뱅크 3333-15-3268863 (예금주 장은총)';
 function openDonate() {
   sheet('<h2>☕ A-KICK 후원</h2><div class="dona"><p>🙏 A-KICK이 팀 운영과 축구하는 일상에 도움이 되셨다면, 원하시는 만큼 후원으로 응원해 주셔도 됩니다.</p>' +
-    '<p>🌱 후원은 앱을 계속 다듬고 새 기능을 더하는 데 쓰입니다. 부담 갖지 않으셔도 됩니다. 😊</p><p class="muted">후원 계좌를 남겨둡니다. 마음이 닿을 때, 원하시는 만큼 후원해 주시면 감사히 받겠습니다.</p>' +
+    '<p>🌱 후원은 앱을 계속 다듬고 새 기능을 더하는 데 쓰입니다.</p><p class="muted">후원 계좌를 남겨둡니다. 마음이 닿을 때, 원하시는 만큼 후원해 주시면 감사히 받겠습니다.</p>' +
     '<div class="acrow"><b>' + DONA + '</b><button id="dcp">복사</button></div></div><div class="srow"><button class="pri" id="dnx">닫기</button></div>', (el) => {
     el.querySelector('#dcp').onclick = () => copy('3333153268863', '계좌번호를 복사했어요 (카카오뱅크 · 장은총)');
     el.querySelector('#dnx').onclick = () => (el.hidden = true);
