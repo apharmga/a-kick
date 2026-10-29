@@ -4,6 +4,7 @@ import { getFirestore, collection, doc, getDocs as _getDocs, getDoc as _getDoc, 
 import { demoAdmin } from './demo.js';
 import { mountCoach } from './coach.js';
 import { IOS_APP, nativeSignIn, providerOf, scheduleAlarms } from './native.js';
+import { isEncrypted, decryptXlsx } from './xlsxcrypt.js';
 /* 관리자 체험 (admin.html?demo=1): 서버 대신 메모리 속 샘플 데이터를 읽고 씀 · 새로고침하면 처음 상태로 */
 const DEMO = new URLSearchParams(location.search).get('demo') === '1';
 const MEM = DEMO ? demoAdmin() : null;
@@ -1024,9 +1025,34 @@ function bindManualTools(m, t) {
 
 /* ---- 카카오뱅크 엑셀 넣기 ---- */
 /* 통장 엑셀 읽기: xlsx·xls·csv(한글 깨짐 자동 처리) · 비밀번호 걸린 파일 안내 */
+/** 엑셀 비밀번호 묻기 (이 화면을 닫기 전까지만 기억 · 저장 안 함) */
+function askXlsPw(wrong) {
+  return new Promise((res) => {
+    modal('<h2>🔒 엑셀 비밀번호</h2><div class="muted" style="margin-bottom:10px">' + (wrong ? '<b style="color:#B42318">비밀번호가 달라요. 다시 입력해 주세요.</b><br>' : '') + '은행 앱에서 엑셀을 받을 때 정한 비밀번호예요 (예: 생년월일 6자리). 휴대폰 안에서만 풀고 어디에도 저장하지 않아요.</div>' +
+      '<input id="xpw" type="password" autocomplete="off" style="width:100%" placeholder="비밀번호">' +
+      '<div class="mfoot"><span style="flex:1"></span><button class="btn" id="xcx">취소</button><button class="btn pri" id="xok">열기</button></div>', (m) => {
+      const i = m.querySelector('#xpw'); setTimeout(() => i.focus(), 50);
+      const done = (v) => { closeModal(); res(v); };
+      m.querySelector('#xcx').onclick = () => done(null);
+      m.onclick = (e) => { if (e.target === m) done(null); };
+      m.querySelector('#xok').onclick = () => done(i.value);
+      i.onkeydown = (e) => { if (e.key === 'Enter') done(i.value); };
+    });
+  });
+}
+async function unlockXlsx(buf) {
+  for (let wrong = false; ;) {
+    const pw = S.xlsPw || (await askXlsPw(wrong));
+    if (pw == null) throw new Error('비밀번호 입력을 취소했어요');
+    toast('엑셀을 푸는 중이에요... (몇 초 걸려요)');
+    try { const out = await decryptXlsx(buf, pw); S.xlsPw = pw; return out; }
+    catch (e) { S.xlsPw = null; if (e.message !== 'WRONG_PASSWORD') throw new Error('잠긴 엑셀을 풀지 못했어요: ' + e.message); wrong = true; }
+  }
+}
 async function bankRows(file) {
-  const buf = await file.arrayBuffer();
+  let buf = await file.arrayBuffer();
   let wb;
+  if (!/\.csv$/i.test(file.name) && isEncrypted(buf)) buf = await unlockXlsx(buf);
   try {
     if (/\.csv$/i.test(file.name)) {
       let txt = new TextDecoder('utf-8').decode(buf);
