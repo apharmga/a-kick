@@ -491,3 +491,9 @@ body.noscroll #app{visibility:hidden}
 .vpg button{width:30px;height:30px;border-radius:50%;border:1px solid var(--line,#E4E7EC);background:var(--card,#fff);color:var(--ink);font-size:18px;line-height:1;cursor:pointer}
 .vpg button:disabled{opacity:.3;cursor:default}
 .vday{font-size:13px;font-weight:700;color:var(--mut,#667085);margin:-2px 0 10px}
+.mdb{border:0;background:transparent;padding:0;cursor:pointer;display:inline-flex}
+.ali[data-ach]{cursor:pointer}
+.adet{gap:8px;min-width:260px}.adet .md.big{width:150px;height:156px;margin-bottom:4px}
+.adet .adon{font-size:13px;color:#067647;background:#ECFDF3;border-radius:999px;padding:5px 12px;margin-top:4px}
+.adprog{width:100%;display:flex;flex-direction:column;gap:4px;margin-top:6px}.adprog i{display:block;height:8px;border-radius:8px;background:var(--line);overflow:hidden}.adprog u{display:block;height:100%;background:var(--acc);border-radius:8px}.adprog small{margin:0}
+.adx{margin-top:10px;border:1px solid var(--line);background:#fff;border-radius:12px;min-height:42px;padding:0 28px;font:inherit;font-weight:700;cursor:pointer}

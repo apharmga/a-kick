@@ -1214,6 +1214,22 @@ function achCelebrate(list) {
   };
   one();
 }
+/** 배지 누르면: 큰 방패 + 자세한 내용 */
+function achDetail(id) {
+  const a = ACH.find((q) => q[0] === id); if (!a) return;
+  const on = !!A.got[a[0]], hid = a[8] && !on, x = achCtx(), cur = Math.min(x[a[6]] || 0, a[7]);
+  const el = document.createElement('div'); el.className = 'apop';
+  el.innerHTML = '<div class="apbox adet" role="dialog" aria-label="업적 자세히">' + medal(a, on, 1) +
+    '<small>' + esc(a[1]) + '</small><b>' + (hid ? '???' : esc(a[4])) + '</b><em class="t' + a[2] + '">' + TIER[a[2]].join(' · ') + '</em>' +
+    '<span>' + (hid ? '숨겨진 업적이에요. 달성하면 공개돼요' : esc(a[5])) + '</span>' +
+    (on ? '<strong class="adon">✓ ' + ymd(new Date(A.got[a[0]])).replace(/-/g, '.') + ' 달성 · +' + XP_ACH[a[2]] + ' EXP</strong>'
+      : hid ? '' : '<div class="adprog"><i><u style="width:' + Math.round(cur / a[7] * 100) + '%"></u></i><small>' + cur + ' / ' + a[7] + '</small></div>') +
+    '<button class="adx">닫기</button></div>';
+  document.body.appendChild(el);
+  const bye = () => el.remove();
+  el.onclick = (e) => { if (e.target === el || e.target.classList.contains('adx')) bye(); };
+}
+document.addEventListener('click', (e) => { const t = e.target.closest && e.target.closest('[data-ach]'); if (t && A) achDetail(t.dataset.ach); });
 function achNext(x) {
   return ACH.filter((a) => !A.got[a[0]] && !a[8] && a[0] !== 'plat').map((a) => [a, Math.min(x[a[6]], a[7]) / a[7]]).sort((p, q) => q[1] - p[1])[0];
 }
@@ -1222,7 +1238,7 @@ function achCard() {
   const x = achCtx(), got = ACH.filter((a) => A.got[a[0]]), nx = achNext(x), cnt = (t) => got.filter((a) => a[2] === t).length;
   const last = got.slice().sort((p, q) => A.got[q[0]] - A.got[p[0]]).slice(0, 5);
   return '<section class="card achc"><div class="h2row"><h2>🏆 업적 <small class="muted">' + got.length + '/' + ACH.length + '</small></h2><button class="more inl" id="achall">전체 ›</button></div>' +
-    '<div class="arow">' + (last.length ? last.map((a) => medal(a, 1)).join('') : '<span class="muted">아직 없어요. 매일 들어오기만 해도 하나씩 열려요</span>') + '</div>' +
+    '<div class="arow">' + (last.length ? last.map((a) => '<button class="mdb" data-ach="' + a[0] + '" aria-label="' + esc(a[4]) + ' 자세히">' + medal(a, 1) + '</button>').join('') : '<span class="muted">아직 없어요. 매일 들어오기만 해도 하나씩 열려요</span>') + '</div>' +
     (nx ? '<div class="anext"><span>다음 목표 ' + nx[0][3] + ' <b>' + esc(nx[0][4]) + '</b></span><em>' + Math.min(x[nx[0][6]], nx[0][7]) + '/' + nx[0][7] + '</em><i><u style="width:' + Math.round(nx[1] * 100) + '%"></u></i></div>' : '') +
     '<div class="atiers"><span class="tB">브론즈 ' + cnt('B') + '</span><span class="tS">실버 ' + cnt('S') + '</span><span class="tG">골드 ' + cnt('G') + '</span><span class="tP">플래티넘 ' + cnt('P') + '</span>' + ((A.streak || 0) > 1 ? '<span class="tF">🔥 ' + A.streak + '일 연속</span>' : '') + '</div></section>';
 }
@@ -1235,7 +1251,7 @@ function openAch() {
     (rank.length ? '<div class="arank"><b>팀 업적 순위</b>' + rank.map((r, i) => '<span>' + (i + 1) + '. ' + lvPill(lvOfName(r[0])) + esc(r[0]) + (r[2] ? ' 💎' : '') + ' <em>' + r[1] + '개</em></span>').join('') + '</div>' : '') +
     ACAT.map((c) => '<div class="acat">' + c + '</div><div class="alist">' + ACH.filter((a) => a[1] === c).map((a) => {
       const on = !!A.got[a[0]], hid = a[8] && !on, cur = Math.min(x[a[6]] || 0, a[7]);
-      return '<div class="ali' + (on ? ' on' : '') + '">' + medal(a, on) + '<div><b>' + (hid ? '숨겨진 업적' : esc(a[4])) + '<em class="t' + a[2] + '">' + TIER[a[2]][0] + '</em></b><small>' + (hid ? '달성하면 공개돼요' : esc(a[5])) + '</small>' +
+      return '<div class="ali' + (on ? ' on' : '') + '" data-ach="' + a[0] + '" role="button" tabindex="0">' + medal(a, on) + '<div><b>' + (hid ? '숨겨진 업적' : esc(a[4])) + '<em class="t' + a[2] + '">' + TIER[a[2]][0] + '</em></b><small>' + (hid ? '달성하면 공개돼요' : esc(a[5])) + '</small>' +
         (on ? '<small class="adt">' + ymd(new Date(A.got[a[0]])).replace(/-/g, '.') + ' 달성</small>' : hid || a[7] === 1 ? '' : '<i><u style="width:' + Math.round(cur / a[7] * 100) + '%"></u></i><small>' + cur + '/' + a[7] + '</small>') + '</div></div>';
     }).join('') + '</div>').join('') +
     '<div class="srow"><button class="pri" id="ax">닫기</button></div>', (el) => (el.querySelector('#ax').onclick = () => (el.hidden = true)));
