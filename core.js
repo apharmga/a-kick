@@ -281,7 +281,7 @@
     if (amtDiff.length) return { code: 'amt', msg: '금액이 달라요. 통장엔 ' + w(amtDiff[0]) + '이 들어왔어요. 직접 입력 금액을 잘못 넣었으면 금액을 고친 뒤 합치세요.', cands: amtDiff };
     var nameDiff = pick(function (x) { return x.amt === t.amt && dayGap(x.dt, t.dt) <= 1; });
     if (nameDiff.length) return { code: 'name', msg: '이름이 달라요. 같은 무렵 ' + w(nameDiff[0]) + '이 있어요. 다른 사람이 대신 냈다면 [합치기]를 누르세요.', cands: nameDiff };
-    if (!lastBank || d > lastBank) return { code: 'wait', msg: '통장 엑셀이 아직 이 날짜(' + d.substr(5).replace('-', '/') + ')까지 안 들어왔어요. 엑셀을 넣으면 자동으로 맞춰봐요.', cands: [] };
+    if (!lastBank || d >= lastBank) return { code: 'wait', msg: '통장 엑셀이 아직 이 날짜(' + d.substr(5).replace('-', '/') + ')까지 안 들어왔어요. 엑셀을 넣으면 자동으로 맞춰봐요.', cands: [] };
     return { code: 'none', msg: '이 날짜 앞뒤로 통장에 비슷한 거래가 없어요. 날짜·이름·금액을 다시 확인하고, 현금으로 받은 돈이면 통장에 넣은 날짜로 고치세요.', cands: near.filter(function (x) { return x.amt === t.amt; }).slice(0, 3) };
   }
   /** 통장 잔액 이어짐 검사: 앞 거래 잔액 ± 금액 = 이번 잔액이 아니면 그 사이 거래가 엑셀에서 빠진 것 */
@@ -603,7 +603,7 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.84';
+  var VERSION = 'v0.85';
   var Core = { diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, triPlan: triPlan, rotPlan: rotPlan, rotN: rotN, sideLabel: sideLabel, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
