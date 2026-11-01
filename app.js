@@ -1416,7 +1416,7 @@ function statsHTML() {
   const gl = games.filter((g) => !S.sym || g.date.substr(0, 7) === S.sym).reverse().map((g) => {
     const gs = S.goals.filter((x) => x.gid === g.id), sc = C.score(g, S.goals);
     return '<div class="glog"><div class="glh"><b>' + md(g.date) + ' (' + C.dayName(g.date) + ')</b>' + (g.teams.length >= 3 ? '<span>' + triTxt(g) + '</span>' : g.teams.length >= 2 ? '<span>A ' + sc[0] + ' : ' + sc[1] + ' B</span>' : '') + '</div>' +
-      (gs.length ? gs.map((x) => '<div class="gli">⚽ <b>' + (x.scorer.charAt(0) === '(' ? '골 미기록' : esc(x.scorer)) + '</b>' + (x.assist ? ' <span class="muted">도움 ' + esc(x.assist) + '</span>' : '') + '<small>' + esc(x.byName || '') + ' 입력</small><button class="btn xs ghost" data-gdel="' + x.id + '">삭제</button></div>').join('') : '<div class="muted">기록 없음 · 회원 화면 \'경기기록\' 탭에서 누구나 넣을 수 있어요</div>') + '</div>';
+      (gs.length ? gs.map((x) => '<div class="gli">⚽ <b>' + (x.scorer.indexOf('(자책)') === 0 ? esc(x.scorer.slice(4)) + ' (자책골)' : x.scorer.charAt(0) === '(' ? '골 미기록' : esc(x.scorer)) + '</b>' + (x.assist ? ' <span class="muted">도움 ' + esc(x.assist) + '</span>' : '') + '<small>' + esc(x.byName || '') + ' 입력</small><button class="btn xs ghost" data-gdel="' + x.id + '">삭제</button></div>').join('') : '<div class="muted">기록 없음 · 회원 화면 \'경기기록\' 탭에서 누구나 넣을 수 있어요</div>') + '</div>';
   }).join('');
   return '<div class="pagehead"><h1>경기기록</h1><div class="ph-act"><select id="sym"><option value="">전체 기간</option>' + months.map((m) => '<option value="' + m + '"' + (m === S.sym ? ' selected' : '') + '>' + m.replace('-', '년 ') + '월</option>').join('') + '</select></div></div>' +
     '<div class="evnote">🔒 아래 1위 정리는 관리자만 보여요. · 골·도움은 ' + md(statFrom()) + ' 경기부터 집계 (설정에서 변경)</div>' +

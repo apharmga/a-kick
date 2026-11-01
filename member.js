@@ -968,11 +968,12 @@ async function loadWorkout(gid) {
 const gNm = (n) => String(n || '').replace(/ 일행(\d*)$/, (x, d) => ' 용병' + (d && d !== '1' ? d : ''));
 function sboard(gs, T, sc) {
   const side = (ti) => {
-    const mine = gs.filter((x) => { const who = x.scorer && x.scorer.charAt(0) !== '(' ? x.scorer : x.assist; return T[ti].indexOf(who) >= 0; });
+    const isOg = (x) => x.scorer && x.scorer.indexOf('(자책)') === 0;
+    const mine = gs.filter((x) => { if (isOg(x)) { const o = x.scorer.slice(4); return T[ti].indexOf(o) < 0 && T[1 - ti].indexOf(o) >= 0; } const who = x.scorer && x.scorer.charAt(0) !== '(' ? x.scorer : x.assist; return T[ti].indexOf(who) >= 0; });
     const goals = {}, ord = [], as = {};
-    mine.forEach((x) => { const k = x.scorer && x.scorer.charAt(0) !== '(' ? x.scorer : '?'; if (!goals[k]) { goals[k] = 0; ord.push(k); } goals[k]++; if (x.assist) as[x.assist] = (as[x.assist] || 0) + 1; });
+    mine.forEach((x) => { const k = isOg(x) ? x.scorer : x.scorer && x.scorer.charAt(0) !== '(' ? x.scorer : '?'; if (!goals[k]) { goals[k] = 0; ord.push(k); } goals[k]++; if (x.assist) as[x.assist] = (as[x.assist] || 0) + 1; });
     const asl = Object.keys(as);
-    return ord.map((k) => '<div class="sbp">' + (k === '?' ? '<em>득점자 미기록</em>' : esc(gNm(k))) + ' <span>' + '⚽'.repeat(Math.min(goals[k], 5)) + (goals[k] > 5 ? '×' + goals[k] : '') + '</span></div>').join('') +
+    return ord.map((k) => '<div class="sbp">' + (k === '?' ? '<em>득점자 미기록</em>' : k.indexOf('(자책)') === 0 ? '<em>' + esc(gNm(k.slice(4))) + ' 자책골</em>' : esc(gNm(k))) + ' <span>' + '⚽'.repeat(Math.min(goals[k], 5)) + (goals[k] > 5 ? '×' + goals[k] : '') + '</span></div>').join('') +
       (asl.length ? '<div class="sba">도움 ' + asl.map((k) => esc(gNm(k)) + (as[k] > 1 ? '×' + as[k] : '')).join(', ') + '</div>' : '') || '<div class="sba">-</div>';
   };
   return '<div class="sb"><div class="sbt"><span class="sbn a">A</span><b>' + sc[0] + '</b><i>:</i><b>' + sc[1] + '</b><span class="sbn b">B</span></div><div class="sbg"><div class="sbc">' + side(0) + '</div><div class="sbc r">' + side(1) + '</div></div></div>';
@@ -982,7 +983,7 @@ function gameRec(g) {
   const sc = window.Core.score({ id: g.id, teams: T }, S.goals || []), M = g.matches || [];
   const tri = T.length >= 3 ? (M.length ? triTable(M) : '<div class="muted" style="padding:4px 0">3파전 · 판 결과가 아직 없어요</div>') : '';
   return '<div class="grec"><div class="grh"><b>' + md(g.date) + ' (' + day(g.date) + ')</b>' + (T.length >= 3 ? '<span class="score">3파전' + (M.length ? ' · 🏆 ' + TC[window.Core.standings(3, M)[0].t] + '팀' : '') + '</span>' : T.length >= 2 && !(T.length === 2 && gs.length) ? '<span class="score"><em class="a">A</em> ' + sc[0] + ' : ' + sc[1] + ' <em class="b">B</em></span>' : '<span class="muted">' + g.players.length + '명</span>') + '</div>' + tri +
-    (T.length === 2 && gs.length ? sboard(gs, T, sc) + '<details class="sbd"><summary>기록 수정 · 삭제</summary>' + (gs.length ? gs.map((x) => '<div class="gli"><span>⚽ ' + (x.scorer.charAt(0) === '(' ? '<b class="muted">골 미기록</b>' : '<b>' + lvPill(lvOfName(x.scorer)) + esc(x.scorer) + '</b>') + (x.assist ? ' <small>도움 ' + lvPill(lvOfName(x.assist)) + esc(x.assist) + '</small>' : '') + '</span>' + (x.by === S.uid || S.owner ? '<button class="x" data-gdel="' + esc(x.id) + '" aria-label="삭제">✕</button>' : '') + '</div>').join('') : '<div class="muted" style="padding:6px 0">아직 기록이 없어요</div>') + '</details>' : (gs.length ? gs.map((x) => '<div class="gli"><span>⚽ ' + (x.scorer.charAt(0) === '(' ? '<b class="muted">골 미기록</b>' : '<b>' + lvPill(lvOfName(x.scorer)) + esc(x.scorer) + '</b>') + (x.assist ? ' <small>도움 ' + lvPill(lvOfName(x.assist)) + esc(x.assist) + '</small>' : '') + '</span>' + (x.by === S.uid || S.owner ? '<button class="x" data-gdel="' + esc(x.id) + '" aria-label="삭제">✕</button>' : '') + '</div>').join('') : '<div class="muted" style="padding:6px 0">아직 기록이 없어요</div>')) +
+    (T.length === 2 && gs.length ? sboard(gs, T, sc) + '<details class="sbd"><summary>기록 수정 · 삭제</summary>' + (gs.length ? gs.map((x) => '<div class="gli"><span>⚽ ' + (x.scorer.indexOf('(자책)') === 0 ? '<b>' + esc(gNm(x.scorer.slice(4))) + '</b> <small>자책골</small>' : x.scorer.charAt(0) === '(' ? '<b class="muted">골 미기록</b>' : '<b>' + lvPill(lvOfName(x.scorer)) + esc(x.scorer) + '</b>') + (x.assist ? ' <small>도움 ' + lvPill(lvOfName(x.assist)) + esc(x.assist) + '</small>' : '') + '</span>' + (x.by === S.uid || S.owner ? '<button class="x" data-gdel="' + esc(x.id) + '" aria-label="삭제">✕</button>' : '') + '</div>').join('') : '<div class="muted" style="padding:6px 0">아직 기록이 없어요</div>') + '</details>' : (gs.length ? gs.map((x) => '<div class="gli"><span>⚽ ' + (x.scorer.indexOf('(자책)') === 0 ? '<b>' + esc(gNm(x.scorer.slice(4))) + '</b> <small>자책골</small>' : x.scorer.charAt(0) === '(' ? '<b class="muted">골 미기록</b>' : '<b>' + lvPill(lvOfName(x.scorer)) + esc(x.scorer) + '</b>') + (x.assist ? ' <small>도움 ' + lvPill(lvOfName(x.assist)) + esc(x.assist) + '</small>' : '') + '</span>' + (x.by === S.uid || S.owner ? '<button class="x" data-gdel="' + esc(x.id) + '" aria-label="삭제">✕</button>' : '') + '</div>').join('') : '<div class="muted" style="padding:6px 0">아직 기록이 없어요</div>')) +
     '<button class="addg" data-gadd="' + esc(g.id) + '">+ 골 기록 넣기</button></div>';
 }
 function recHTML() {
@@ -1023,14 +1024,15 @@ function openGoal(gid) {
   const opts = groups.map(([l, ns]) => '<optgroup label="' + l + '">' + ns.map((n) => '<option>' + esc(n) + '</option>').join('') + '</optgroup>').join('');
   sheet('<h2>' + md(g.date) + ' 골 기록</h2><label class="sf">골 넣은 사람<select id="gs"><option value="">고르세요</option>' + opts + '</select></label>' +
     '<label class="sf">도움 (없으면 그대로)<select id="ga"><option value="">없음</option>' + opts + '</select></label>' +
+    '<label class="sf ogk"><input type="checkbox" id="gog"> 자책골이에요 (위에서 고른 사람이 우리 골대에 넣음)</label>' +
     '<div class="srow"><button id="gx">취소</button><button id="gok" class="pri">저장</button></div>', (el) => {
     el.querySelector('#gx').onclick = () => (el.hidden = true);
     el.querySelector('#gok').onclick = async () => {
-      const sc = el.querySelector('#gs').value, as = el.querySelector('#ga').value;
+      const og = el.querySelector('#gog').checked, sc0 = el.querySelector('#gs').value, as = og ? '' : el.querySelector('#ga').value, sc = og && sc0 ? '(자책)' + sc0 : sc0;
       if (!sc) return toast('골 넣은 사람을 골라주세요');
       if (sc === as) return toast('골과 도움이 같은 사람이에요');
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      try { await setDoc(CD('goals', id), { gid, scorer: sc, assist: as, by: S.uid, byName: S.me.name, at: Date.now() }); el.hidden = true; toast(sc === '(미기록)' ? '🅰️ ' + as + ' 도움 기록!' : '⚽ ' + sc + ' 골 기록!'); }
+      try { await setDoc(CD('goals', id), { gid, scorer: sc, assist: as, by: S.uid, byName: S.me.name, at: Date.now() }); el.hidden = true; toast(og ? '🙈 ' + sc0 + ' 자책골 기록' : '⚽ ' + sc + ' 골 기록!'); }
       catch (e) { toast('저장 실패: ' + e.message); logErr('저장 실패: ' + e.message, e.stack); }
     };
   });
