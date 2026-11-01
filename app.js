@@ -1640,7 +1640,7 @@ function teamCanvas(g, T, wxShort) {
       c.strokeStyle = '#FFFFFF'; c.lineWidth = 4; c.beginPath(); c.arc(px, py - 14, 28, 0, Math.PI * 2); c.stroke();
       const num = numOf(name) || (i === 0 ? 'GK' : '');
       if (num) { font(800, String(num).length > 2 ? 18 : 22); txt(String(num), px, py - 6, TCOL[ti][1], 'center'); }
-      font(700, 26); const nm = name.replace(' 일행', '+'), w = c.measureText(nm).width + 22;
+      font(700, 26); const nm = name.replace(/ 일행1$/, ' 일행'), w = c.measureText(nm).width + 22;
       c.fillStyle = 'rgba(0,0,0,.55)'; roundRect(c, px - w / 2, py + 20, w, 38, 19); c.fill();
       txt(nm, px, py + 48, '#FFFFFF', 'center');
     });
