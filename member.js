@@ -1027,10 +1027,21 @@ function openGoal(gid) {
     '<label class="sf ogk"><input type="checkbox" id="gog"> 자책골이에요 (위에서 고른 사람이 우리 골대에 넣음)</label>' +
     '<div class="srow"><button id="gx">취소</button><button id="gok" class="pri">저장</button></div>', (el) => {
     el.querySelector('#gx').onclick = () => (el.hidden = true);
+    const teamOf = (n) => T.findIndex((t) => t.indexOf(n) >= 0);
+    const gsel = el.querySelector('#gs'), asel = el.querySelector('#ga'), ogc = el.querySelector('#gog');
+    const lock = () => {                                   // 골 넣은 사람과 다른 팀은 도움으로 못 고르게 (자책골이면 도움 없음)
+      const ti = T.length >= 2 ? teamOf(gsel.value) : -1;
+      asel.querySelectorAll('optgroup').forEach((og, i) => { og.disabled = ogc.checked || (ti >= 0 && i !== ti); });
+      if (asel.value && asel.selectedOptions[0] && asel.selectedOptions[0].parentNode.disabled) { asel.value = ''; toast('도움은 골 넣은 사람과 같은 팀만 고를 수 있어요'); }
+      asel.disabled = ogc.checked;
+    };
+    gsel.onchange = lock; ogc.onchange = lock;
+    asel.onchange = () => { if (T.length >= 2 && gsel.value && asel.value && teamOf(asel.value) !== teamOf(gsel.value)) { toast('다른 팀 선수예요. 골 넣은 사람과 같은 팀에서 골라주세요'); asel.value = ''; } };
     el.querySelector('#gok').onclick = async () => {
       const og = el.querySelector('#gog').checked, sc0 = el.querySelector('#gs').value, as = og ? '' : el.querySelector('#ga').value, sc = og && sc0 ? '(자책)' + sc0 : sc0;
       if (!sc) return toast('골 넣은 사람을 골라주세요');
       if (sc === as) return toast('골과 도움이 같은 사람이에요');
+      if (!og && as && T.length >= 2 && teamOf(sc0) !== teamOf(as)) return toast('골과 도움이 다른 팀이에요. 다시 골라주세요');
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       try { await setDoc(CD('goals', id), { gid, scorer: sc, assist: as, by: S.uid, byName: S.me.name, at: Date.now() }); el.hidden = true; toast(og ? '🙈 ' + sc0 + ' 자책골 기록' : '⚽ ' + sc + ' 골 기록!'); }
       catch (e) { toast('저장 실패: ' + e.message); logErr('저장 실패: ' + e.message, e.stack); }
