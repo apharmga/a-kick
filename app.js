@@ -1169,7 +1169,7 @@ async function noticeText(gid) {
       const loc = S.cfg.wxLoc || { lat: 35.8714, lon: 128.6014 }, w = await C.fetchWx(loc.lat, loc.lon, g.date, g.time);
       setDoc(D('wx', g.id), Object.assign({}, w, { gid: g.id, date: g.date, time: g.time || '', at: Date.now() })).catch(() => {});
       const [ic, lb] = C.wxLabel(w.code), pv = C.playable(w.mx != null ? w.mx : w.pr, w.st || w.code >= 95, sport);
-      wx = ic + ' ' + lb + ' ' + w.t + '℃ · 비 올 확률 ' + w.pop + '% · 바람 ' + w.wind + 'm/s\n   👉 ' + pv.text.replace(/^\S+ /, '');
+      wx = ic + ' ' + lb + ' ' + w.t + '℃ · 비 올 확률 ' + w.pop + '% · ' + ((w.mx != null ? w.mx : w.pr) > 0 ? '강수량 ' + (w.mx != null ? w.mx : w.pr) + 'mm/시간' : '비 없음') + '\n   👉 ' + pv.text.replace(/^\S+ /, '');
     } catch (e) { wx = '🌤 날씨를 못 불러왔어요 (잠시 후 다시)'; }
   }
   const T = (g.teams || []).map((x) => x.filter((n) => playersOf(g).indexOf(n) >= 0)).filter((x) => x.length);
