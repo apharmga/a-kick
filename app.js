@@ -418,7 +418,7 @@ function gameHTML(g) {
     roster.map((n) => { const L = latest(g, n), on = att.indexOf(n) >= 0; return '<button class="mchip' + (on ? ' on' : L && L.v === '불참' ? ' no' : '') + '" data-att="' + esc(n) + '" data-g="' + g.id + '" aria-pressed="' + on + '" title="' + (L ? (L.self ? '회원 투표: ' : '직접 체크: ') + L.v : '응답 없음') + '">' + esc(n) + (L && L.self ? '<i class="vdot"></i>' : '') + '</button>'; }).join('') + '</div></div>' +
     '<button class="dl" data-dl="' + g.id + '">투표 마감 ' + (g.deadline ? esc(g.deadline.replace('T', ' ').substr(5).replace('-', '/')) : '없음 (경기 시작까지)') + ' · 바꾸기</button>' +
     '<div class="g-sec"><div class="g-lbl">게스트 ' + guests.length + '명 <small>입금 기준</small></div><div class="chips">' +
-    (guests.length ? guests.map((n) => '<span class="gchip">' + esc(n) + '</span>').join('') : '<span class="g-none">아직 없음</span>') + '</div>' +
+    (guests.length ? guests.map((n) => '<button class="gchip" data-gtx="' + esc(n) + '" data-g="' + g.id + '" title="눌러서 입금 거래 열기 (이월·분류 변경)">' + esc(n) + '</button>').join('') : '<span class="g-none">아직 없음</span>') + '</div>' +
     (pullSrc(g) ? '<button class="pullg" data-pull="' + g.id + '">↩ ' + md(pullSrc(g).date) + ' 경기 게스트 ' + guestParts(pullSrc(g).id).filter((x) => !x.p.self).reduce((a, x) => a + (x.p.cnt || 1), 0) + '명 불러오기 (우천·연기)</button>' : '') + '</div>' +
     '<div class="g-btns"><button class="btn g-btn" data-team="' + g.id + '">⚽ 팀 편성' + (g.teams ? ' 보기' : '') + '</button><button class="btn g-btn2" data-recruit="' + g.id + '">' + IC.copy + ' 모집글</button><button class="btn g-btn2" data-notice="' + g.id + '">📢 경기안내</button></div></div>';
 }
@@ -459,6 +459,12 @@ function bindWeek() {
   $('#nw').onclick = () => { S.week = C.addDays(S.week, 7); render(); };
   const j = $('#jump'); if (j) j.onclick = () => { const t = S.txs.find((x) => x.state === '확인필요'); S.week = monday(C.dtDate(t.dt)); render(); };
   document.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => editTx(b.dataset.edit)));
+  document.querySelectorAll('[data-gtx]').forEach((b) => (b.onclick = () => {
+    const n = b.dataset.gtx, base = n.replace(/\s*일행\d+$/, '').trim();
+    const x = guestParts(b.dataset.g).find((q) => [q.p.name, ...(q.p.names || []), q.t.desc].some((v) => v && String(v).trim() === base));
+    if (!x) return toast('이 게스트의 입금 거래를 못 찾았어요. 장부에서 직접 열어주세요');
+    toast('불참이면 [게스트비 → 다음 경기로 이월] 또는 분류를 바꿔 저장하세요', 5000); editTx(x.t.id);
+  }));
   document.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => quick(b.dataset.id, b.dataset.q)));
   document.querySelectorAll('[data-att]').forEach((b) => (b.onclick = async () => {
     const g = S.games.find((x) => x.id === b.dataset.g), n = b.dataset.att;
