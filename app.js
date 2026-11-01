@@ -1378,7 +1378,7 @@ function statsHTML() {
   const games = playedGames(), months = [...new Set(games.map((g) => g.date.substr(0, 7)))].sort().reverse();
   if (S.sym == null) S.sym = months[0] || '';
   const base = S.members.filter((m) => m.state !== '탈퇴').map((m) => m.name);
-  const data = C.statTable(games, S.goals, S.sym, base).filter((r) => r.ap || base.indexOf(r.name) >= 0);
+  const allN = S.members.map((m) => m.name), data = C.statTable(games, S.goals, S.sym, base).filter((r) => allN.indexOf(r.name) >= 0 && (r.ap || base.indexOf(r.name) >= 0));   // 팀 집계는 회원만
   const top = (k, l, unit) => {
     const mx = Math.max(0, ...data.map((r) => r[k])), who = data.filter((r) => r[k] === mx && mx > 0).map((r) => r.name);
     return '<div class="sum"><span>' + l + '</span><b>' + (mx ? mx + '<em>' + unit + '</em>' : '-') + '</b><small>' + esc(who.join(', ') || '아직 없음') + '</small></div>';

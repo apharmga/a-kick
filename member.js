@@ -975,7 +975,7 @@ function gameRec(g) {
 function recHTML() {
   const yms = [...new Set(played().map((g) => g.date.substr(0, 7)))].sort().reverse();
   const base = (S.pub.members || []).map((x) => x.name);
-  const rows = window.Core.statTable(played(), S.goals || [], S.sym || '', base).filter((r) => r.ap || base.indexOf(r.name) >= 0);
+  const rows = window.Core.statTable(played(), S.goals || [], S.sym || '', base).filter((r) => base.indexOf(r.name) >= 0);   // 팀 집계는 회원만 (용병 골은 경기 기록에만)
   const all = window.Core.statTable(played(), S.goals || [], '', [S.me.name]), me = all.find((r) => r.name === S.me.name) || { gp: 0, g: 0, a: 0, ap: 0 };
   const r = (S.pub.records || {})[S.me.name] || { total: 0, came: 0, last: [] }, rate = r.total ? Math.round((r.came / r.total) * 100) : 0;
   const th = (k, l) => sortTh('st', k, l);
@@ -1008,14 +1008,13 @@ function openGoal(gid) {
   const T = (g.teams || []).map((x) => x.split('|')).filter((x) => x[0]);
   const groups = T.length >= 2 ? T.map((t, i) => ['ABC'[i] + '팀', t]) : [['참석자', g.players]];
   const opts = groups.map(([l, ns]) => '<optgroup label="' + l + '">' + ns.map((n) => '<option>' + esc(n) + '</option>').join('') + '</optgroup>').join('');
-  sheet('<h2>' + md(g.date) + ' 골 기록</h2><label class="sf">골 넣은 사람<select id="gs"><option value="">고르세요</option><option value="(미기록)">기록 안 함 (도움만 기록)</option>' + opts + '</select></label>' +
+  sheet('<h2>' + md(g.date) + ' 골 기록</h2><label class="sf">골 넣은 사람<select id="gs"><option value="">고르세요</option>' + opts + '</select></label>' +
     '<label class="sf">도움 (없으면 그대로)<select id="ga"><option value="">없음</option>' + opts + '</select></label>' +
     '<div class="srow"><button id="gx">취소</button><button id="gok" class="pri">저장</button></div>', (el) => {
     el.querySelector('#gx').onclick = () => (el.hidden = true);
     el.querySelector('#gok').onclick = async () => {
       const sc = el.querySelector('#gs').value, as = el.querySelector('#ga').value;
       if (!sc) return toast('골 넣은 사람을 골라주세요');
-      if (sc === '(미기록)' && !as) return toast('도움 준 사람을 골라주세요');
       if (sc === as) return toast('골과 도움이 같은 사람이에요');
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       try { await setDoc(CD('goals', id), { gid, scorer: sc, assist: as, by: S.uid, byName: S.me.name, at: Date.now() }); el.hidden = true; toast(sc === '(미기록)' ? '🅰️ ' + as + ' 도움 기록!' : '⚽ ' + sc + ' 골 기록!'); }
