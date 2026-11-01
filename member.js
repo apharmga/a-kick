@@ -1026,6 +1026,7 @@ function openGoal(gid) {
     '<label class="sf">도움 (없으면 그대로)<select id="ga"><option value="">없음</option>' + opts + '</select></label>' +
     '<label class="sf ogk"><input type="checkbox" id="gog"> 자책골이에요 (위에서 고른 사람이 우리 골대에 넣음)</label>' +
     '<div class="srow"><button id="gx">취소</button><button id="gok" class="pri">저장</button></div>', (el) => {
+    delete el.dataset.busy;
     el.querySelector('#gx').onclick = () => (el.hidden = true);
     const teamOf = (n) => T.findIndex((t) => t.indexOf(n) >= 0);
     const gsel = el.querySelector('#gs'), asel = el.querySelector('#ga'), ogc = el.querySelector('#gog');
@@ -1042,8 +1043,9 @@ function openGoal(gid) {
       if (!sc) return toast('골 넣은 사람을 골라주세요');
       if (sc === as) return toast('골과 도움이 같은 사람이에요');
       if (!og && as && T.length >= 2 && teamOf(sc0) !== teamOf(as)) return toast('골과 도움이 다른 팀이에요. 다시 골라주세요');
+      if (el.dataset.busy) return; el.dataset.busy = '1'; el.hidden = true;   // 저장 누르면 바로 닫음 → 연달아 눌러도 한 번만 저장
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      try { await setDoc(CD('goals', id), { gid, scorer: sc, assist: as, by: S.uid, byName: S.me.name, at: Date.now() }); el.hidden = true; toast(og ? '🙈 ' + sc0 + ' 자책골 기록' : '⚽ ' + sc + ' 골 기록!'); }
+      try { await setDoc(CD('goals', id), { gid, scorer: sc, assist: as, by: S.uid, byName: S.me.name, at: Date.now() }); toast(og ? '🙈 ' + sc0 + ' 자책골 기록' : '⚽ ' + sc + ' 골 기록!'); }
       catch (e) { toast('저장 실패: ' + e.message); logErr('저장 실패: ' + e.message, e.stack); }
     };
   });
