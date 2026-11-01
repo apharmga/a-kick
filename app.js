@@ -724,8 +724,34 @@ function addMatch(g) {
     };
   });
 }
+/** 실력 점수 조정 추천 — 개인 기록(골·도움)만 봄, 팀 승패는 안 봄. 자동으로 바꾸지 않고 관리자가 [적용]해야 바뀜 */
+function sgIgn() { try { return JSON.parse(localStorage.getItem('akick_sgign') || '{}'); } catch (e) { return {}; } }
+function scoreSuggest() {
+  const rec = {}; (S.goals || []).forEach((x) => (rec[x.gid] = 1));
+  const games = playedGames().filter((g) => rec[g.id]);               // 골 기록이 있는 경기만
+  const names = S.members.filter((m) => m.state !== '탈퇴').map((m) => m.name);
+  const st = names.map((n) => {
+    const gl = games.filter((g) => g.players.indexOf(n) >= 0), ids = {}; gl.forEach((g) => (ids[g.id] = 1));
+    let go = 0, as = 0; (S.goals || []).forEach((x) => { if (!ids[x.gid]) return; if (x.scorer === n) go++; if (x.assist === n) as++; });
+    return { n, gp: gl.length, go, as, apg: gl.length ? (go + as * 0.7) / gl.length : 0 };
+  }).filter((r) => r.gp >= 5);
+  if (st.length < 3) return { list: [], need: 5 };
+  const mean = st.reduce((s, r) => s + r.apg, 0) / st.length, sd = Math.sqrt(st.reduce((s, r) => s + (r.apg - mean) ** 2, 0) / st.length) || 1, ign = sgIgn();
+  const list = st.map((r) => {
+    const cur = scoreOf(r.n), z = (r.apg - mean) / sd;
+    const to = z >= 1 && cur < 5 ? cur + 1 : z <= -1 && cur > 1 && r.gp >= 8 ? cur - 1 : cur;
+    return Object.assign(r, { cur, to, key: r.n + ':' + cur + '>' + to + ':' + r.gp, why: r.gp + '경기 골 ' + r.go + ' · 도움 ' + r.as + ' (경기당 ' + r.apg.toFixed(1) + ', 평균 ' + mean.toFixed(1) + ')' });
+  }).filter((r) => r.to !== r.cur && !ign[r.key]);
+  return { list };
+}
+function suggestHTML() {
+  const s = scoreSuggest();
+  if (!s.list.length) return '<div class="sgbox muted">📈 점수 조정 추천 · ' + (s.need ? '회원 3명 이상이 골 기록 있는 경기 ' + s.need + '번 이상 뛰면 추천이 떠요' : '지금은 바꿀 만한 사람이 없어요') + '</div>';
+  return '<div class="sgbox"><b>📈 점수 조정 추천</b><small>골·도움 기록만 보고 계산했어요 (팀 승패는 안 봐요). 수비·골키퍼는 낮게 나올 수 있으니 참고만 하세요</small>' +
+    s.list.map((r) => '<div class="sgr"><span><b>' + esc(r.n) + '</b> ' + r.cur + ' → <b class="' + (r.to > r.cur ? 'up' : 'dn') + '">' + r.to + '</b><small>' + esc(r.why) + '</small></span><span><button class="btn xs" data-sgno="' + esc(r.key) + '">무시</button> <button class="btn xs pri" data-sgok="' + esc(r.n) + '" data-v="' + r.to + '">적용</button></span></div>').join('') + '</div>';
+}
 function scoreList(players) {
-  return '<div class="panel pad"><div class="g-lbl2" style="margin-bottom:10px">실력 점수 (관리자만 보여요 · 카톡에는 이름만 나가요)</div><div class="slist">' +
+  return '<div class="panel pad">' + suggestHTML() + '<div class="g-lbl2" style="margin-bottom:10px">실력 점수 (관리자만 보여요 · 카톡에는 이름만 나가요)</div><div class="slist">' +
     players.map((n) => '<div class="srow"><span>' + esc(n) + (scores()[n] ? '' : ' <em class="tag gry">새</em>') + '</span><span class="seg5">' + [1, 2, 3, 4, 5].map((v) => '<button class="' + (scoreOf(n) === v ? 'on' : '') + '" data-sc="' + esc(n) + '" data-v="' + v + '" aria-label="' + esc(n) + ' ' + v + '점">' + v + '</button>').join('') + '</span></div>').join('') +
     '</div><div class="muted" style="margin-top:8px">5 에이스 · 4 잘함 · 3 보통(모르면 3) · 2 초보 · 1 입문</div></div>';
 }
@@ -767,6 +793,8 @@ function bindTeam() {
   }));
   bindDrag(swap);
   document.querySelectorAll('[data-sc]').forEach((b) => (b.onclick = async () => { scores()[b.dataset.sc] = +b.dataset.v; render(); await putSkills(); }));
+  document.querySelectorAll('[data-sgok]').forEach((b) => (b.onclick = async () => { scores()[b.dataset.sgok] = +b.dataset.v; render(); await putSkills(); toast(b.dataset.sgok + ' 점수를 ' + b.dataset.v + '로 바꿨어요'); }));
+  document.querySelectorAll('[data-sgno]').forEach((b) => (b.onclick = () => { const x = sgIgn(); x[b.dataset.sgno] = 1; try { localStorage.setItem('akick_sgign', JSON.stringify(x)); } catch (e) {} render(); }));
 }
 
 /** 꾹 눌러서 끌어다 놓기: 0.3초 누르면 선수가 손가락을 따라오고, 다른 팀 선수 위에서 떼면 서로 바뀜 */
