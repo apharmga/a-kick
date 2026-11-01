@@ -499,13 +499,13 @@
     function row(n) { return R[n] = R[n] || { name: n, gp: 0, g: 0, a: 0, ap: 0 }; }
     (base || []).forEach(row);
     gs.forEach(function (g) { ids[g.id] = 1; (g.players || []).forEach(function (n) { row(n).gp++; }); });
-    goals.forEach(function (x) { if (!ids[x.gid]) return; if (x.scorer) { row(x.scorer).g++; row(x.scorer).ap++; } if (x.assist) { row(x.assist).a++; row(x.assist).ap++; } });
+    goals.forEach(function (x) { if (!ids[x.gid]) return; if (x.scorer && x.scorer.charAt(0) !== '(') { row(x.scorer).g++; row(x.scorer).ap++; } if (x.assist) { row(x.assist).a++; row(x.assist).ap++; } });
     return Object.keys(R).map(function (k) { return R[k]; });
   }
   /** 경기 점수: 팀 편성 기준 [A팀 골, B팀 골, C팀 골] */
   function score(game, goals) {
     var T = game.teams || [], s = T.map(function () { return 0; });
-    goals.forEach(function (x) { if (x.gid !== game.id) return; T.forEach(function (t, i) { if (t.indexOf(x.scorer) >= 0) s[i]++; }); });
+    goals.forEach(function (x) { if (x.gid !== game.id) return; var who = x.scorer && x.scorer.charAt(0) !== '(' ? x.scorer : x.assist; T.forEach(function (t, i) { if (t.indexOf(who) >= 0) s[i]++; }); });
     return s;
   }
   /** 3파전 타임테이블: tri {min 한 판(분), rest 판 사이 휴식(분), n 판 수, start 'HH:MM'} → 판마다 시간·경기 팀·쉬는 팀 (순서 고정 A:B → B:C → C:A) */
@@ -609,7 +609,7 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v0.98';
+  var VERSION = 'v0.99';
   var Core = { mix: mix, diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, triPlan: triPlan, rotPlan: rotPlan, rotN: rotN, sideLabel: sideLabel, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
