@@ -419,7 +419,7 @@ function gameHTML(g) {
     '<button class="dl" data-dl="' + g.id + '">투표 마감 ' + (g.deadline ? esc(g.deadline.replace('T', ' ').substr(5).replace('-', '/')) : '없음 (경기 시작까지)') + ' · 바꾸기</button>' +
     '<div class="g-sec"><div class="g-lbl">게스트 ' + guests.length + '명 <small>입금 기준</small></div><div class="chips">' +
     (guests.length ? guests.map((n) => '<button class="gchip" data-gtx="' + esc(n) + '" data-g="' + g.id + '" title="눌러서 입금 거래 열기 (이월·분류 변경)">' + esc(n) + '</button>').join('') : '<span class="g-none">아직 없음</span>') + '</div>' +
-    (pullSrc(g) ? '<button class="pullg" data-pull="' + g.id + '">↩ ' + md(pullSrc(g).date) + ' 경기 게스트 ' + guestParts(pullSrc(g).id).filter((x) => !x.p.self).reduce((a, x) => a + (x.p.cnt || 1), 0) + '명 불러오기 (우천·연기)</button>' : '') + '</div>' +
+    '</div>' +
     '<div class="g-btns"><button class="btn g-btn" data-team="' + g.id + '">⚽ 팀 편성' + (g.teams ? ' 보기' : '') + '</button><button class="btn g-btn2" data-recruit="' + g.id + '">' + IC.copy + ' 모집글</button><button class="btn g-btn2" data-notice="' + g.id + '">📢 경기안내</button></div></div>';
 }
 /* ---- 연기된 경기의 게스트를 새 경기로 불러오기 ---- */
