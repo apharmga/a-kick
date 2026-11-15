@@ -480,7 +480,11 @@ function bindWeek() {
     render(); await putGame(g);
   }));
   document.querySelectorAll('[data-recruit]').forEach((b) => (b.onclick = () => recruitText(b.dataset.recruit)));
-  document.querySelectorAll('[data-notice]').forEach((b) => (b.onclick = () => noticeText(b.dataset.notice)));
+  document.querySelectorAll('[data-notice]').forEach((b) => {
+    b.onclick = () => noticeText(b.dataset.notice);
+    const g = S.games.find((x) => x.id === b.dataset.notice);   // 미리 날씨를 받아둬서 누르면 바로 나오게
+    if (g && (Date.parse(g.date) - Date.now()) / 864e5 <= 15) wxGet(g, 20000).catch(() => {});
+  });
   document.querySelectorAll('[data-pull]').forEach((b) => (b.onclick = () => pullGuests(b.dataset.pull)));
   document.querySelectorAll('[data-team]').forEach((b) => (b.onclick = () => { S.gid = b.dataset.team; S.view = 'team'; S.pick = null; render(); window.scrollTo(0, 0); }));
   document.querySelectorAll('[data-newgame]').forEach((b) => (b.onclick = () => newGameAsk(b.dataset.newgame)));
@@ -1188,6 +1192,32 @@ function recruitText(gid) {
     '✅ 실력 무관 · 초보 환영 · 1인 참가 OK\n✅ 참가비 ' + won(S.cfg.guestFee) + '원\n\n현재 ' + total + '명 확정 🙌' + (S.cfg.openChat ? '\n' + S.cfg.openChat : ''));
 }
 /** 경기안내 문구 (참석 인원 · 날씨 · 팀) — 날씨는 누를 때 새로 받아옴 */
+/** 경기 날씨: ① 3시간 안에 받아둔 것 ② 새로 받기(최대 ms, 실패 시 1번 더) ③ 회원 앱이 저장해둔 날씨(12시간 이내) */
+const wxMem = {}, wxFly = {};
+function wxGet(g, ms) {
+  const key = g.id + '@' + (g.time || ''), hit = wxMem[key];
+  if (hit && Date.now() - hit.at < 3 * 3600e3) return Promise.resolve(hit.w);
+  if (!wxFly[key]) wxFly[key] = wxLoad(g, ms, key).finally(() => delete wxFly[key]);
+  return wxFly[key];
+}
+async function wxLoad(g, ms, key) {
+  const loc = S.cfg.wxLoc || { lat: 35.8714, lon: 128.6014 };
+  const once = (t) => Promise.race([C.fetchWx(loc.lat, loc.lon, g.date, g.time), new Promise((_, rej) => setTimeout(() => rej(new Error('응답 없음 ' + t / 1000 + '초')), t))]);
+  let err;
+  for (const t of [ms, ms]) {
+    try {
+      const w = await once(t); wxMem[key] = { w, at: Date.now() };
+      setDoc(D('wx', g.id), Object.assign({}, w, { gid: g.id, date: g.date, time: g.time || '', at: Date.now() })).catch(() => {});
+      return w;
+    } catch (e) { err = e; }
+  }
+  try {
+    const d = await getDoc(D('wx', g.id)), v = d.exists() ? d.data() : null;
+    if (v && v.t != null && (v.time || '') === (g.time || '') && Date.now() - (v.at || 0) < 12 * 3600e3) return v;
+  } catch (e) {}
+  logErr('경기안내 날씨 실패: ' + (err && err.message), err && err.stack);
+  throw err || new Error('날씨 없음');
+}
 let noticeBusy = false;
 async function noticeText(gid) {
   if (noticeBusy) return toast('경기안내 만드는 중이에요…');
@@ -1204,9 +1234,7 @@ async function noticeTextReal(gid) {
   let wx = '🌤 날씨는 경기 15일 전부터 나와요';
   if ((Date.parse(g.date) - Date.now()) / 864e5 <= 15) {
     try {
-      const loc = S.cfg.wxLoc || { lat: 35.8714, lon: 128.6014 };
-      const w = await Promise.race([C.fetchWx(loc.lat, loc.lon, g.date, g.time), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000))]);
-      setDoc(D('wx', g.id), Object.assign({}, w, { gid: g.id, date: g.date, time: g.time || '', at: Date.now() })).catch(() => {});
+      const w = await Promise.race([wxGet(g, 10000), new Promise((_, rej) => setTimeout(() => rej(new Error('응답 없음')), 15000))]);
       const [ic, lb] = C.wxLabel(w.code), pv = C.playable(w.mx != null ? w.mx : w.pr, w.st || w.code >= 95, sport);
       wx = ic + ' ' + lb + ' ' + w.t + '℃ · 비 올 확률 ' + w.pop + '% · ' + ((w.mx != null ? w.mx : w.pr) > 0 ? '강수량 ' + (w.mx != null ? w.mx : w.pr) + 'mm/시간' : '비 없음') + '\n   👉 ' + pv.text.replace(/^\S+ /, '');
     } catch (e) { wx = '🌤 날씨를 못 불러왔어요 (잠시 후 다시)'; }
