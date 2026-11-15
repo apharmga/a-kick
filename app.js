@@ -1188,13 +1188,24 @@ function recruitText(gid) {
     '✅ 실력 무관 · 초보 환영 · 1인 참가 OK\n✅ 참가비 ' + won(S.cfg.guestFee) + '원\n\n현재 ' + total + '명 확정 🙌' + (S.cfg.openChat ? '\n' + S.cfg.openChat : ''));
 }
 /** 경기안내 문구 (참석 인원 · 날씨 · 팀) — 날씨는 누를 때 새로 받아옴 */
+let noticeBusy = false;
 async function noticeText(gid) {
-  const g = S.games.find((x) => x.id === gid), att = attOf(g), gs = C.guestNames(S.txs, gid, att), total = att.length + gs.length;
+  if (noticeBusy) return toast('경기안내 만드는 중이에요…');
+  noticeBusy = true; toast('경기안내 만드는 중… (날씨 불러오는 중)', 8000);
+  try { await noticeTextReal(gid); }
+  catch (e) { toast('경기안내를 못 만들었어요: ' + (e && e.message || e), 6000); logErr('경기안내 실패: ' + (e && e.message), e && e.stack); }
+  finally { noticeBusy = false; }
+}
+async function noticeTextReal(gid) {
+  const g = S.games.find((x) => x.id === gid);
+  if (!g) throw new Error('경기를 찾지 못했어요. 새로고침 후 다시 눌러주세요');
+  const att = attOf(g), gs = C.guestNames(S.txs, gid, att), total = att.length + gs.length;
   const sport = S.cfg.sport || (perSide() >= 8 ? 'soccer' : 'futsal');
   let wx = '🌤 날씨는 경기 15일 전부터 나와요';
   if ((Date.parse(g.date) - Date.now()) / 864e5 <= 15) {
     try {
-      const loc = S.cfg.wxLoc || { lat: 35.8714, lon: 128.6014 }, w = await C.fetchWx(loc.lat, loc.lon, g.date, g.time);
+      const loc = S.cfg.wxLoc || { lat: 35.8714, lon: 128.6014 };
+      const w = await Promise.race([C.fetchWx(loc.lat, loc.lon, g.date, g.time), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000))]);
       setDoc(D('wx', g.id), Object.assign({}, w, { gid: g.id, date: g.date, time: g.time || '', at: Date.now() })).catch(() => {});
       const [ic, lb] = C.wxLabel(w.code), pv = C.playable(w.mx != null ? w.mx : w.pr, w.st || w.code >= 95, sport);
       wx = ic + ' ' + lb + ' ' + w.t + '℃ · 비 올 확률 ' + w.pop + '% · ' + ((w.mx != null ? w.mx : w.pr) > 0 ? '강수량 ' + (w.mx != null ? w.mx : w.pr) + 'mm/시간' : '비 없음') + '\n   👉 ' + pv.text.replace(/^\S+ /, '');
@@ -1208,6 +1219,7 @@ async function noticeText(gid) {
     (T.length >= 2 ? '\n⚽ 팀 편성은 그림 참고\n' : '') +
     (gs.length && S.cfg.guestFee ? '\n💰 게스트 참가비 ' + won(S.cfg.guestFee) + '원' : '') +
     (T.length >= 2 ? '' : '\n\n팀 편성은 경기 전에 다시 올릴게요!'));
+  $('#toast').hidden = true;
   if (T.length < 2) return copy(msg);
   const wxShort = wx.split('\n')[0].replace(/^🌤 /, '');
   showImg(teamCanvas(g, T, wxShort), '📢 ' + md(g.date) + ' 경기안내', md(g.date).replace('/', '-') + ' 경기안내.png', msg);
