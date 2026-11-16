@@ -194,7 +194,8 @@ async function openPost(pid) {
   let priv = null;
   if (ok) { const s = await getDoc(doc(db, 'gposts', pid, 'priv', 'info')).catch(() => null); priv = s && s.exists() ? s.data() : null; }
   const full = (p.okN || 0) >= p.need, rookieBlock = p.firstOk === false && S.stats && S.stats.a === 0;
-  const canApply = S.uid && (!a || (a.state === 'cancel' && !a.exp)) && p.status === 'open' && !p._old;
+  const mineP = S.uid && p.owner === S.uid;
+  const canApply = S.uid && !mineP && (!a || (a.state === 'cancel' && !a.exp)) && p.status === 'open' && !p._old;
   sheet('<div class="phero"><div class="when">' + md(p.date) + '(' + dayN(p.date) + ') ' + esc(p.time || '') + '</div><div class="where">' + esc(p.place || '') + ' · ' + esc(p.region1) + ' ' + esc(p.region2 || '') + '</div>' +
     '<div class="meta"><span class="pill">' + Math.max(0, p.need - (p.okN || 0)) + '명 구해요</span><span class="pill">' + won(p.fee) + '원</span><span class="pill">' + esc(p.mood) + '</span><span class="pill">포지션 ' + esc(p.pos || '무관') + '</span></div></div>' +
     '<div class="card"><div class="lbl">이 모임은요</div><div class="kv"><span>모임</span><b>' + esc(p.club) + '</b></div>' + (p.style ? '<div class="kv"><span>방식</span><b>' + esc(p.style) + '</b></div>' : '') +
@@ -211,6 +212,7 @@ async function openPost(pid) {
       (full ? '<p class="note warn">정원이 찼어요. 지금 신청하면 대기로 들어가고, 자리가 나면 수락돼요.</p>' : '') +
       '<p class="note">수락되면 <b>수락을 확인한 때부터 3시간 안에</b> 참가비를 보내야 확정돼요. 경기 3시간 전에는 자동 마감돼요.</p>' +
       '<button class="btn" id="go">' + (full ? '대기 신청하기' : '참가 신청하기') + '</button></div>')
+      : mineP ? '<div class="card"><p class="note">내가 올린 모집글이에요. 신청 관리는 <a href="admin.html?c=' + encodeURIComponent(p.cid) + '">관리자 화면</a> → 이번 주 경기 → 🤝 게스트 모집에서 해요.</p></div>'
       : !S.uid ? '<div class="card"><p class="note">신청하려면 먼저 로그인해 주세요.</p></div>'
       : a && a.state !== 'cancel' && !ok ? '<div class="card"><div class="kv"><span>내 신청</span><b>' + stateText(a, p) + '</b></div>' + (a.state === 'req' || a.state === 'wl' ? '<button class="sbtn" data-cancel="' + esc(pid) + '">신청 취소</button>' : '') + '</div>' : '') +
     '<div class="rep"><button class="lnk" id="rp">🚩 이 글 신고하기</button> · <button class="lnk" id="bl">🚫 이 모임 안 보기</button></div>' +
