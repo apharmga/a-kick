@@ -1814,21 +1814,20 @@ async function loadRef(m) {
     let code = (mineQ.find((d) => !d.data().venue) || {}).id;
     for (let i = 0; !code && i < 5; i++) { const c = genCode(); if (!(await getDoc(doc(db, 'refs', c))).exists()) { await setDoc(doc(db, 'refs', c), { uid: S.uid, at: Date.now() }); code = c; } }
     const teams = await teamsBy(code), act = teams.filter(refActive).length, link = REF_ROOT + '?ref=' + code;
+    // 보상(Pro 적립)은 유료 기능이 없어 화면에서 숨김 · 추천 기록(refBy)은 그대로 쌓여서 나중에 보상이 생기면 소급 가능
+    const OLDREF = false;
     let me = '';
-    if (S.club.refBy) {
+    if (OLDREF && S.club.refBy) {
       const ok = refActive(S.club), st = S.club.stat || { m: 0, g: 0 };
       me = '<div class="refme">추천 코드 <b>' + esc(S.club.refBy) + '</b>로 시작한 팀이에요 · ' + (ok ? '✅ 활성 팀 · <b>Pro ' + R_GET + '개월 적립</b>' : '⏳ 활성 팀이 되면 Pro ' + R_GET + '개월 적립 (회원 연결 ' + Math.min(st.m, RM) + '/' + RM + ' · 경기 ' + Math.min(st.g, RG) + '/' + RG + ')') + '</div>';
-    } else if (Date.now() - Date.parse(S.club.created || 0) < 30 * 864e5) {
+    } else if (OLDREF && Date.now() - Date.parse(S.club.created || 0) < 30 * 864e5) {
       me = '<div class="refin"><input id="rfin" maxlength="12" placeholder="받은 추천 코드 (팀 만든 뒤 30일까지)"><button class="btn" id="rfok">등록</button></div>';
     }
-    box.innerHTML = '<div class="g-lbl2">추천 · 다른 팀 총무에게 A-KICK 알려주기</div>' +
-      '<div class="refcode"><span>내 추천 코드</span><b>' + code + '</b><button class="btn pri" id="rfcp">추천 문구 복사</button></div>' +
-      '<div class="refsum"><span>가입한 팀 <b>' + teams.length + '</b></span><span>활성 팀 <b>' + act + '</b></span><span>적립 <b>Pro ' + act * R_GIVE + '개월</b></span></div>' +
-      '<div class="refbd">' + refBadges.map(([n, ic, t]) => '<span class="' + (act >= n ? 'on' : '') + '"><i>' + ic + '</i>' + t + '<small>활성 ' + n + '팀</small></span>').join('') + '</div>' +
-      (teams.length ? '<div class="reflist">' + teams.map((c) => '<div><b>' + esc(c.name) + '</b><span>' + (refActive(c) ? '✅ 활성' : '⏳ 회원 ' + Math.min((c.stat || {}).m || 0, RM) + '/' + RM + ' · 경기 ' + Math.min((c.stat || {}).g || 0, RG) + '/' + RG) + '</span></div>').join('') + '</div>' : '') +
-      '<div class="muted">추천받은 팀이 <b>활성 팀</b>(앱에 연결된 회원 ' + RM + '명 + 경기 ' + RG + '번)이 되면 나는 Pro ' + R_GIVE + '개월, 그 팀은 Pro ' + R_GET + '개월이 적립돼요. 지금은 무료라 유료 기능이 생기는 날 자동 적용돼요.</div>' + me +
+    box.innerHTML = '<div class="g-lbl2">다른 팀 총무에게 A-KICK 알려주기</div>' +
+      '<div class="refcode"><span>아는 총무가 있으면 이 문구를 보내주세요</span><button class="btn pri" id="rfcp">알려주기 문구 복사</button></div>' +
+      (teams.length ? '<div class="muted">내 링크로 시작한 팀 <b>' + teams.length + '</b>곳' + (act ? ' · 실제로 쓰는 팀 <b>' + act + '</b>곳' : '') + ' 🙌</div>' : '') + me +
       (S.uid && auth.currentUser && auth.currentUser.email === OPERATOR ? '<div id="venuebox"></div>' : '');
-    box.querySelector('#rfcp').onclick = () => copy('⚽ 총무 일 줄여주는 앱 A-KICK 써보세요!\n모임통장 엑셀만 올리면 회비·게스트비 정리 끝, 참석 투표·팀 편성도 돼요.\n이 링크로 팀을 만들면 Pro 무료 이용권을 드려요 (유료화 때 적용)\n👉 ' + link);
+    box.querySelector('#rfcp').onclick = () => copy('⚽ 총무 일 줄여주는 무료 앱 A-KICK 써보세요!\n참석 투표·팀 편성은 앱이 하고, 모임통장 엑셀만 올리면 회비·게스트비 정리도 끝나요.\n게스트 구할 때는 게스트 매칭도 돼요.\n👉 ' + link);
     const ok = box.querySelector('#rfok');
     if (ok) ok.onclick = async () => {
       const rc = box.querySelector('#rfin').value.trim().toUpperCase(); if (!rc) return;
