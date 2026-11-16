@@ -490,6 +490,8 @@ async function showNumbers() {
       row('써 본 팀', used.length + '팀', '회원 2명 이상 연결 또는 경기 1번 이상') +
       row('활발히 쓰는 팀', act.length + '팀', '회원 5명 이상 연결 + 경기 2번 이상') +
       row('앱에 연결된 회원', mem + '명', '팀별 연결 회원 합계 (겹칠 수 있음)') + row('게스트 매칭 모집글', gp + '개', '지난 글 포함') +
+      '<div class="lbl" style="margin-top:14px">팀 목록 (최근 만든 순)</div>' + cs.slice().sort((a, b) => Date.parse(b.created || 0) - Date.parse(a.created || 0)).map((c) => row(esc(c.name || '(이름 없음)') + (c.owner === S.uid ? ' <em class="mine">내 팀</em>' : ''),
+        '회원 ' + ((c.stat && c.stat.m) || 0) + ' · 경기 ' + ((c.stat && c.stat.g) || 0), (c.created ? c.created.slice(0, 10) + ' 만듦' : '') + (c.refBy ? ' · 추천 ' + esc(c.refBy) : ''))).join('') +
       '<p class="muted">홍보 문구에는 "활발히 쓰는 팀" 숫자를 쓰는 게 정직해요. 테스트로 만든 팀도 포함돼 있어요.</p><div class="srow"><button class="pri" id="nx">닫기</button></div>', (el) => (el.querySelector('#nx').onclick = () => (el.hidden = true)));
   } catch (e) { toast('못 세었어요: ' + e.message); }
 }
