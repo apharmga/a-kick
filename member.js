@@ -20,6 +20,11 @@ function openOutside() {
   const url = location.href;
   if (IS_KAKAO) location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
   else if (IS_ANDROID) location.href = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+  else if (/iPhone|iPad|iPod/i.test(UA)) {
+    // 아이폰 인스타·페북·네이버 등: iOS 17+ 는 x-safari- 주소로 사파리를 바로 열 수 있음. 안 열리면(구버전·앱이 막음) 직접 여는 방법 안내
+    location.href = 'x-safari-' + url;
+    setTimeout(() => { const h = document.getElementById('exthelp'); if (h) h.hidden = false; }, 1500);
+  }
 }
 if (IS_KAKAO) openOutside();
 const INAPP = /KAKAOTALK|NAVER\(|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp|BAND\//i.test(UA);
@@ -82,8 +87,11 @@ onAuthStateChanged(auth, (u) => { if (IS_DEMO) return startDemo(); if (!u) retur
 function renderLogin() {
   view('<div class="login"><div class="logo8"><div class="stk">A-KICK</div><div class="pills"><span class="p1">⚽ FUTSAL</span><span class="p2">🥅 FOOTBALL</span></div></div>' +
     '<p class="lt">우리 모임, 오늘도 킥오프!<br><span>참석 투표 · 팀 편성 · 회비 · 장부</span></p>' +
-    (INAPP ? '<div class="warn"><b>카카오톡·밴드 안에서는 구글 로그인이 막혀 있어요.</b><br>아래 버튼을 누르면 ' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 바로 열려요.' +
-      '<button id="ext" class="extbtn">' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 열기</button><button id="cpl" class="lnk">안 열리면 링크 복사</button></div>'
+    (INAPP ? '<div class="warn"><b>' + (/Instagram/i.test(UA) ? '인스타그램' : /FBAN|FBAV/i.test(UA) ? '페이스북' : /NAVER\(/i.test(UA) ? '네이버 앱' : '카카오톡·밴드') + ' 안에서는 구글 로그인이 막혀 있어요.</b><br>아래 버튼을 누르면 ' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 바로 열려요.' +
+      '<button id="ext" class="extbtn">' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 열기</button>' +
+      (/iPhone|iPad/i.test(UA) ? '<div id="exthelp" class="exthelp"' + (/Instagram|FBAN|FBAV/i.test(UA) ? '' : ' hidden') + '><b>사파리가 안 열리면</b>' +
+        (/Instagram/i.test(UA) ? '오른쪽 위 <b>⋯</b> → <b>외부 브라우저에서 열기</b>를 눌러주세요' : /FBAN|FBAV/i.test(UA) ? '오른쪽 위 <b>⋯</b> → <b>외부 브라우저로 열기</b>를 눌러주세요' : '아래 버튼으로 링크를 복사해 사파리 주소창에 붙여넣어 주세요') + '</div>' : '') +
+      '<button id="cpl" class="lnk">안 열리면 링크 복사</button></div>'
       : '<button class="gbtn" id="in"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>구글로 시작하기</button>' +
         '<small>처음이면 로그인 → 이름 쓰고 가입 신청 → 관리자 승인 후 입장</small>') + DEMO_BTN + '<a class="about" href="about.html">A-KICK 소개 보기 ›</a>' + LEGAL + '</div>');
   bindDemoBtn();
