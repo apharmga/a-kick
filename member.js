@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, deleteUser } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, deleteUser, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, doc, getDoc as _getDoc, setDoc as _setDoc, deleteDoc as _deleteDoc, writeBatch as _writeBatch, onSnapshot as _onSnapshot, query, where, getDocs as _getDocs, addDoc as _addDoc, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { demoData } from './demo.js';
 import { IOS_APP, STORE_APP, nativeSignIn, signInButtons, providerOf, workoutFor, tap, revokeApple, scheduleAlarms, setWidget } from './native.js';
@@ -87,18 +87,37 @@ onAuthStateChanged(auth, (u) => { if (IS_DEMO) return startDemo(); if (!u) retur
 function renderLogin() {
   view('<div class="login"><div class="logo8"><div class="stk">A-KICK</div><div class="pills"><span class="p1">⚽ FUTSAL</span><span class="p2">🥅 FOOTBALL</span></div></div>' +
     '<p class="lt">우리 모임, 오늘도 킥오프!<br><span>참석 투표 · 팀 편성 · 회비 · 장부</span></p>' +
-    (INAPP ? '<div class="warn"><b>' + (/Instagram/i.test(UA) ? '인스타그램' : /FBAN|FBAV/i.test(UA) ? '페이스북' : /NAVER\(/i.test(UA) ? '네이버 앱' : '카카오톡·밴드') + ' 안에서는 구글 로그인이 막혀 있어요.</b><br>아래 버튼을 누르면 ' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 바로 열려요.' +
+    (INAPP ? emailBox(true) + '<div class="warn"><b>' + (/Instagram/i.test(UA) ? '인스타그램' : /FBAN|FBAV/i.test(UA) ? '페이스북' : /NAVER\(/i.test(UA) ? '네이버 앱' : '카카오톡·밴드') + ' 안에서는 구글 로그인이 막혀 있어요.</b><br>구글 계정으로 쓰려면 ' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 열어주세요.' +
       '<button id="ext" class="extbtn">' + (/iPhone|iPad/i.test(UA) ? '사파리' : '크롬') + '로 열기</button>' +
       (/iPhone|iPad/i.test(UA) ? '<div id="exthelp" class="exthelp" hidden><b>사파리가 안 열리면</b>' +
         (/Instagram/i.test(UA) ? '오른쪽 위 <b>⋯</b> → <b>외부 브라우저에서 열기</b>를 눌러주세요' : /FBAN|FBAV/i.test(UA) ? '오른쪽 위 <b>⋯</b> → <b>외부 브라우저로 열기</b>를 눌러주세요' : '아래 버튼으로 링크를 복사해 사파리 주소창에 붙여넣어 주세요') + '</div>' : '') +
       '<button id="cpl" class="lnk">안 열리면 링크 복사</button></div>'
       : '<button class="gbtn" id="in"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>구글로 시작하기</button>' +
-        '<small>처음이면 로그인 → 이름 쓰고 가입 신청 → 관리자 승인 후 입장</small>') + DEMO_BTN + '<a class="about" href="about.html">A-KICK 소개 보기 ›</a>' + LEGAL + '</div>');
+        '<small>처음이면 로그인 → 이름 쓰고 가입 신청 → 관리자 승인 후 입장</small>' + (IOS_APP ? '' : emailBox(false))) + DEMO_BTN + '<a class="about" href="about.html">A-KICK 소개 보기 ›</a>' + LEGAL + '</div>');
   bindDemoBtn();
   const i = $('#in'); if (i) i.onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => toast(e.code === 'auth/popup-closed-by-user' ? '로그인을 취소했어요' : '로그인 실패: ' + e.message));
   if (IOS_APP && i) iosLogin(i);
   const x = $('#ext'); if (x) x.onclick = openOutside;
   const c = $('#cpl'); if (c) c.onclick = () => copy(location.href, '링크를 복사했어요. 사파리·크롬 주소창에 붙여넣으세요');
+  bindEmail();
+}
+
+/* 이메일로 시작하기: 인스타·페북처럼 구글 로그인이 막힌 앱 안 브라우저에서도 바로 쓰게 (사파리로 안 넘어가도 됨) */
+function emailBox(open) {
+  return '<div class="embox"' + (open ? '' : ' data-closed="1"') + '>' + (open ? '<b class="emt">✉️ 여기서 바로 시작하기</b>' : '<button class="lnk" id="emopen">이메일로 시작하기</button>') +
+    '<div class="emf"' + (open ? '' : ' hidden') + '><input id="eme" type="email" autocomplete="email" inputmode="email" placeholder="이메일"><input id="emp" type="password" autocomplete="current-password" placeholder="비밀번호 (6자 이상)">' +
+    '<div class="emb"><button id="emin" class="ebtn pri">로그인</button><button id="emup" class="ebtn">처음이에요 · 가입</button></div><button class="lnk" id="emfg">비밀번호를 잊었어요</button></div></div>';
+}
+function bindEmail() {
+  const op = $('#emopen'); if (op) op.onclick = () => { op.hidden = true; document.querySelector('.emf').hidden = false; $('#eme').focus(); };
+  const v = () => [($('#eme') || {}).value ? $('#eme').value.trim() : '', ($('#emp') || {}).value || ''];
+  const msg = (e) => ({ 'auth/invalid-credential': '이메일이나 비밀번호가 맞지 않아요. 처음이면 [처음이에요 · 가입]을 눌러주세요', 'auth/wrong-password': '비밀번호가 맞지 않아요', 'auth/user-not-found': '가입된 이메일이 없어요. [처음이에요 · 가입]을 눌러주세요',
+    'auth/email-already-in-use': '이미 가입된 이메일이에요. [로그인]을 눌러주세요 (구글로 가입했다면 사파리·크롬에서 구글로 로그인)', 'auth/weak-password': '비밀번호는 6자 이상으로 해주세요', 'auth/invalid-email': '이메일 주소를 확인해 주세요',
+    'auth/operation-not-allowed': '이메일 로그인이 아직 켜져 있지 않아요. 잠시 뒤 다시 해주세요', 'auth/too-many-requests': '시도가 너무 많아요. 잠시 뒤 다시 해주세요' })[e.code] || ('실패: ' + e.message);
+  const go = (fn) => async () => { const [em, pw] = v(); if (!em || !pw) return toast('이메일과 비밀번호를 넣어주세요'); try { await fn(auth, em, pw); } catch (e) { toast(msg(e)); } };
+  const a = $('#emin'); if (a) a.onclick = go(signInWithEmailAndPassword);
+  const b = $('#emup'); if (b) b.onclick = go(createUserWithEmailAndPassword);
+  const f = $('#emfg'); if (f) f.onclick = async () => { const [em] = v(); if (!em) return toast('이메일을 먼저 넣어주세요'); try { await sendPasswordResetEmail(auth, em); toast('비밀번호 재설정 메일을 보냈어요. 메일함을 확인해 주세요'); } catch (e) { toast(msg(e)); } };
 }
 
 /** 아이폰 앱: 구글 팝업 대신 Apple·Google 네이티브 로그인 버튼 */

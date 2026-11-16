@@ -183,9 +183,8 @@ async function login() {
   const ua = navigator.userAgent, url = location.href;
   if (/KAKAOTALK|NAVER\(|Instagram|FBAN|FBAV|BAND\//i.test(ua)) {   // 앱 안 브라우저: 바깥 브라우저로 바로 열기 시도
     if (/KAKAOTALK/i.test(ua)) location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
-    else if (/Android/i.test(ua)) location.href = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
-    else if (/iPhone|iPad/i.test(ua)) location.href = 'x-safari-' + url;
-    return toast('구글 로그인은 ' + (/iPhone|iPad/i.test(ua) ? '사파리' : '크롬') + '에서 돼요. 안 열리면 오른쪽 위 ⋯ → 외부 브라우저로 열기', 7000);
+    else location.href = './';   // 첫 화면의 '이메일로 시작하기'로 앱 안에서 바로 로그인 → 홈의 게스트 매칭으로 돌아옴
+    return;
   }
   try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (e) { toast(e.code === 'auth/popup-closed-by-user' ? '로그인을 취소했어요' : '로그인 실패: ' + e.message); }
 }

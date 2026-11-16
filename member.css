@@ -520,3 +520,13 @@ a.gmcard span{font-size:13px;color:#64748B}
 .nrow em.mine.new{background:#E7F5EC;color:#15803D}
 .nrow em.mine.old{background:#F1F5F9;color:#64748B}
 .exthelp{margin-top:10px;background:#fff;color:#334155;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.5}.exthelp b:first-child{display:block;color:#1E3A8A}
+/* 이메일로 시작하기 */
+.embox{width:100%;margin:14px 0 4px;text-align:center}
+.embox .emt{display:block;font-size:15px;color:#1E3A8A;margin-bottom:8px}
+.emf{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;text-align:left}
+.emf input{width:100%;border:1px solid var(--line);border-radius:12px;padding:13px 12px;font-size:16px;font-family:inherit}
+.emb{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ebtn{min-height:48px;border-radius:12px;border:1px solid var(--line);background:#fff;font-weight:800;font-size:15px;font-family:inherit;color:#334155}
+.ebtn.pri{background:#1E3A8A;border-color:#1E3A8A;color:#fff}
+.emf .lnk{align-self:center}
+.emf .lnk{border:0;background:none;color:#64748B;text-decoration:underline;font-size:13px;padding:6px;font-family:inherit}.embox #emopen{border:0;background:none;color:#64748B;text-decoration:underline;font-size:14px;padding:8px;font-family:inherit}
