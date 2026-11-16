@@ -480,19 +480,24 @@ async function showErrs() {
 async function showNumbers() {
   toast('세는 중...');
   try {
-    const cs = (await getDocs(collection(db, 'clubs'))).docs.map((d) => d.data());
+    // 실제 사용자 기준: 정식 출시일(2026-11-16 한국시간) 이후에 만들어졌고, 운영자(나)가 만든 팀이 아닌 것만
+    const LAUNCH = Date.parse('2026-11-15T15:00:00Z');
+    const all = (await getDocs(collection(db, 'clubs'))).docs.map((d) => Object.assign({ id: d.id }, d.data()));
+    const real = (c) => c.owner !== S.uid && Date.parse(c.created || 0) >= LAUNCH;
+    const cs = all.filter(real);
     const now = Date.now(), wk = (c) => c.created && now - Date.parse(c.created) < 7 * 864e5;
     const act = cs.filter((c) => c.stat && c.stat.m >= 5 && c.stat.g >= 2), used = cs.filter((c) => c.stat && (c.stat.m >= 2 || c.stat.g >= 1));
     const mem = cs.reduce((n, c) => n + ((c.stat && c.stat.m) || 0), 0);
-    const gp = (await getDocs(collection(db, 'gposts')).catch(() => ({ docs: [] }))).docs.length;
+    const gp = (await getDocs(collection(db, 'gposts')).catch(() => ({ docs: [] }))).docs.map((d) => d.data());
+    const gpReal = gp.filter((g) => cs.some((c) => c.id === g.cid)).length;
     const row = (k, v, s) => '<div class="nrow"><span>' + k + '</span><b>' + v + '</b>' + (s ? '<small>' + s + '</small>' : '') + '</div>';
-    sheet('<h2>A-KICK 현황</h2>' + row('만든 팀', cs.length + '팀', '이번 주 새로 ' + cs.filter(wk).length + '팀') +
+    sheet('<h2>A-KICK 현황 <small class="muted">출시(11/16) 후 · 내 팀 제외</small></h2>' + row('새로 만든 팀', cs.length + '팀', '이번 주 ' + cs.filter(wk).length + '팀') +
       row('써 본 팀', used.length + '팀', '회원 2명 이상 연결 또는 경기 1번 이상') +
       row('활발히 쓰는 팀', act.length + '팀', '회원 5명 이상 연결 + 경기 2번 이상') +
-      row('앱에 연결된 회원', mem + '명', '팀별 연결 회원 합계 (겹칠 수 있음)') + row('게스트 매칭 모집글', gp + '개', '지난 글 포함') +
-      '<div class="lbl" style="margin-top:14px">팀 목록 (최근 만든 순)</div>' + cs.slice().sort((a, b) => Date.parse(b.created || 0) - Date.parse(a.created || 0)).map((c) => row(esc(c.name || '(이름 없음)') + (c.owner === S.uid ? ' <em class="mine">내 팀</em>' : ''),
+      row('앱에 연결된 회원', mem + '명', '위 팀들의 연결 회원 합계') + row('게스트 매칭 모집글', gpReal + '개', '위 팀들이 올린 글') +
+      '<div class="lbl" style="margin-top:14px">팀 목록 (최근 만든 순)</div>' + all.slice().sort((a, b) => Date.parse(b.created || 0) - Date.parse(a.created || 0)).map((c) => row(esc(c.name || '(이름 없음)') + (c.owner === S.uid ? ' <em class="mine">내 팀</em>' : real(c) ? ' <em class="mine new">실사용</em>' : ' <em class="mine old">출시 전</em>'),
         '회원 ' + ((c.stat && c.stat.m) || 0) + ' · 경기 ' + ((c.stat && c.stat.g) || 0), (c.created ? c.created.slice(0, 10) + ' 만듦' : '') + (c.refBy ? ' · 추천 ' + esc(c.refBy) : ''))).join('') +
-      '<p class="muted">홍보 문구에는 "활발히 쓰는 팀" 숫자를 쓰는 게 정직해요. 테스트로 만든 팀도 포함돼 있어요.</p><div class="srow"><button class="pri" id="nx">닫기</button></div>', (el) => (el.querySelector('#nx').onclick = () => (el.hidden = true)));
+      '<p class="muted">출시 전 테스트 팀과 내 팀은 숫자에서 빠져요. 숫자는 팀 관리자가 관리자 화면을 열 때 갱신돼요.</p><div class="srow"><button class="pri" id="nx">닫기</button></div>', (el) => (el.querySelector('#nx').onclick = () => (el.hidden = true)));
   } catch (e) { toast('못 세었어요: ' + e.message); }
 }
 async function renderHome() {

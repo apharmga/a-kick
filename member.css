@@ -517,3 +517,5 @@ a.gmcard span{font-size:13px;color:#64748B}
 .nrow b{font-size:20px;text-align:right}
 .nrow small{grid-column:1/-1;color:var(--sub);font-size:12px}
 .nrow em.mine{font-style:normal;font-size:11px;background:#E8EDFB;color:#1E3A8A;border-radius:6px;padding:2px 6px;margin-left:4px}
+.nrow em.mine.new{background:#E7F5EC;color:#15803D}
+.nrow em.mine.old{background:#F1F5F9;color:#64748B}
