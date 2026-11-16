@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, doc, getDocs as _getDocs, getDoc as _getDoc, setDoc as _setDoc, deleteDoc as _deleteDoc, writeBatch as _writeBatch, onSnapshot as _onSnapshot, addDoc as _addDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, collection, doc, getDocs as _getDocs, getDoc as _getDoc, setDoc as _setDoc, deleteDoc as _deleteDoc, writeBatch as _writeBatch, onSnapshot as _onSnapshot, addDoc as _addDoc, query, where, getCountFromServer } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { demoAdmin } from './demo.js';
 import { mountCoach } from './coach.js';
 import { IOS_APP, nativeSignIn, providerOf, scheduleAlarms } from './native.js';
@@ -150,6 +150,7 @@ async function loadAll() {
     getDocs(CL('claims')).then((q) => { q.docs.forEach((d) => (S.claims[d.id] = d.data())); S.claimsLoaded = true; if (S.view === 'week') render(); }).catch(() => {});
     if (!S.goalSub) S.goalSub = onSnapshot(CL('goals'), (q) => { S.goals = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); if (S.view === 'stats') render(); }, () => {});
     render();
+    gmWatch();
     if (!S.voteSub) S.voteSub = onSnapshot(CL('votes'), (snap) => {
       const v = {};
       snap.docs.forEach((d) => { const x = d.data(); (v[x.gid] = v[x.gid] || {})[x.name] = { v: x.v, at: x.at || 0, self: true }; });
@@ -420,7 +421,9 @@ function gameHTML(g) {
     '<div class="g-sec"><div class="g-lbl">게스트 ' + guests.length + '명 <small>입금 기준</small></div><div class="chips">' +
     (guests.length ? guests.map((n) => '<button class="gchip" data-gtx="' + esc(n) + '" data-g="' + g.id + '" title="눌러서 입금 거래 열기 (이월·분류 변경)">' + esc(n) + '</button>').join('') : '<span class="g-none">아직 없음</span>') + '</div>' +
     '</div>' +
-    '<div class="g-btns"><button class="btn g-btn" data-team="' + g.id + '">⚽ 팀 편성' + (g.teams ? ' 보기' : '') + '</button><button class="btn g-btn2" data-recruit="' + g.id + '">' + IC.copy + ' 모집글</button><button class="btn g-btn2" data-notice="' + g.id + '">📢 경기안내</button></div></div>';
+    gmLine(g) +
+    '<div class="g-btns"><button class="btn g-btn" data-team="' + g.id + '">⚽ 팀 편성' + (g.teams ? ' 보기' : '') + '</button><button class="btn g-btn2" data-recruit="' + g.id + '">' + IC.copy + ' 모집글</button><button class="btn g-btn2" data-notice="' + g.id + '">📢 경기안내</button>' +
+    (g.date >= today() ? '<button class="btn g-btn2 gmb" data-gm="' + g.id + '">🤝 게스트 모집' + (gmNew(g.id) ? ' <em class="badge">' + gmNew(g.id) + '</em>' : '') + '</button>' : gmPost(g.id) ? '<button class="btn g-btn2" data-gm="' + g.id + '">🤝 게스트 출석</button>' : '') + '</div></div>';
 }
 /* ---- 연기된 경기의 게스트를 새 경기로 불러오기 ---- */
 function guestParts(gid) { const out = []; S.txs.forEach((t) => { if (t.state === '무시') return; (t.parts || []).forEach((p) => { if (p.cls === '게스트비' && p.gid === gid) out.push({ t, p }); }); }); return out; }
@@ -480,6 +483,7 @@ function bindWeek() {
     render(); await putGame(g);
   }));
   document.querySelectorAll('[data-recruit]').forEach((b) => (b.onclick = () => recruitText(b.dataset.recruit)));
+  document.querySelectorAll('[data-gm]').forEach((b) => (b.onclick = () => gmOpen(b.dataset.gm)));
   document.querySelectorAll('[data-notice]').forEach((b) => {
     b.onclick = () => noticeText(b.dataset.notice);
     const g = S.games.find((x) => x.id === b.dataset.notice);   // 미리 날씨를 받아둬서 누르면 바로 나오게
@@ -1849,6 +1853,174 @@ async function loadVenues(el, vs) {
     if ((await getDoc(doc(db, 'refs', c))).exists()) return toast('이미 있는 코드예요');
     try { await setDoc(doc(db, 'refs', c), { uid: S.uid, at: Date.now(), venue: n }); toast('구장 코드를 만들었어요'); loadVenues(el, vs.concat([{ id: c, data: () => ({ venue: n }) }])); } catch (e) { fail(e); }
   };
+}
+
+/* ================= 게스트 매칭 (총무) =================
+   모집글(gposts) · 신청(gapps) · 참여 기록(gstats/{uid}/log)은 팀 밖 공용 공간에 둔다 (다른 모임 사람이 봐야 하니까).
+   입금 계좌·연락처는 gposts/{pid}/priv 에 따로 → 수락된 사람만 읽음.
+   서버가 없어서 기한 지남 정리 · 대기자 올리기는 총무 화면이 열릴 때 처리한다. */
+const GM_REGIONS = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
+S.gm = { posts: {}, apps: [], stats: {}, open: '' };
+const gmPid = (gid) => CID + '_' + gid;
+const gmPost = (gid) => S.gm.posts[gid];
+const gmApps = (gid) => S.gm.apps.filter((a) => a.pid === gmPid(gid));
+const gmNew = (gid) => gmApps(gid).filter((a) => a.state === 'req').length;
+const gmOkList = (gid) => { const p = gmPost(gid); return p ? gmApps(gid).filter((a) => a.state === 'ok' && !C.gmExpired(a, p)) : []; };
+const AD = (pid, uid) => doc(db, 'gapps', pid + '__' + uid);
+function gmWatch() {
+  if (S.gmSub) return;
+  const done = () => { S.gm.posts = {}; S.gm.postList.forEach((p) => (S.gm.posts[p.gid] = p)); gmHouseAll(); if (S.view === 'week') render(); if (S.gm.open) gmManage(S.gm.open, true); };
+  if (DEMO) {
+    S.gm.postList = Object.keys(MEM).filter((k) => /^gposts\/[^/]+$/.test(k) && MEM[k].cid === CID).map((k) => Object.assign({ id: k.split('/')[1] }, MEM[k]));
+    S.gm.apps = Object.keys(MEM).filter((k) => /^gapps\/[^/]+$/.test(k) && MEM[k].owner === S.uid).map((k) => Object.assign({}, MEM[k]));
+    S.gmSub = 1; return done();
+  }
+  S.gm.postList = [];
+  S.gmSub = [
+    _onSnapshot(query(collection(db, 'gposts'), where('cid', '==', CID)), (q) => { S.gm.postList = q.docs.map((d) => Object.assign({ id: d.id }, d.data())); done(); }, () => {}),
+    _onSnapshot(query(collection(db, 'gapps'), where('owner', '==', S.uid)), (q) => { S.gm.apps = q.docs.map((d) => d.data()).filter((a) => a.cid === CID); done(); }, () => {})
+  ];
+}
+function gmDemoSync(a) { if (DEMO) { const k = 'gapps/' + a.pid + '__' + a.uid; MEM[k] = Object.assign({}, a); } }
+async function gmSetApp(a, patch) {
+  Object.assign(a, patch); gmDemoSync(a);
+  await setDoc(AD(a.pid, a.uid), patch, { merge: true }).catch(fail);
+}
+/** 기한 지난 수락 → 취소, 빈자리 → 대기자 올리기, 모집글의 수락 인원 맞추기 */
+let gmBusy = false;
+async function gmHouseAll() {
+  if (gmBusy) return; gmBusy = true;
+  try {
+    for (const gid of Object.keys(S.gm.posts)) {
+      const p = S.gm.posts[gid]; if (C.gmStart(p) < Date.now()) continue;
+      for (const a of gmApps(gid)) if (C.gmExpired(a, p)) await gmSetApp(a, { state: 'cancel', exp: true });
+      const wl = gmApps(gid).filter((a) => a.state === 'wl').sort((x, y) => (x.wlAt || x.at) - (y.wlAt || y.at));
+      while (gmOkList(gid).length < p.need && wl.length && p.status === 'open') { const a = wl.shift(); await gmSetApp(a, { state: 'ok', okAt: Date.now(), seenAt: 0 }); toast('대기 중이던 ' + a.name + '님을 자동으로 수락했어요', 4000); }
+      const okN = gmOkList(gid).length;
+      if (p.okN !== okN) { p.okN = okN; await setDoc(doc(db, 'gposts', p.id), { okN }, { merge: true }).catch(() => {}); }
+    }
+  } finally { gmBusy = false; }
+}
+function gmLine(g) {
+  const p = gmPost(g.id); if (!p) return '';
+  const ok = gmOkList(g.id), wait = ok.filter((a) => !a.paid).length;
+  return '<div class="g-sec gml"><div class="g-lbl">🤝 게스트 매칭 <small>' + (p.status === 'open' ? '모집 중' : '마감') + '</small></div><div class="muted">수락 ' + ok.length + '/' + p.need + '명' +
+    (wait ? ' · <b class="warnt">입금 대기 ' + wait + '</b>' : '') + (gmNew(g.id) ? ' · <b class="neg">새 신청 ' + gmNew(g.id) + '</b>' : '') + '</div>' +
+    (ok.length ? '<div class="chips">' + ok.map((a) => '<span class="gchip' + (a.paid ? '' : ' wait') + '">' + esc(a.name) + (a.paid ? ' ✓' : ' ⏳') + '</span>').join('') + '</div>' : '') + '</div>';
+}
+function gmOpen(gid) { return gmPost(gid) ? gmManage(gid) : gmForm(gid); }
+
+/* ---- 모집글 쓰기 · 고치기 ---- */
+function gmForm(gid, p) {
+  const g = S.games.find((x) => x.id === gid); if (!g) return;
+  const total = attOf(g).length + C.guestNames(S.txs, g.id, attOf(g)).length, cap = g.cap || S.cfg.cap || 12;
+  const F = p ? Object.assign({}, p) : { need: Math.max(1, Math.min(10, cap - total)), fee: S.cfg.guestFee || 10000, mood: '적당히', pos: '무관', firstOk: true, note: '', refund: '하루 전까지 취소하면 환불해 드려요',
+    region1: S.cfg.gmR1 || '대구', region2: S.cfg.gmR2 || '', place: S.cfg.place || '' };
+  const chips = (k, list) => '<div class="seg gmseg">' + list.map((v) => '<button type="button" data-' + k + '="' + v + '" class="' + (F[k] === v ? 'on' : '') + '">' + v + '</button>').join('') + '</div>';
+  modal('<h2>🤝 ' + (p ? '모집글 고치기' : '게스트 모집 올리기') + '</h2><div class="muted">' + md(g.date) + ' (' + C.dayName(g.date) + ') ' + esc(g.time || S.cfg.time || '') + ' · 지금 ' + total + '명 · 정원 ' + cap + '명. 올리면 같은 지역 A-KICK 사용자에게 보여요.</div>' +
+    '<div class="row"><label class="f">지역<select id="gr1">' + GM_REGIONS.map((r) => '<option' + (r === F.region1 ? ' selected' : '') + '>' + r + '</option>').join('') + '</select></label><label class="f">구·군<input id="gr2" maxlength="10" placeholder="예: 수성구" value="' + esc(F.region2) + '"></label></div>' +
+    '<label class="f">구장<input id="gpl" maxlength="30" value="' + esc(F.place) + '"></label>' +
+    '<div class="row"><label class="f">필요한 인원<input id="gnd" type="number" min="1" max="20" value="' + F.need + '"></label><label class="f">참가비 (원)<input id="gfe" type="number" min="0" step="1000" value="' + F.fee + '"></label></div>' +
+    '<div class="f">분위기' + chips('mood', ['즐겜', '적당히', '빡겜']) + '</div><div class="f">포지션' + chips('pos', ['무관', '필드', '골키퍼']) + '</div>' +
+    '<label class="f">한마디 (선택)<input id="gnt" maxlength="80" placeholder="예: 초보도 환영해요. 풋살화 필수" value="' + esc(F.note) + '"></label>' +
+    '<label class="f">환불 규칙<input id="grf" maxlength="60" value="' + esc(F.refund) + '"></label>' +
+    '<label class="ck"><input type="checkbox" id="gfo"' + (F.firstOk !== false ? ' checked' : '') + '> 게스트 첫 참여자도 받기 <small>(끄면 다른 모임에서 한 번 이상 참여한 사람만)</small></label>' +
+    '<div class="g-lbl2" style="margin-top:12px">수락된 게스트에게만 보여요</div>' +
+    '<label class="f">입금 계좌<input id="gac" maxlength="40" value="' + esc(S.cfg.account || '') + '"></label>' +
+    '<label class="f">연락 방법 (선택 · 오픈채팅 링크나 번호)<input id="gct" maxlength="120" value="' + esc(S.cfg.openChat || '') + '"></label>' +
+    '<div class="muted">게스트는 수락을 확인한 때부터 <b>3시간 안에 입금</b>해야 확정돼요. 기한이 지나면 자동 취소되고 대기자가 올라와요.</div>' +
+    '<div class="mfoot"><span style="flex:1"></span><button class="btn" id="gx">취소</button><button class="btn pri" id="gok">' + (p ? '저장' : '모집 올리기') + '</button></div>', (m) => {
+    ['mood', 'pos'].forEach((k) => m.querySelectorAll('[data-' + k + ']').forEach((b) => (b.onclick = () => { F[k] = b.dataset[k]; m.querySelectorAll('[data-' + k + ']').forEach((x) => x.classList.toggle('on', x === b)); })));
+    m.querySelector('#gx').onclick = closeModal;
+    m.querySelector('#gok').onclick = async () => {
+      const v = (id) => m.querySelector(id).value.trim();
+      const need = Math.round(+v('#gnd')), fee = Math.round(+v('#gfe'));
+      if (!(need >= 1 && need <= 20)) return toast('필요한 인원은 1~20명으로 넣어주세요');
+      if (!(fee >= 0 && fee <= 100000)) return toast('참가비를 확인해 주세요');
+      if (!v('#gpl')) return toast('구장 이름을 넣어주세요');
+      const past = S.games.filter((x) => x.date < today() && !x.postponed);
+      const data = { cid: CID, club: S.club.name, owner: S.uid, gid, date: g.date, time: g.time || S.cfg.time || '', place: v('#gpl'), region1: m.querySelector('#gr1').value, region2: v('#gr2'),
+        need, fee, mood: F.mood, pos: F.pos, firstOk: m.querySelector('#gfo').checked, note: v('#gnt'), refund: v('#grf'), status: p ? p.status : 'open', okN: p ? p.okN || 0 : 0,
+        games: past.length, guestsGot: past.reduce((n, x) => n + C.guestNames(S.txs, x.id, attOf(x)).length, 0), created: p ? p.created : Date.now(), updated: Date.now() };
+      const pid = gmPid(gid);
+      try {
+        await setDoc(doc(db, 'gposts', pid), data);
+        await setDoc(doc(db, 'gposts', pid, 'priv', 'info'), { account: v('#gac'), contact: v('#gct') });
+        if (data.region1 !== S.cfg.gmR1 || data.region2 !== S.cfg.gmR2) { S.cfg.gmR1 = data.region1; S.cfg.gmR2 = data.region2; setDoc(D('config', 'main'), { gmR1: data.region1, gmR2: data.region2 }, { merge: true }).catch(() => {}); }
+      } catch (e) { return toast('저장 실패: ' + e.message, 6000); }
+      S.gm.posts[gid] = Object.assign({ id: pid }, data);
+      if (DEMO) { S.gm.postList = S.gm.postList.filter((x) => x.gid !== gid).concat([S.gm.posts[gid]]); }
+      closeModal(); render();
+      toast(p ? '고쳤어요' : '올렸어요! ' + data.region1 + ' 지역 게스트 매칭에 보여요', 4500);
+      if (!p) gmManage(gid);
+    };
+  });
+}
+
+/* ---- 신청 관리 ---- */
+async function gmStatsOf(uid) {
+  if (S.gm.stats[uid]) return S.gm.stats[uid];
+  let r = { a: 0, x: 0 };
+  try {
+    if (DEMO) { const L = Object.keys(MEM).filter((k) => k.indexOf('gstats/' + uid + '/log/') === 0).map((k) => MEM[k]); r = { a: L.filter((x) => x.v === 'a').length, x: L.filter((x) => x.v === 'x').length }; }
+    else { const c = collection(db, 'gstats', uid, 'log'); const [a, x] = await Promise.all([getCountFromServer(query(c, where('v', '==', 'a'))), getCountFromServer(query(c, where('v', '==', 'x')))]); r = { a: a.data().count, x: x.data().count }; }
+  } catch (e) {}
+  return (S.gm.stats[uid] = r);
+}
+async function gmManage(gid, refresh) {
+  const p = gmPost(gid), g = S.games.find((x) => x.id === gid); if (!p || !g) return;
+  if (refresh && !document.querySelector('#modal:not([hidden]) .gmbox[data-g="' + gid + '"]')) { S.gm.open = ''; return; }
+  S.gm.open = gid;
+  const apps = gmApps(gid); await Promise.all(apps.map((a) => gmStatsOf(a.uid)));
+  const now = Date.now(), ok = gmOkList(gid), slots = p.need - ok.length, after = g.date <= today();
+  const st = (a) => { const s = S.gm.stats[a.uid] || { a: 0, x: 0 }; return (s.a ? '참여 ' + s.a + '회' : '첫 참여') + (s.x ? ' · <b class="neg">노쇼 ' + s.x + '회</b>' : ' · 노쇼 0'); };
+  const who = (a) => '<div class="nm"><b>' + esc(a.name) + '</b>' + (a.payer && a.payer !== a.name ? ' <small>입금자명 ' + esc(a.payer) + '</small>' : '') + '<div class="muted">' + st(a) + (a.msg ? ' · "' + esc(a.msg) + '"' : '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>';
+  const row = (a, acts) => '<div class="gmap">' + who(a) + '<div class="act">' + acts + '</div></div>';
+  const b = (k, a, l, c) => '<button class="btn xs ' + (c || '') + '" data-gma="' + k + '" data-u="' + esc(a.uid) + '">' + l + '</button>';
+  const okHTML = ok.map((a) => row(a,
+    (a.paid ? '<span class="pill ok">입금 ✓</span>' : a.paidClaim ? '<span class="pill warn">입금했다고 함</span>' + b('paid', a, '입금 확인', 'pri') : '<span class="pill gry">입금 대기 · ' + (a.seenAt ? C.gmLeft(C.gmPayDue(a, p) - now) + ' 남음' : '아직 확인 안 함') + '</span>' + b('paid', a, '입금 확인')) +
+    (after ? (a.att ? '<span class="pill ' + (a.att === 'a' ? 'ok' : 'bad') + '">' + (a.att === 'a' ? '왔어요' : '노쇼') + '</span>' : '') + b('att_a', a, '왔어요') + b('att_x', a, '안 왔어요', 'danger')
+      : (a.conf ? '<span class="pill ok">전날 확인 ✓</span>' : C.gmStart(p) - now < 36 * 3600e3 ? '<span class="pill warn">전날 확인 아직</span>' : '')))).join('');
+  const req = apps.filter((a) => a.state === 'req'), wl = apps.filter((a) => a.state === 'wl').sort((x, y) => (x.wlAt || x.at) - (y.wlAt || y.at)), gone = apps.filter((a) => a.state === 'no' || a.state === 'cancel');
+  const list = (t, arr, html) => '<div class="g-lbl2">' + t + ' ' + arr.length + '명</div>' + (arr.length ? html : '<div class="muted gmnone">없어요</div>');
+  modal('<h2 class="gmbox" data-g="' + gid + '">🤝 ' + md(g.date) + ' (' + C.dayName(g.date) + ') 게스트 매칭</h2><div class="muted">' + esc(p.place) + ' · ' + esc(p.region1 + ' ' + (p.region2 || '')) + ' · ' + won(p.fee) + '원 · ' + (p.status === 'open' ? '<b class="pos">모집 중</b>' : '<b>마감</b>') + '</div>' +
+    list('수락 (' + ok.length + '/' + p.need + ')', ok, okHTML) +
+    list('새 신청', req, req.map((a) => row(a, (slots > 0 ? b('ok', a, '수락', 'pri') : b('wl', a, '대기로', 'pri')) + b('no', a, '거절'))).join('')) +
+    (wl.length ? list('대기 (자리 나면 순서대로 자동 수락)', wl, wl.map((a, i) => row(a, '<span class="pill gry">대기 ' + (i + 1) + '번</span>' + (slots > 0 ? b('ok', a, '수락', 'pri') : '') + b('no', a, '거절'))).join('')) : '') +
+    (gone.length ? '<details class="gmgone"><summary>지난 신청 ' + gone.length + '건 (거절·취소·기한 지남)</summary>' + gone.map((a) => '<div class="muted">' + esc(a.name) + ' · ' + (a.exp ? '입금 기한 지나 취소' : a.state === 'no' ? '거절' : '본인 취소') + '</div>').join('') + '</details>' : '') +
+    '<div class="muted gmhelp">💡 입금 확인을 누르면 장부에 게스트비가 직접 입력으로 들어가요. 나중에 통장 엑셀을 넣으면 같은 입금과 자동으로 합쳐져요.</div>' +
+    '<div class="mfoot"><button class="btn" id="gme">글 고치기</button><button class="btn" id="gmc">' + (p.status === 'open' ? '모집 마감' : '다시 열기') + '</button><a class="btn" href="match.html" target="_blank" rel="noopener">매칭 화면 보기</a><span style="flex:1"></span><button class="btn pri" id="gmx">닫기</button></div>', (m) => {
+    m.querySelector('#gmx').onclick = () => { S.gm.open = ''; closeModal(); };
+    m.querySelector('#gme').onclick = () => { S.gm.open = ''; gmForm(gid, p); };
+    m.querySelector('#gmc').onclick = async () => { p.status = p.status === 'open' ? 'closed' : 'open'; if (DEMO) MEM['gposts/' + p.id] = Object.assign({}, MEM['gposts/' + p.id], { status: p.status }); await setDoc(doc(db, 'gposts', p.id), { status: p.status }, { merge: true }).catch(fail); toast(p.status === 'open' ? '다시 열었어요' : '마감했어요. 더 이상 신청을 안 받아요'); render(); gmManage(gid); };
+    m.querySelectorAll('[data-gma]').forEach((x) => (x.onclick = () => gmAct(gid, x.dataset.gma, x.dataset.u)));
+  });
+}
+async function gmAct(gid, k, uid) {
+  const p = gmPost(gid), a = gmApps(gid).find((x) => x.uid === uid); if (!p || !a) return;
+  if (k === 'ok') { if (gmOkList(gid).length >= p.need) return toast('정원이 찼어요. 인원을 늘리려면 글 고치기에서 바꿔주세요'); await gmSetApp(a, { state: 'ok', okAt: Date.now(), seenAt: 0 }); toast(a.name + '님 수락! 게스트가 확인한 때부터 3시간 안에 입금해야 확정돼요', 4500); }
+  else if (k === 'wl') { await gmSetApp(a, { state: 'wl', wlAt: Date.now() }); toast('대기로 넣었어요. 자리가 나면 자동으로 수락돼요'); }
+  else if (k === 'no') { if (!confirm(a.name + '님 신청을 거절할까요?')) return; await gmSetApp(a, { state: 'no' }); }
+  else if (k === 'paid') {
+    if (!confirm(a.name + '님 참가비 ' + won(p.fee) + '원 입금을 확인했나요?\n장부에 게스트비로 들어가요 (입금자명: ' + (a.payer || a.name) + ')')) return;
+    await gmSetApp(a, { paid: true, paidAt: Date.now() });
+    const key = a.pid + '__' + a.uid;
+    if (p.fee > 0 && !S.txs.some((t) => t.gmApp === key)) {
+      const d = new Date(), dt = today().replace(/-/g, '.') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':00';
+      const t = { id: 'H' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), dt, kind: '입금', amt: p.fee, desc: a.payer || a.name, bal: 0, type: '직접입력', memo: '게스트 매칭', manual: true,
+        parts: [{ cls: '게스트비', amt: p.fee, cnt: 1, name: a.name, gid }], state: '자동', reason: '게스트비 (게스트 매칭)', addedAt: d.toISOString(), gmApp: key };
+      S.txs = S.txs.concat([t]).sort((x, y) => (x.dt < y.dt ? -1 : 1)); await putTx(t);
+    }
+    toast('확정했어요. ' + md(p.date) + ' 경기 게스트로 들어갔어요', 4000);
+  } else if (k === 'att_a' || k === 'att_x') {
+    const v = k === 'att_a' ? 'a' : 'x';
+    if (v === 'x' && !confirm(a.name + '님을 노쇼로 기록할까요?\n다른 모임 총무가 신청을 받을 때 "노쇼 1회"로 보여요.')) return;
+    await gmSetApp(a, { att: v });
+    if (DEMO) MEM['gstats/' + a.uid + '/log/' + a.pid] = { v, cid: CID, at: Date.now() };
+    else await setDoc(doc(db, 'gstats', a.uid, 'log', a.pid), { v, cid: CID, at: Date.now() }).catch(fail);
+    delete S.gm.stats[a.uid];
+  }
+  await gmHouseAll(); render(); gmManage(gid);
 }
 
 /* ---- 화면 아무 데나 끌어다 놓기 ---- */

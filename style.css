@@ -467,3 +467,22 @@ button.gchip{font:inherit;cursor:pointer}button.gchip:hover{border-color:var(--n
 .sgbox>small{color:var(--sub);font-size:12px}
 .sgr{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#fff;border-radius:10px;padding:8px 10px}
 .sgr small{display:block;color:var(--sub);font-size:11.5px;margin-top:2px}.sgr .up{color:#067647}.sgr .dn{color:#B42318}
+
+/* 게스트 매칭 (총무) */
+.g-btns .gmb{grid-column:1/-1}
+.gml .chips{margin-top:6px}
+.gchip.wait{background:#FFF7E6;border-color:#F5C451;color:#B45309}
+.warnt{color:var(--warn)}
+.gmseg{margin-top:6px}
+.gmap{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.gmap .nm{flex:1;min-width:180px}
+.gmap .nm small{color:var(--sub);font-weight:500}
+.gmap .act{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pill.bad{background:#FDECEC;color:var(--neg)}
+.gmnone{padding:6px 0 4px}
+.gmgone{margin-top:10px;font-size:13px}
+.gmgone summary{cursor:pointer;color:var(--sub);font-weight:600}
+.gmhelp{margin-top:12px;background:var(--bg);border-radius:10px;padding:10px 12px}
+label.ck{display:flex;gap:8px;align-items:center;font-size:13px;margin-top:10px}
+label.ck small{color:var(--sub)}
+.gmap .pill{padding:5px 10px;font-size:12px}

@@ -154,6 +154,15 @@
   function num(v) { if (typeof v === 'number') return v; var s = String(v == null ? '' : v).replace(/[^\d.-]/g, ''); return s ? +s : 0; }
 
 
+  /* ---------- 게스트 매칭: 입금 기한 (총무·게스트 화면 공통) ---------- */
+  var GH = 3600e3;
+  function gmStart(p) { return new Date(p.date + 'T' + (p.time || '00:00') + ':00').getTime(); }
+  /** 수락을 처음 본 때부터 3시간. 단 경기 3시간 전이면 그때 마감 */
+  function gmPayDue(a, p) { var cut = gmStart(p) - 3 * GH; return a.seenAt ? Math.min(a.seenAt + 3 * GH, cut) : cut; }
+  /** 수락됐는데 기한까지 입금(또는 '입금했어요')이 없으면 자동 취소 */
+  function gmExpired(a, p, now) { return a.state === 'ok' && !a.paid && !a.paidClaim && (now || Date.now()) > gmPayDue(a, p); }
+  function gmLeft(ms) { if (ms <= 0) return '지남'; var h = Math.floor(ms / GH), m = Math.floor((ms % GH) / 6e4); return (h ? h + '시간 ' : '') + m + '분'; }
+
   /* ---------- 레벨: 꾸준히 1년 쓰면 50(GOAT) ---------- */
   var LV_MAX = 50;
   function lvNeed(l) { return Math.round(60 + 3.3 * l); }                     // l → l+1 에 필요한 EXP
@@ -611,8 +620,8 @@
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', g[0]);
     return v;
   }
-  var VERSION = 'v1.07';
-  var Core = { mix: mix, diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, triPlan: triPlan, rotPlan: rotPlan, rotN: rotN, sideLabel: sideLabel, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
+  var VERSION = 'v1.08';
+  var Core = { gmStart: gmStart, gmPayDue: gmPayDue, gmExpired: gmExpired, gmLeft: gmLeft, mix: mix, diagnoseManual: diagnoseManual, balanceGaps: balanceGaps, pendingManual: pendingManual, matchManual: matchManual, sameTx: sameTx, nmMatch: nmMatch, dayGap: dayGap, VERSION: VERSION, THEMES: THEMES, applyTheme: applyTheme, statTable: statTable, score: score, standings: standings, triPlan: triPlan, rotPlan: rotPlan, rotN: rotN, sideLabel: sideLabel, order: order, md5: md5, txId: txId, parseBankRows: parseBankRows, lvOf: lvOf, lvNeed: lvNeed, lvBand: lvBand, LV_MAX: LV_MAX, fetchWx: fetchWx, wxLabel: wxLabel, playable: playable, guessBank: guessBank, parseWith: parseWith, BANKCOL: BANKCOL, num: num, ymd: ymd, dtStr: dtStr, dtDate: dtDate, ymOf: ymOf,
     addYM: addYM, addDays: addDays, dayName: dayName, comma: comma, startYM: startYM, membersFor: membersFor,
     aliasMap: aliasMap, partsOf: partsOf, duesPaid: duesPaid, guestCount: guestCount, guestNames: guestNames,
     balance: balance, book: book, nearestGame: nearestGame, nextGameAfter: nextGameAfter, gamesInMonth: gamesInMonth,

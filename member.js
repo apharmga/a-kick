@@ -430,6 +430,11 @@ function openLeave() {
       for (const c of cids) await wipeMine(c);
       await deleteDoc(doc(db, 'me', S.uid)).catch(() => {}); await deleteDoc(doc(db, 'ach', S.uid)).catch(() => {});
       const rf = await getDocs(query(collection(db, 'refs'), where('uid', '==', S.uid))).catch(() => null); if (rf) for (const d of rf.docs) await deleteDoc(d.ref).catch(() => {});
+      // 게스트 매칭 신청·기록·안 보기 목록
+      for (const c of [query(collection(db, 'gapps'), where('uid', '==', S.uid)), collection(db, 'gstats', S.uid, 'log')]) {
+        const q = await getDocs(c).catch(() => null); if (q) for (const d of q.docs) await deleteDoc(d.ref).catch(() => {});
+      }
+      await deleteDoc(doc(db, 'gblock', S.uid)).catch(() => {});
       if (IOS_APP && providerOf(auth.currentUser) === 'apple') {    // Apple 로그인은 탈퇴 때 Apple 연결도 끊어야 함 (애플 규정)
         const r = await nativeSignIn(auth, 'apple').catch(() => null);
         if (!r) { toast('Apple 확인을 취소해서 계정 삭제를 멈췄어요. 기록은 이미 지워졌어요', 6000); return; }
@@ -480,6 +485,7 @@ async function renderHome() {
     (ids.length ? '<section class="card"><div class="clist">' + ids.map((k) => { const own = owned.some((o) => o[0] === k);
       return '<div class="crow"><a href="./?c=' + esc(k) + '">' + esc(all[k]) + (own ? '<em>관리자</em>' : '') + '</a><button class="cdel" data-cdel="' + esc(k) + '" data-own="' + (own ? 1 : 0) + '">' + (own ? '삭제' : '빼기') + '</button></div>'; }).join('') + '</div></section>'
       : '<section class="card soft"><h2>아직 들어간 팀이 없어요</h2><p class="muted">회원이라면 관리자에게 받은 <b>팀 링크</b>로 들어오세요.</p></section>') +
+    '<a class="card gmcard" href="match.html"><b>🤝 게스트 매칭</b><span>공 찰 곳 찾기 · 우리 동네 모임에 게스트로 참여해요</span></a>' +
     '<section class="card"><h2>내가 관리자예요</h2><p class="muted">새 팀을 만들면 회비·참석·팀 편성을 관리할 수 있어요. 만들면 4단계 설정(운동·요일·회비·회원)이 바로 시작돼요.</p>' +
     '<div class="newc"><input id="cn" placeholder="팀 이름 (예: 대구FC)" maxlength="20"><button id="mk">팀 만들기</button></div>' +
     '<label class="rcl">추천 코드 <small>(선택 · 받은 링크로 들어왔으면 자동으로 채워져요)</small><input id="rc" maxlength="12" placeholder="예: K7P2QX" value="' + esc(refSaved()) + '"></label></section>' + DEMO_BTN + LEGAL + '</main>');
@@ -758,6 +764,7 @@ function homeHTML() {
     tile('week', '팀 편성', g && (g.teams || []).length >= 2 ? '공개됨' : '준비 중', g ? md(g.date) + ' 경기' : '-') + '</div>' +
     (recent.length ? '<section class="card"><div class="h2row"><h2>최근 입출금</h2><button class="more inl" data-go="bank">전체 ›</button></div><div class="blist">' + recent.map((t) =>
       '<div class="brow' + (t.off ? ' off' : '') + '"><span class="bd">' + md(t.dt.substr(0, 10)) + '</span><span class="bw"><b>' + esc(t.who) + '</b><small>' + esc(t.off ? '장부 제외' : t.what + (t.pend ? ' · 통장 확인 전' : '')) + '</small></span><span class="ba"><b class="' + (t.io ? 'p' : 'n') + '">' + (t.io ? '+' : '−') + won(t.amt) + '</b></span></div>').join('') + '</div></section>' : '') +
+    '<a class="card gmcard" href="match.html"><b>🤝 게스트 매칭</b><span>다른 날 공 차고 싶을 때 · 우리 동네 모임에 게스트로 참여해요</span></a>' +
     '<button class="sugbtn" id="sug">💬 우리 팀 총무에게 건의하기</button>' +
     (S.owner ? '<a class="bigbtn" href="admin.html?c=' + esc(S.cid) + '">관리자 페이지</a>' : '') +
     '<div class="links"><button class="link" id="home">다른 팀 보기</button><button class="link" id="out">로그아웃</button><button class="link" id="leave">탈퇴</button>' + (IOS_APP ? '' : '<button class="link" id="ntf">🔔 알림</button>') + '</div><div class="links"><button class="link" id="dev">💌 앱 개발자에게 건의</button>' + (STORE_APP ? '' : '<button class="link" id="dona">☕ A-KICK 후원</button>') + '</div><div class="links"><a class="link" href="privacy.html">개인정보처리방침</a><a class="link" href="terms.html">이용약관</a></div></main>';

@@ -115,5 +115,26 @@ export function demoAdmin() {
   txs.sort((a, b) => (a.dt < b.dt ? -1 : 1)); let b2 = 300000; txs.forEach((t) => { b2 += t.kind === '입금' ? t.amt : -t.amt; t.bal = b2; put('tx/' + t.id, t); });
   put('polls/p1', { title: '11월 회식 날짜 골라주세요', desc: '경기 끝나고 같이 밥 먹어요 🍖', options: [{ id: 'a', text: '첫째 주 목요일' }, { id: 'b', text: '둘째 주 목요일' }], multi: true, allowAdd: true, anon: false, deadline: D(add(today, 3)) + 'T23:00', created: new Date(Date.now() - 864e5).toISOString() });
   N.slice(1, 6).forEach((n, i) => put('pollvotes/p1__m' + (i + 2), { pid: 'p1', mid: 'm' + (i + 2), name: n, picks: [i % 2 ? 'b' : 'a'], add: '', at: 0 }));
+  // 게스트 매칭: 이번 주 경기에 모집글 + 신청 3건
+  const pid = 'demo_' + gid(thu), now = Date.now();
+  st['gposts/' + pid] = { cid: 'demo', club: '체험FC', owner: 'demo', gid: gid(thu), date: D(thu), time: '20:00', place: '풋살파크 1구장', region1: '대구', region2: '수성구', need: 3, fee: 10000, mood: '적당히', pos: '무관', note: '초보도 환영해요', refund: '하루 전까지 취소하면 환불', firstOk: true, status: 'open', okN: 1, games: 9, guestsGot: 6, created: now - 864e5 };
+  st['gposts/' + pid + '/priv/info'] = { account: '체험용 계좌 0000-00-0000000', contact: '' };
+  [['g1', '김게스트', 'req', {}], ['g2', '박골키퍼', 'req', { msg: '골키퍼 가능해요' }], ['g3', '이용병', 'ok', { okAt: now - 2 * 36e5, seenAt: now - 36e5, paidClaim: true }]].forEach(([u, n, s, x]) =>
+    (st['gapps/' + pid + '__' + u] = Object.assign({ pid, uid: u, owner: 'demo', cid: 'demo', name: n, payer: n, phone: '', msg: '', at: now - 5 * 36e5, state: s }, x)));
+  st['gstats/g1/log/x1'] = { v: 'a', cid: 'other', at: 0 }; st['gstats/g3/log/x2'] = { v: 'a', cid: 'other', at: 0 }; st['gstats/g3/log/x3'] = { v: 'x', cid: 'other', at: 0 };
+  return st;
+}
+
+/* 게스트 매칭 체험 (match.html?demo=1) */
+export function demoMatch() {
+  const C = window.Core, add = (n) => { const x = new Date(); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() + n); return C.ymd(x); }, now = Date.now(), st = {};
+  const P = [['p1', '도남풋살', 1, '16:00', '수성 ○○풋살장', '수성구', 3, 10000, '적당히', '무관', 24, 18, 1],
+    ['p2', '범어FS', 3, '08:00', '범어 □□구장', '수성구', 2, 8000, '빡겜', '골키퍼', 11, 4, 0],
+    ['p3', '퇴근풋살', 5, '21:00', '만촌 △△풋살', '수성구', 4, 10000, '즐겜', '무관', 0, 0, 0],
+    ['p4', '달서FC', 2, '19:00', '달서 ◇◇풋살파크', '달서구', 2, 10000, '즐겜', '필드', 32, 21, 0]];
+  P.forEach(([id, club, d, time, place, r2, need, fee, mood, pos, games, got, okN]) => (st['gposts/' + id] = { cid: 'c_' + id, club, owner: 'o_' + id, gid: 'G', date: add(d), time, place, region1: '대구', region2: r2, need, fee, mood, pos, games, guestsGot: got, okN, status: 'open', firstOk: id !== 'p2', note: id === 'p1' ? '초보도 환영해요. 풋살화 필수, 조끼는 저희가 준비해요.' : '', refund: '하루 전까지 취소하면 환불', created: now }));
+  st['gposts/p1/priv/info'] = { account: '체험용 계좌 0000-00-0000000', contact: 'https://open.kakao.com/' };
+  st['gapps/p1__demo-guest'] = { pid: 'p1', uid: 'demo-guest', owner: 'o_p1', cid: 'c_p1', name: '체험 게스트', payer: '체험게스트', state: 'ok', okAt: now - 36e5, at: now - 5 * 36e5 };
+  st['gstats/demo-guest/log/a1'] = { v: 'a', cid: 'x', at: 0 };
   return st;
 }
