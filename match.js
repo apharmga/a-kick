@@ -227,10 +227,18 @@ async function openPost(pid) {
     el.querySelector('#sx').onclick = () => (el.hidden = true);
     const cp = el.querySelector('#cpa'); if (cp) cp.onclick = () => navigator.clipboard.writeText(priv.account).then(() => toast('계좌를 복사했어요'), () => prompt('복사해서 쓰세요', priv.account));
     const go = el.querySelector('#go'); if (go) go.onclick = () => apply(p, el, full);
+    const ph = el.querySelector('#ac'); if (ph) { const f = () => (ph.value = telFmt(ph.value)); ph.oninput = f; f(); }
     const c = el.querySelector('[data-cancel]'); if (c) c.onclick = () => cancelApp(pid);
     el.querySelector('#rp').onclick = () => report(p);
     el.querySelector('#bl').onclick = () => block(p);
   });
+}
+/** 전화번호에 하이픈 자동: 01012345678 → 010-1234-5678 (숫자가 아니면 그대로) */
+function telFmt(v) {
+  const d = String(v || '').replace(/\D/g, '');
+  if (!d || /[^\d\s-]/.test(v)) return v;
+  if (d.startsWith('02')) return d.length <= 2 ? d : d.length <= 5 ? d.slice(0, 2) + '-' + d.slice(2) : d.length <= 9 ? d.slice(0, 2) + '-' + d.slice(2, 5) + '-' + d.slice(5) : d.slice(0, 2) + '-' + d.slice(2, 6) + '-' + d.slice(6, 10);
+  return d.length <= 3 ? d : d.length <= 6 ? d.slice(0, 3) + '-' + d.slice(3) : d.length <= 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7, 11);
 }
 async function apply(p, el, full) {
   if (!S.uid) return toast('먼저 로그인해 주세요');

@@ -1978,7 +1978,7 @@ async function gmManage(gid, refresh) {
   const apps = gmApps(gid); await Promise.all(apps.map((a) => gmStatsOf(a.uid)));
   const now = Date.now(), ok = gmOkList(gid), slots = p.need - ok.length, after = g.date <= today();
   const st = (a) => { const s = S.gm.stats[a.uid] || { a: 0, x: 0 }; return (s.a ? '참여 ' + s.a + '회' : '첫 참여') + (s.x ? ' · <b class="neg">노쇼 ' + s.x + '회</b>' : ' · 노쇼 0'); };
-  const who = (a) => '<div class="nm"><b>' + esc(a.name) + '</b>' + (a.payer && a.payer !== a.name ? ' <small>입금자명 ' + esc(a.payer) + '</small>' : '') + '<div class="muted">' + st(a) + (a.msg ? ' · "' + esc(a.msg) + '"' : '') + (a.phone ? ' · ' + esc(a.phone) : '') + '</div></div>';
+  const who = (a) => '<div class="nm"><b>' + esc(a.name) + '</b>' + (a.payer && a.payer !== a.name ? ' <small>입금자명 ' + esc(a.payer) + '</small>' : '') + '<div class="muted">' + st(a) + (a.msg ? ' · "' + esc(a.msg) + '"' : '') + (a.phone ? ' · ' + esc(String(a.phone).replace(/^(0\d{1,2})(\d{3,4})(\d{4})$/, '$1-$2-$3')) : '') + '</div></div>';
   const row = (a, acts) => '<div class="gmap">' + who(a) + '<div class="act">' + acts + '</div></div>';
   const b = (k, a, l, c) => '<button class="btn xs ' + (c || '') + '" data-gma="' + k + '" data-u="' + esc(a.uid) + '">' + l + '</button>';
   const okHTML = ok.map((a) => row(a,
