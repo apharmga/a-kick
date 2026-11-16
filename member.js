@@ -476,6 +476,23 @@ async function showErrs() {
     el.querySelector('#ex').onclick = () => (el.hidden = true); el.querySelector('#ec').onclick = () => copy(txt, '복사했어요. Claude에게 붙여넣어 주세요');
   });
 }
+/** 운영자: 홍보 문구에 쓸 실제 숫자 (만든 팀 · 실제로 쓰는 팀 · 연결된 회원 · 게스트 매칭) */
+async function showNumbers() {
+  toast('세는 중...');
+  try {
+    const cs = (await getDocs(collection(db, 'clubs'))).docs.map((d) => d.data());
+    const now = Date.now(), wk = (c) => c.created && now - Date.parse(c.created) < 7 * 864e5;
+    const act = cs.filter((c) => c.stat && c.stat.m >= 5 && c.stat.g >= 2), used = cs.filter((c) => c.stat && (c.stat.m >= 2 || c.stat.g >= 1));
+    const mem = cs.reduce((n, c) => n + ((c.stat && c.stat.m) || 0), 0);
+    const gp = (await getDocs(collection(db, 'gposts')).catch(() => ({ docs: [] }))).docs.length;
+    const row = (k, v, s) => '<div class="nrow"><span>' + k + '</span><b>' + v + '</b>' + (s ? '<small>' + s + '</small>' : '') + '</div>';
+    sheet('<h2>A-KICK 현황</h2>' + row('만든 팀', cs.length + '팀', '이번 주 새로 ' + cs.filter(wk).length + '팀') +
+      row('써 본 팀', used.length + '팀', '회원 2명 이상 연결 또는 경기 1번 이상') +
+      row('활발히 쓰는 팀', act.length + '팀', '회원 5명 이상 연결 + 경기 2번 이상') +
+      row('앱에 연결된 회원', mem + '명', '팀별 연결 회원 합계 (겹칠 수 있음)') + row('게스트 매칭 모집글', gp + '개', '지난 글 포함') +
+      '<p class="muted">홍보 문구에는 "활발히 쓰는 팀" 숫자를 쓰는 게 정직해요. 테스트로 만든 팀도 포함돼 있어요.</p><div class="srow"><button class="pri" id="nx">닫기</button></div>', (el) => (el.querySelector('#nx').onclick = () => (el.hidden = true)));
+  } catch (e) { toast('못 세었어요: ' + e.message); }
+}
 async function renderHome() {
   let owned = [];
   try { owned = (await getDocs(query(collection(db, 'clubs'), where('owner', '==', S.uid)))).docs.map((d) => [d.id, d.data().name]); } catch (e) {}
@@ -491,7 +508,7 @@ async function renderHome() {
     '<label class="rcl">추천 코드 <small>(선택 · 받은 링크로 들어왔으면 자동으로 채워져요)</small><input id="rc" maxlength="12" placeholder="예: K7P2QX" value="' + esc(refSaved()) + '"></label></section>' + DEMO_BTN + LEGAL + '</main>');
   bindDemoBtn();
   $('#out').onclick = () => signOut(auth);
-  if (S.email === OPERATOR) { $('main').insertAdjacentHTML('beforeend', '<button class="link" id="ops">운영자: 오류 기록 보기</button><button class="link" id="opf">운영자: 개발자 건의 보기</button>'); $('#ops').onclick = showErrs; $('#opf').onclick = showFeedback; }
+  if (S.email === OPERATOR) { $('main').insertAdjacentHTML('beforeend', '<button class="link" id="ops">운영자: 오류 기록 보기</button><button class="link" id="opf">운영자: 개발자 건의 보기</button><button class="link" id="opn">운영자: 앱 현황(팀 수)</button>'); $('#ops').onclick = showErrs; $('#opf').onclick = showFeedback; $('#opn').onclick = showNumbers; }
   document.querySelectorAll('[data-cdel]').forEach((b) => (b.onclick = () => (b.dataset.own === '1' ? deleteClub(b.dataset.cdel, all[b.dataset.cdel]) : leaveList(b.dataset.cdel, all[b.dataset.cdel]))));
   $('#mk').onclick = async () => {
     const name = $('#cn').value.trim(); if (!name) return toast('팀 이름을 넣어주세요');

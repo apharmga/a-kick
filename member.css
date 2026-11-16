@@ -513,3 +513,6 @@ body.noscroll #app{visibility:hidden}
 a.gmcard{display:flex;flex-direction:column;gap:3px;text-decoration:none;color:inherit;border:1px solid #C9D4F0}
 a.gmcard b{font-size:16px;color:#1E3A8A}
 a.gmcard span{font-size:13px;color:#64748B}
+.nrow{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 0;border-top:1px solid var(--line)}
+.nrow b{font-size:20px;text-align:right}
+.nrow small{grid-column:1/-1;color:var(--sub);font-size:12px}
