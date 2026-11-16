@@ -132,7 +132,7 @@ export function demoMatch() {
     ['p2', '범어FS', 3, '08:00', '범어 □□구장', '수성구', 2, 8000, '빡겜', '골키퍼', 11, 4, 0],
     ['p3', '퇴근풋살', 5, '21:00', '만촌 △△풋살', '수성구', 4, 10000, '즐겜', '무관', 0, 0, 0],
     ['p4', '달서FC', 2, '19:00', '달서 ◇◇풋살파크', '달서구', 2, 10000, '즐겜', '필드', 32, 21, 0]];
-  P.forEach(([id, club, d, time, place, r2, need, fee, mood, pos, games, got, okN]) => (st['gposts/' + id] = { cid: 'c_' + id, club, owner: 'o_' + id, gid: 'G', date: add(d), time, place, region1: '대구', region2: r2, need, fee, mood, pos, games, guestsGot: got, okN, status: 'open', firstOk: id !== 'p2', note: id === 'p1' ? '초보도 환영해요. 풋살화 필수, 조끼는 저희가 준비해요.' : '', refund: '하루 전까지 취소하면 환불', created: now }));
+  P.forEach(([id, club, d, time, place, r2, need, fee, mood, pos, games, got, okN]) => (st['gposts/' + id] = { cid: 'c_' + id, club, owner: 'o_' + id, gid: 'G', date: add(d), time, place, region1: '대구', region2: r2, need, fee, mood, pos, games, guestsGot: got, okN, status: 'open', fac: id === 'p1' ? ['park', 'vest', 'ball'] : id === 'p4' ? ['park', 'shoe', 'vest', 'shower', 'indoor'] : ['vest'], firstOk: id !== 'p2', note: id === 'p1' ? '초보도 환영해요. 풋살화 필수, 조끼는 저희가 준비해요.' : '', refund: '하루 전까지 취소하면 환불', created: now }));
   st['gposts/p1/priv/info'] = { account: '체험용 계좌 0000-00-0000000', contact: 'https://open.kakao.com/' };
   st['gapps/p1__demo-guest'] = { pid: 'p1', uid: 'demo-guest', owner: 'o_p1', cid: 'c_p1', name: '체험 게스트', payer: '체험게스트', state: 'ok', okAt: now - 36e5, at: now - 5 * 36e5 };
   st['gstats/demo-guest/log/a1'] = { v: 'a', cid: 'x', at: 0 };

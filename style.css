@@ -486,3 +486,4 @@ button.gchip{font:inherit;cursor:pointer}button.gchip:hover{border-color:var(--n
 label.ck{display:flex;gap:8px;align-items:center;font-size:13px;margin-top:10px}
 label.ck small{color:var(--sub)}
 .gmap .pill{padding:5px 10px;font-size:12px}
+.gmfac{flex-wrap:wrap}.gmfac button{flex:0 0 auto;padding:7px 10px}

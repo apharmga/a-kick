@@ -1859,6 +1859,8 @@ async function loadVenues(el, vs) {
    모집글(gposts) · 신청(gapps) · 참여 기록(gstats/{uid}/log)은 팀 밖 공용 공간에 둔다 (다른 모임 사람이 봐야 하니까).
    입금 계좌·연락처는 gposts/{pid}/priv 에 따로 → 수락된 사람만 읽음.
    서버가 없어서 기한 지남 정리 · 대기자 올리기는 총무 화면이 열릴 때 처리한다. */
+/* 구장 시설: 게스트가 고를 때 보는 정보 (모임마다 한 번 체크하면 다음 글에도 그대로) */
+const GM_FAC = [['park', '🅿️ 주차'], ['shoe', '👟 풋살화 대여'], ['vest', '🦺 조끼 제공'], ['ball', '⚽ 공 제공'], ['shower', '🚿 샤워실'], ['indoor', '🏠 실내']];
 const GM_REGIONS = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
 S.gm = { posts: {}, apps: [], stats: {}, open: '' };
 const gmPid = (gid) => CID + '_' + gid;
@@ -1915,12 +1917,14 @@ function gmForm(gid, p) {
   const g = S.games.find((x) => x.id === gid); if (!g) return;
   const total = attOf(g).length + C.guestNames(S.txs, g.id, attOf(g)).length, cap = g.cap || S.cfg.cap || 12;
   const F = p ? Object.assign({}, p) : { need: Math.max(1, Math.min(10, cap - total)), fee: S.cfg.guestFee || 10000, mood: '적당히', pos: '무관', firstOk: true, note: '', refund: '하루 전까지 취소하면 환불해 드려요',
-    region1: S.cfg.gmR1 || '대구', region2: S.cfg.gmR2 || '', place: S.cfg.place || '' };
+    region1: S.cfg.gmR1 || '대구', region2: S.cfg.gmR2 || '', place: S.cfg.place || '', fac: S.cfg.gmFac || [] };
+  F.fac = (F.fac || []).slice();
   const chips = (k, list) => '<div class="seg gmseg">' + list.map((v) => '<button type="button" data-' + k + '="' + v + '" class="' + (F[k] === v ? 'on' : '') + '">' + v + '</button>').join('') + '</div>';
   modal('<h2>🤝 ' + (p ? '모집글 고치기' : '게스트 모집 올리기') + '</h2><div class="muted">' + md(g.date) + ' (' + C.dayName(g.date) + ') ' + esc(g.time || S.cfg.time || '') + ' · 지금 ' + total + '명 · 정원 ' + cap + '명. 올리면 같은 지역 A-KICK 사용자에게 보여요.</div>' +
     '<div class="row"><label class="f">지역<select id="gr1">' + GM_REGIONS.map((r) => '<option' + (r === F.region1 ? ' selected' : '') + '>' + r + '</option>').join('') + '</select></label><label class="f">구·군<input id="gr2" maxlength="10" placeholder="예: 수성구" value="' + esc(F.region2) + '"></label></div>' +
     '<label class="f">구장<input id="gpl" maxlength="30" value="' + esc(F.place) + '"></label>' +
     '<div class="row"><label class="f">필요한 인원<input id="gnd" type="number" min="1" max="20" value="' + F.need + '"></label><label class="f">참가비 (원)<input id="gfe" type="number" min="0" step="1000" value="' + F.fee + '"></label></div>' +
+    '<div class="f">구장 시설 <small class="muted">(있는 것만 눌러주세요 · 게스트가 보고 골라요)</small><div class="seg gmseg gmfac">' + GM_FAC.map((f) => '<button type="button" data-fac="' + f[0] + '" class="' + (F.fac.indexOf(f[0]) >= 0 ? 'on' : '') + '">' + f[1] + '</button>').join('') + '</div></div>' +
     '<div class="f">분위기' + chips('mood', ['즐겜', '적당히', '빡겜']) + '</div><div class="f">포지션' + chips('pos', ['무관', '필드', '골키퍼']) + '</div>' +
     '<label class="f">한마디 (선택)<input id="gnt" maxlength="80" placeholder="예: 초보도 환영해요. 풋살화 필수" value="' + esc(F.note) + '"></label>' +
     '<label class="f">환불 규칙<input id="grf" maxlength="60" value="' + esc(F.refund) + '"></label>' +
@@ -1931,6 +1935,7 @@ function gmForm(gid, p) {
     '<div class="muted">게스트는 수락을 확인한 때부터 <b>3시간 안에 입금</b>해야 확정돼요. 기한이 지나면 자동 취소되고 대기자가 올라와요.</div>' +
     '<div class="mfoot"><span style="flex:1"></span><button class="btn" id="gx">취소</button><button class="btn pri" id="gok">' + (p ? '저장' : '모집 올리기') + '</button></div>', (m) => {
     ['mood', 'pos'].forEach((k) => m.querySelectorAll('[data-' + k + ']').forEach((b) => (b.onclick = () => { F[k] = b.dataset[k]; m.querySelectorAll('[data-' + k + ']').forEach((x) => x.classList.toggle('on', x === b)); })));
+    m.querySelectorAll('[data-fac]').forEach((b) => (b.onclick = () => { const k = b.dataset.fac, i = F.fac.indexOf(k); if (i >= 0) F.fac.splice(i, 1); else F.fac.push(k); b.classList.toggle('on', i < 0); }));
     m.querySelector('#gx').onclick = closeModal;
     m.querySelector('#gok').onclick = async () => {
       const v = (id) => m.querySelector(id).value.trim();
@@ -1940,13 +1945,13 @@ function gmForm(gid, p) {
       if (!v('#gpl')) return toast('구장 이름을 넣어주세요');
       const past = S.games.filter((x) => x.date < today() && !x.postponed);
       const data = { cid: CID, club: S.club.name, owner: S.uid, gid, date: g.date, time: g.time || S.cfg.time || '', place: v('#gpl'), region1: m.querySelector('#gr1').value, region2: v('#gr2'),
-        need, fee, mood: F.mood, pos: F.pos, firstOk: m.querySelector('#gfo').checked, note: v('#gnt'), refund: v('#grf'), status: p ? p.status : 'open', okN: p ? p.okN || 0 : 0,
+        need, fee, mood: F.mood, pos: F.pos, fac: GM_FAC.map((f) => f[0]).filter((k) => F.fac.indexOf(k) >= 0), firstOk: m.querySelector('#gfo').checked, note: v('#gnt'), refund: v('#grf'), status: p ? p.status : 'open', okN: p ? p.okN || 0 : 0,
         games: past.length, guestsGot: past.reduce((n, x) => n + C.guestNames(S.txs, x.id, attOf(x)).length, 0), created: p ? p.created : Date.now(), updated: Date.now() };
       const pid = gmPid(gid);
       try {
         await setDoc(doc(db, 'gposts', pid), data);
         await setDoc(doc(db, 'gposts', pid, 'priv', 'info'), { account: v('#gac'), contact: v('#gct') });
-        if (data.region1 !== S.cfg.gmR1 || data.region2 !== S.cfg.gmR2) { S.cfg.gmR1 = data.region1; S.cfg.gmR2 = data.region2; setDoc(D('config', 'main'), { gmR1: data.region1, gmR2: data.region2 }, { merge: true }).catch(() => {}); }
+        if (data.region1 !== S.cfg.gmR1 || data.region2 !== S.cfg.gmR2 || data.fac.join() !== (S.cfg.gmFac || []).join()) { S.cfg.gmR1 = data.region1; S.cfg.gmR2 = data.region2; S.cfg.gmFac = data.fac; setDoc(D('config', 'main'), { gmR1: data.region1, gmR2: data.region2, gmFac: data.fac }, { merge: true }).catch(() => {}); }
       } catch (e) { return toast('저장 실패: ' + e.message, 6000); }
       S.gm.posts[gid] = Object.assign({ id: pid }, data);
       if (DEMO) { S.gm.postList = S.gm.postList.filter((x) => x.gid !== gid).concat([S.gm.posts[gid]]); }

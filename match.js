@@ -43,8 +43,10 @@ let tT = null;
 function toast(m, ms) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(tT); tT = setTimeout(() => (t.hidden = true), ms || 2800); }
 const store = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 
+const FAC = { park: '🅿️ 주차', shoe: '👟 풋살화 대여', vest: '🦺 조끼 제공', ball: '⚽ 공 제공', shower: '🚿 샤워실', indoor: '🏠 실내' };
+const facOf = (p) => (p.fac || []).filter((k) => FAC[k]);
 export const REGIONS = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
-const S = { uid: '', name: '', posts: [], apps: {}, stats: null, region: store.get('akick_mregion', '대구'), when: 'all', mood: '', seg: 'g', blocked: [], loaded: false };
+const S = { uid: '', name: '', posts: [], apps: {}, stats: null, region: store.get('akick_mregion', '대구'), when: 'all', mood: '', need: [], seg: 'g', blocked: [], loaded: false };
 
 /* ---------- 기한 계산 (총무 화면과 같은 규칙) ---------- */
 const C = window.Core;
@@ -110,6 +112,7 @@ function filtered() {
   return S.posts.filter((p) => !p._old && p.status === 'open' && startOf(p) - 3 * H > now && S.blocked.indexOf(p.cid) < 0 && p.region1 === S.region)
     .filter((p) => S.when === 'all' || (S.when === 'week' && p.date <= weekEnd) || (S.when === 'sat' && wd(p.date) === 6) || (S.when === 'sun' && wd(p.date) === 0) || (S.when === 'night' && wd(p.date) > 0 && wd(p.date) < 6 && (p.time || '') >= '18:00'))
     .filter((p) => !S.mood || p.mood === S.mood)
+    .filter((p) => S.need.every((k) => facOf(p).indexOf(k) >= 0))
     .sort((a, b) => startOf(a) - startOf(b));
 }
 function dLabel(p) {
@@ -120,6 +123,7 @@ function postCard(p) {
   const [dl, dc] = dLabel(p), ok = p.okN || 0, a = S.apps[p.id];
   return '<button class="gc" data-p="' + esc(p.id) + '"><div class="t"><div><div class="when">' + md(p.date) + '(' + dayN(p.date) + ') ' + esc(p.time || '') + '</div><div class="where">' + esc(p.place || '') + ' · ' + esc(p.region2 || p.region1) + '</div></div><span class="' + dc + '">' + dl + '</span></div>' +
     '<div class="meta"><span class="pill need">' + Math.max(0, p.need - ok) + '명 구해요</span><span class="pill fee">' + won(p.fee) + '원</span><span class="pill">' + esc(p.mood || '') + '</span>' + (p.pos && p.pos !== '무관' ? '<span class="pill">' + esc(p.pos) + '</span>' : '') + (a ? '<span class="pill me">내 신청: ' + stateText(a, p) + '</span>' : '') + '</div>' +
+    (facOf(p).length ? '<div class="fac">' + facOf(p).map((k) => '<span>' + FAC[k] + '</span>').join('') + '</div>' : '') +
     '<div class="bar2"><i style="width:' + Math.min(100, Math.round((ok / Math.max(1, p.need)) * 100)) + '%"></i></div>' +
     '<div class="club"><span class="av">' + esc((p.club || '?')[0]) + '</span>' + esc(p.club || '') + ' · ' + (p.games ? '경기 ' + p.games + '회 진행' : '새 모임') + (p.guestsGot ? ' · 게스트 ' + p.guestsGot + '명 받음' : '') + '</div></button>';
 }
@@ -156,8 +160,9 @@ function render() {
     (S.seg !== 'g' ? '<div class="soon"><b>' + (S.seg === 'f' ? '구장 양도' : '팀 매칭') + '는 곧 열려요</b><p>게스트 매칭을 먼저 다듬고 이어서 열게요.</p></div>' :
       (S.uid ? myBox() : '<section class="login"><b>신청하려면 로그인하세요</b><p>구글 계정 하나면 돼요. 모임에 가입하지 않아도 신청할 수 있어요.</p><div id="lgbox"><button class="btn" id="in">구글로 시작하기</button></div></section>') +
       '<div class="flt">' + chip('when', 'all', '전체') + chip('when', 'week', '이번 주') + chip('when', 'sat', '토') + chip('when', 'sun', '일') + chip('when', 'night', '평일 저녁') + '</div>' +
+      '<div class="flt">' + ['park', 'shoe', 'vest', 'shower'].map((k) => '<button class="chip' + (S.need.indexOf(k) >= 0 ? ' on' : '') + '" data-need="' + k + '">' + FAC[k] + '</button>').join('') + '</div>' +
       '<div class="flt">' + chip('mood', '', '분위기 전체') + chip('mood', '즐겜', '즐겜') + chip('mood', '적당히', '적당히') + chip('mood', '빡겜', '빡겜') + '</div>' +
-      '<main class="bd">' + (list.length ? list.map(postCard).join('') : '<div class="empty"><b>' + esc(S.region) + '에 지금 올라온 모집이 없어요</b><p>총무라면 A-KICK 관리자 화면 → 이번 주 경기 → <b>🤝 게스트 모집</b>으로 올릴 수 있어요.</p></div>') + '</main>') +
+      '<main class="bd">' + (list.length ? list.map(postCard).join('') : '<div class="empty"><b>' + esc(S.region) + '에 ' + (S.need.length || S.mood || S.when !== 'all' ? '조건에 맞는' : '지금 올라온') + ' 모집이 없어요</b><p>총무라면 A-KICK 관리자 화면 → 이번 주 경기 → <b>🤝 게스트 모집</b>으로 올릴 수 있어요.</p></div>') + '</main>') +
     (S.uid && S.stats ? '<p class="mystat">내 기록: 게스트 참여 ' + S.stats.a + '회 · 노쇼 ' + S.stats.x + '회 · <button class="lnk" id="wipe">매칭 기록 지우기</button></p>' : ''));
   bind();
   const w = $('#wipe'); if (w) w.onclick = wipeMine;
@@ -166,6 +171,7 @@ function bind() {
   const rg = $('#rg'); if (rg) rg.onchange = () => { S.region = rg.value; store.set('akick_mregion', S.region); render(); };
   document.querySelectorAll('[data-seg]').forEach((b) => (b.onclick = () => { S.seg = b.dataset.seg; render(); }));
   document.querySelectorAll('[data-when]').forEach((b) => (b.onclick = () => { S.when = b.dataset.when; render(); }));
+  document.querySelectorAll('[data-need]').forEach((b) => (b.onclick = () => { const k = b.dataset.need, i = S.need.indexOf(k); if (i >= 0) S.need.splice(i, 1); else S.need.push(k); render(); }));
   document.querySelectorAll('[data-mood]').forEach((b) => (b.onclick = () => { S.mood = b.dataset.mood; render(); }));
   document.querySelectorAll('[data-p]').forEach((b) => (b.onclick = (e) => { if (e.target.closest('button[data-paid],button[data-conf],button[data-cancel]')) return; openPost(b.dataset.p); }));
   document.querySelectorAll('[data-paid]').forEach((b) => (b.onclick = () => paidClaim(b.dataset.paid)));
@@ -200,6 +206,7 @@ async function openPost(pid) {
     '<div class="meta"><span class="pill">' + Math.max(0, p.need - (p.okN || 0)) + '명 구해요</span><span class="pill">' + won(p.fee) + '원</span><span class="pill">' + esc(p.mood) + '</span><span class="pill">포지션 ' + esc(p.pos || '무관') + '</span></div></div>' +
     '<div class="card"><div class="lbl">이 모임은요</div><div class="kv"><span>모임</span><b>' + esc(p.club) + '</b></div>' + (p.style ? '<div class="kv"><span>방식</span><b>' + esc(p.style) + '</b></div>' : '') +
     '<div class="trust"><div><b>' + (p.games || 0) + '</b><span>진행한 경기</span></div><div><b>' + (p.guestsGot || 0) + '</b><span>받은 게스트</span></div><div><b>' + (p.need) + '</b><span>이번에 구하는 인원</span></div></div>' +
+    '<div class="kv"><span>구장 시설</span><b>' + (facOf(p).length ? facOf(p).map((k) => FAC[k]).join(' · ') : '정보 없음') + '</b></div>' +
     (p.note ? '<p class="note">' + esc(p.note) + '</p>' : '') + (p.refund ? '<p class="note"><b>환불 규칙</b> · ' + esc(p.refund) + '</p>' : '') + '</div>' +
     (ok ? '<div class="card okc"><div class="lbl">🎉 수락됐어요</div>' + (priv && priv.account ? '<div class="kv"><span>입금 계좌</span><b>' + esc(priv.account) + '</b></div><button class="sbtn" id="cpa">계좌 복사</button>' : '<p class="note">입금 계좌는 총무에게 물어봐 주세요.</p>') +
       (priv && priv.contact ? '<div class="kv"><span>총무 연락</span><b>' + (/^https?:\/\//.test(priv.contact) ? '<a href="' + esc(priv.contact) + '" target="_blank" rel="noopener">오픈채팅 열기</a>' : esc(priv.contact)) + '</b></div>' : '') +
