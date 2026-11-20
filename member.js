@@ -1461,7 +1461,7 @@ async function openRps() {
   sheet('<h2>✊✌️🖐️ 가위바위보</h2><div class="rstat"><div><span>보유 EXP</span><b>' + have.toLocaleString() + '</b></div><div><span>남은 판</span><b>' + left + '/5</b></div>' +
     '<div><span>오늘 승률</span><b>' + (me.w + me.l ? Math.round(me.w / (me.w + me.l) * 100) + '%' : '-') + '</b></div><div><span>오늘 결과</span><b class="' + (me.net < 0 ? 'n' : 'p') + '">' + (me.net > 0 ? '+' : '') + (me.net || 0) + '</b></div></div>' +
     '<div class="rvs"><div><small>' + esc(S.me.name) + '</small><i id="rme">❔</i></div><b class="vs">VS</b><div><small>킥봇</small><i id="rbot">❔</i></div></div><div class="rres" id="rres">' + (left > 0 ? '걸 EXP를 넣고 하나를 고르세요' : '오늘은 다 했어요. 내일 또 만나요!') + '</div>' +
-    '<label class="rbet">걸 EXP <input id="rbet" type="number" inputmode="numeric" min="1" max="100" value="' + Math.min(50, Math.max(1, have)) + '"><small>최대 100 · 비기면 횟수 그대로</small></label>' +
+    '<label class="rbet">걸 EXP <input id="rbet" type="number" inputmode="numeric" min="1" max="100" placeholder="1~100" value="' + rpsLastBet() + '"><small>최대 100 · 비기면 횟수 그대로</small></label>' +
     '<div class="rbtns">' + RPS.map(([k, e, l]) => '<button data-rps="' + k + '"' + (left > 0 && have > 0 ? '' : ' disabled') + '><i>' + e + '</i>' + l + '</button>').join('') + '</div>' +
     '<div class="rtop"><div><h3>🔥 오늘의 승부사</h3>' + (win.map((x, i) => row(x, i)).join('') || '<p class="muted">아직 없어요</p>') + '</div><div><h3>💧 오늘의 액땜</h3>' + (lose.map((x, i) => row(x, i, 1)).join('') || '<p class="muted">아직 없어요</p>') + '</div></div>' +
     '<div class="srow"><button id="rx">닫기</button></div>', (el) => {
@@ -1470,6 +1470,8 @@ async function openRps() {
     el.querySelectorAll('[data-rps]').forEach((b) => (b.onclick = () => rpsPlay(b.dataset.rps, el)));
   });
 }
+/** 처음엔 빈 칸, 그다음부터는 마지막에 건 EXP */
+function rpsLastBet() { try { return localStorage.getItem('akick_rpsbet') || ''; } catch (e) { return ''; } }
 let rpsBusy = false;
 async function rpsPlay(mine, el) {
   if (rpsBusy) return;
@@ -1478,6 +1480,7 @@ async function rpsPlay(mine, el) {
   if (me.n >= 5) return toast('오늘 5판을 다 했어요');
   if (bet < 1) return toast('걸 EXP를 넣어주세요');
   bet = Math.min(bet, 100, have);
+  try { localStorage.setItem('akick_rpsbet', String(bet)); } catch (e) {}   // 마지막에 건 숫자 기억
   rpsBusy = true; el.querySelectorAll('[data-rps]').forEach((b) => (b.disabled = true));
   const bot = RPS[crypto.getRandomValues(new Uint8Array(1))[0] % 3][0], E = (k) => RPS.find((x) => x[0] === k)[1];
   const bi = el.querySelector('#rbot'), last = me.n === 4, wait = (ms) => new Promise((r) => setTimeout(r, ms));
