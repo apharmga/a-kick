@@ -408,7 +408,7 @@ function gameHTML(g) {
   const att = attOf(g);
   const roster = activeAt(g.date).map((m) => m.name);
   att.forEach((n) => roster.indexOf(n) < 0 && roster.push(n));
-  const guests = gNames(g, att), free = splitNames(g.free);
+  const guests = gNames(g, att), free = freeOf(g);
   const total = att.length + guests.length;
   const status = sideTxt(total);
   if (g.postponed) return '<div class="game off"><div class="g-head"><b>' + md(g.date) + ' (' + C.dayName(g.date) + ') ' + esc(g.time || '') + '</b><span class="pp">' + esc(g.postponed) + '</span></div><div class="muted">이 경기는 열리지 않았어요. 출석·경기기록 계산에서 빠져요.</div></div>';
@@ -471,7 +471,7 @@ function bindWeek() {
   document.querySelectorAll('[data-gfree]').forEach((b) => (b.onclick = async () => {
     const g = S.games.find((x) => x.id === b.dataset.g), n = b.dataset.gfree;
     if (!g || !confirm(n + '님을 무료 게스트에서 뺄까요?')) return;
-    g.free = splitNames(g.free).filter((x) => x !== n); if (!g.free.length) delete g.free;
+    g.free = splitNames(g.free).filter((x) => x !== n && x + '(게)' !== n); if (!g.free.length) delete g.free;
     render(); await putGame(g); toast('뺐어요');
   }));
   document.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => quick(b.dataset.id, b.dataset.q)));
@@ -549,7 +549,8 @@ const putSkills = () => setDoc(D('private', 'skills'), { scores: scores(), bundl
 function scoreOf(n) { const v = scores()[n]; return v >= 1 && v <= 5 ? v : 3; }
 /** 게스트 = 입금 게스트 + 무료 게스트(g.free, 장부엔 안 남음) */
 const splitNames = (a) => [...new Set([].concat(a || []).flatMap((s) => String(s).split(/[,，、\/\n]+/)).map((s) => s.trim()).filter(Boolean))];
-function gNames(g, att) { const paid = C.guestNames(S.txs, g.id, att); return paid.concat(splitNames(g.free).filter((n) => att.indexOf(n) < 0 && paid.indexOf(n) < 0)); }
+const freeOf = (g) => splitNames(g.free).map((n) => (S.members.some((x) => x.name === n) ? n + '(게)' : n));
+function gNames(g, att) { const paid = C.guestNames(S.txs, g.id, att); return paid.concat(freeOf(g).filter((n) => att.indexOf(n) < 0 && paid.indexOf(n) < 0)); }
 function playersOf(g) { const a = attOf(g); return a.concat(gNames(g, a)); }
 
 function teamCost(T) {
@@ -1056,9 +1057,12 @@ function addManual() {
         read(); const gsel = m.querySelector('#mg').value, g = S.games.find((x) => x.id === gsel);
         if (!F.name) return toast('게스트 이름을 넣어주세요');
         if (!g) { m.querySelector('#mg').classList.add('need'); return toast('어느 경기 게스트인지 골라주세요', 5000); }
-        const have = playersOf(g), add = splitNames(F.name).filter((n) => have.indexOf(n) < 0);
+        // 회원과 이름이 같은 게스트(동명이인)는 '(게)'를 붙여 따로 관리 — 실력 점수가 회원 것과 섞이지 않게
+        const mem = (n) => S.members.some((x) => x.name === n), dup = splitNames(F.name).filter(mem);
+        if (dup.length && !confirm(dup.join(', ') + ' — 회원과 이름이 같아요.\n게스트는 ' + dup.map((n) => n + '(게)').join(', ') + '로 따로 저장할게요.')) return;
+        const have = playersOf(g), add = splitNames(F.name).map((n) => (mem(n) ? n + '(게)' : n)).filter((n) => have.indexOf(n) < 0);
         if (!add.length) return toast('이미 이 경기 인원에 있어요', 5000);
-        g.free = splitNames(g.free).concat(add); closeModal(); render(); await putGame(g);
+        g.free = freeOf(g).concat(add); closeModal(); render(); await putGame(g);
         return toast('저장했어요 · ' + md(g.date) + ' 경기 무료 게스트 ' + add.length + '명', 5000);
       }
       const x = prev(); if (!x) return toast('날짜·이름·금액을 넣어주세요');
