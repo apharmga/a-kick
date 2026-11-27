@@ -471,6 +471,7 @@ button.gchip{font:inherit;cursor:pointer}button.gchip:hover{border-color:var(--n
 /* 게스트 매칭 (총무) */
 .g-btns .gmb{grid-column:1/-1}
 .gml .chips{margin-top:6px}
+.gchip.free{background:#F0FDF4;border-color:#86EFAC;color:#15803D}.gchip.free small{font-size:10px;opacity:.8}
 .gchip.wait{background:#FFF7E6;border-color:#F5C451;color:#B45309}
 .warnt{color:var(--warn)}
 .gmseg{margin-top:6px}
